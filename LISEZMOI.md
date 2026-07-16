@@ -53,6 +53,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v27) — arrière-plans enrichis
+
+- **Sol synthwave** de retour et sublimé : une **grille en perspective** qui défile en bas de tous les écrans, avec un **horizon lumineux** (halo rose/violet) et des lignes **teintées du magenta (horizon) au cyan (près de toi)**, rendues en **lumière additive** pour un glow premium. Ça donne enfin un vrai « lieu » et de la profondeur à la scène.
+- **Fond plus profond** : dégradé de nuit retravaillé avec un **halo violet/cyan** qui monte du bas, en écho à l'horizon.
+- (Rappel v26 : nébuleuses colorées + étoiles teintées dans le champ d'étoiles.)
+
 ## Nouveautés (v26) — graphismes & textures enrichis
 
 - **Pièces 3D plus « premium »** : chaque cube du moteur voxel reçoit maintenant une **glaçure céramique** (dégradé clair→ombre), une **lumière du ciel** sur les faces tournées vers le haut et un **contraste** plus marqué — les squids/crabes/cœurs paraissent vernis et lisent mieux le volume. Visible partout (galerie du hub, flash de capture, victoire, menu).

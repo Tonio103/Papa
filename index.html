@@ -57,7 +57,8 @@
 html,body{ height:100%; }
 body{
   background:
-    radial-gradient(1100px 700px at 50% -10%, #191940 0%, var(--bg) 55%, #07071a 100%);
+    radial-gradient(1200px 760px at 50% -12%, #1d1d48 0%, #191940 42%, var(--bg) 66%, #06061a 100%),
+    radial-gradient(900px 520px at 50% 118%, rgba(96,64,255,.16), transparent 70%);
   color:var(--blanc);
   font-family:var(--f-term); font-size:22px; line-height:1.35;
   overflow:hidden; user-select:none; -webkit-user-select:none;
@@ -68,13 +69,16 @@ canvas{ image-rendering:pixelated; }
 body::before{
   content:""; position:fixed; inset:-22%; z-index:0; pointer-events:none;
   background:
-    radial-gradient(58% 48% at 18% 18%, rgba(255,46,136,.09), transparent 62%),
-    radial-gradient(50% 44% at 82% 28%, rgba(43,228,208,.08), transparent 62%),
-    radial-gradient(56% 50% at 50% 88%, rgba(96,64,255,.09), transparent 62%);
+    radial-gradient(52% 42% at 16% 14%, rgba(255,46,136,.11), transparent 60%),
+    radial-gradient(48% 42% at 84% 24%, rgba(43,228,208,.10), transparent 60%),
+    radial-gradient(60% 52% at 50% 92%, rgba(96,64,255,.12), transparent 62%),
+    radial-gradient(40% 34% at 78% 74%, rgba(255,46,136,.06), transparent 64%);
 }
 @media (prefers-reduced-motion: no-preference){
-  body::before{ animation:aurora 26s ease-in-out infinite alternate; }
-  @keyframes aurora{ to{ transform:translate(4%,-3%) scale(1.09) rotate(2deg); } }
+  body::before{ animation:aurora 30s ease-in-out infinite alternate; }
+  @keyframes aurora{
+    50%{ transform:translate(-3%,2%) scale(1.06); }
+    to{ transform:translate(4%,-3%) scale(1.1) rotate(2deg); } }
 }
 
 /* ── Champ d'étoiles (derrière tout) ──────────────────────── */
@@ -83,8 +87,9 @@ body::before{
 /* ── Sol en grille perspective (horizon synthwave) ────────── */
 #gridfloor{
   position:fixed; left:0; right:0; bottom:0; z-index:0; pointer-events:none;
-  -webkit-mask-image:linear-gradient(180deg, transparent, #000 45%);
-  mask-image:linear-gradient(180deg, transparent, #000 45%);
+  opacity:.85;
+  -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 16%, #000 88%, transparent 100%);
+  mask-image:linear-gradient(180deg, transparent 0, #000 16%, #000 88%, transparent 100%);
 }
 
 /* ── Cadre de borne d'arcade ──────────────────────────────── */
@@ -811,13 +816,19 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 
 body{
   background:
-    linear-gradient(180deg,#1a1b46 0%,#221a55 42%,#1a1740 74%,#0e1030 100%) !important;
+    radial-gradient(130% 62% at 50% 112%, rgba(128,66,210,.30), transparent 60%),
+    radial-gradient(90% 46% at 50% 116%, rgba(63,224,214,.12), transparent 60%),
+    linear-gradient(180deg,#191a48 0%,#221a55 40%,#181438 74%,#0a0b26 100%) !important;
   background-attachment:fixed !important;
   color:var(--ink); font-family:var(--f-term); font-weight:700;
   font-size:19px; line-height:1.4;
 }
-/* on garde le champ d'étoiles (joli sur fond nuit), on retire le reste */
-#gridfloor, #frame, #crt-on{ display:none !important; }
+/* on garde le champ d'étoiles + le sol synthwave (glow additif),
+   on retire le cadre d'arcade et les scanlines CRT */
+#frame, #crt-on{ display:none !important; }
+#gridfloor{ display:block !important; opacity:.6 !important; mix-blend-mode:screen;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 82%,transparent 100%) !important;
+  mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 82%,transparent 100%) !important; }
 body::after{                                    /* vignette douce (profondeur) */
   display:block !important;
   background:radial-gradient(ellipse at 50% 38%, transparent 52%, rgba(4,5,20,.5) 100%) !important;
@@ -3727,29 +3738,55 @@ function maybeTransmission(next){
   reduced ? draw(0) : requestAnimationFrame(draw);
 })();
 
-/* sol en grille : perspective + défilement (fond global) */
+/* sol synthwave : horizon lumineux + grille en perspective qui
+   défile, teintée du magenta (horizon) au cyan (près de toi) */
 (function gridFloor(){
   const cv = $("#gridfloor"), c = cv.getContext("2d");
-  const H = 190;
+  const H = 240, HOR = 34;                    // hauteur du canvas, ligne d'horizon
   function size(){ cv.width = innerWidth; cv.height = H; }
   size(); addEventListener("resize", size);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let off = 0;
+  /* couleur d'une ligne selon sa profondeur p (0 horizon → 1 près) */
+  const lineCol = (p, a)=>{
+    const r = Math.round(255*(1-p) + 43*p);
+    const g = Math.round(46*(1-p) + 228*p);
+    const b = Math.round(136*(1-p) + 208*p);
+    return `rgba(${r},${g},${b},${a})`;
+  };
   function draw(){
     const W = cv.width;
     c.clearRect(0, 0, W, H);
-    c.strokeStyle = "rgba(43,228,208,.22)"; c.lineWidth = 1;
-    for(let i=-9; i<=9; i++){
-      c.beginPath(); c.moveTo(W/2 + i*26, 0); c.lineTo(W/2 + i*W*0.5, H); c.stroke();
+
+    /* halo d'horizon : brume rose/cyan qui émerge du bas de l'écran */
+    const bloom = c.createLinearGradient(0, HOR-28, 0, HOR+70);
+    bloom.addColorStop(0, "rgba(255,46,136,0)");
+    bloom.addColorStop(.4, "rgba(255,46,136,.16)");
+    bloom.addColorStop(.62, "rgba(120,90,255,.10)");
+    bloom.addColorStop(1, "rgba(43,228,208,0)");
+    c.fillStyle = bloom; c.fillRect(0, HOR-28, W, 98);
+    /* la ligne d'horizon elle-même, nette et brillante */
+    c.fillStyle = "rgba(255,120,200,.5)"; c.fillRect(0, HOR, W, 2);
+    c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(0, HOR, W, 1);
+
+    /* fuyantes verticales : convergent vers le point de fuite */
+    for(let i=-11; i<=11; i++){
+      c.strokeStyle = lineCol(0, .16 + Math.abs(i)/11*.06);
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(W/2 + i*14, HOR);
+      c.lineTo(W/2 + i*W*0.62, H);
+      c.stroke();
     }
-    for(let k=0; k<11; k++){
-      const p = ((k + off) % 11) / 11;
-      const y = Math.pow(p, 2.3) * H;
-      c.globalAlpha = .1 + p*.55;
+    /* horizontales qui défilent vers toi, teinte + éclat croissants */
+    for(let k=0; k<13; k++){
+      const p = ((k + off) % 13) / 13;
+      const y = HOR + Math.pow(p, 2.2) * (H - HOR);
+      c.strokeStyle = lineCol(p, .12 + p*.6);
+      c.lineWidth = p > .72 ? 1.6 : 1;
       c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
     }
-    c.globalAlpha = 1;
-    if(!reduced){ off += 0.012; requestAnimationFrame(draw); }
+    if(!reduced){ off += 0.014; requestAnimationFrame(draw); }
   }
   draw();
 })();
