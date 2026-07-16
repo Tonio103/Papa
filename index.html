@@ -352,6 +352,14 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   #cam-frame{ animation:framePulse 1.7s ease-in-out infinite; }
   @keyframes framePulse{ 50%{ border-color:rgba(43,228,208,.35);
     box-shadow:0 0 0 1000px rgba(0,0,0,.4), 0 0 6px rgba(43,228,208,.2); } }
+  /* ligne de balayage : le scanner "cherche" visiblement */
+  #cam-wrap::after{
+    content:""; position:absolute; left:0; right:0; top:0; height:30%;
+    background:linear-gradient(180deg, transparent,
+      rgba(43,228,208,.14) 80%, rgba(43,228,208,.5));
+    animation:scanline 2.4s linear infinite; pointer-events:none;
+  }
+  @keyframes scanline{ from{ transform:translateY(-100%); } to{ transform:translateY(340%); } }
 }
 #manual{ display:flex; gap:8px; margin-top:14px; }
 #manual input{
@@ -425,6 +433,20 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 /* ── Intro / boot ─────────────────────────────────────────── */
 #boot-screen{ overflow:hidden; }
 #boot3d{ position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+/* ── Cinématique d'intro ──────────────────────────────────── */
+#cine-screen{ background:#04040e; overflow:hidden; }
+#cine-cv{ position:absolute; inset:0; width:100%; height:100%; }
+#cine-sub{ position:absolute; left:0; right:0; bottom:13%; z-index:2;
+  text-align:center; font-size:clamp(19px, 5.4vw, 24px); color:var(--blanc);
+  padding:0 30px; white-space:pre-line; min-height:64px; pointer-events:none;
+  text-shadow:0 2px 8px rgba(0,0,0,.95), 0 0 22px rgba(0,0,0,.7);
+  transition:opacity .4s; }
+#cine-skip{ position:absolute; right:14px; top:14px; z-index:3;
+  font-size:10px; padding:10px 14px; opacity:.85; }
+#boot-ribbon{ text-align:center; font-size:9px; color:#3a2a06; margin:12px auto 0;
+  width:max-content; padding:6px 16px; letter-spacing:2px;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d); border-radius:99px;
+  box-shadow:0 3px 0 #b8791a, 0 6px 14px rgba(0,0,0,.4), 0 0 18px rgba(255,206,77,.35); }
 #boot-ui{ position:relative; z-index:2; }
 #boot-screen::before{
   content:""; position:absolute; inset:0; z-index:1; pointer-events:none;
@@ -993,14 +1015,23 @@ button:disabled{ color:#7683ad;
   <canvas id="boot3d"></canvas>
   <div class="screen-inner" id="boot-ui">
     <h1>L'INVASION<br>DES VANS</h1>
+    <div id="boot-ribbon" class="pix">✦ ÉDITION LES VANS ✦</div>
     <div id="boot-txt" class="cursor"></div>
     <div id="attract"></div>
     <div id="hi-line" class="pix" style="font-size:10px; color:var(--gris); text-align:center; min-height:14px;"></div>
     <div class="btn-row">
       <button id="btn-start">▶ Appuyer pour démarrer</button>
+      <button id="btn-newgame" class="b3" hidden>✦ Nouvelle partie (voir l'intro)</button>
     </div>
     <div class="pix" style="font-size:8px; color:#3c3c66; text-align:center; margin-top:14px;">© 2026 INVADER CORP — LES VANS</div>
   </div>
+</section>
+
+<!-- ═══ ÉCRAN 1bis : CINÉMATIQUE D'INTRO ═══ -->
+<section id="cine-screen" class="screen">
+  <canvas id="cine-cv"></canvas>
+  <div id="cine-sub"></div>
+  <button id="cine-skip" class="b3" hidden>Passer ►</button>
 </section>
 
 <!-- ═══ ÉCRAN 2 : HUB ═══ -->
@@ -1026,6 +1057,7 @@ button:disabled{ color:#7683ad;
     </div>
 
     <div id="quest"></div>
+    <div id="quest-next" class="dim" style="font-size:17px; text-align:center; margin-top:7px; min-height:22px;"></div>
     <h2>Code final</h2>
     <div id="frags"></div>
     <p class="sub">Chaque défi réussi révèle un chiffre.</p>
@@ -1162,6 +1194,11 @@ const CONFIG = {
   // secours si un QR est perdu, arraché ou illisible au soleil.
   codeTriche: "ULYSSE",                 // À PERSONNALISER
 
+  // Code secret de remise à zéro : tapé dans la saisie manuelle du
+  // scanner, il efface toute la progression (avec double confirmation)
+  // et relance le jeu depuis le début — cinématique comprise.
+  codeReset: "0000",                    // À PERSONNALISER
+
   credits: "Conçu, codé et mosaïqué\nà la main, rien que pour toi.\n\n— A.",   // À PERSONNALISER
 
   // 8 stations. fragment = le chiffre révélé par le défi.
@@ -1178,12 +1215,12 @@ const CONFIG = {
       indice:"Résous d'abord la ligne du haut, elle ne bougera plus." },
     { code:"LV_05", nom:"Le Simon",      points:50,  fragment:"2", sprite:"crab",   couleur:"#2BE4D0",
       indice:"Jouez à deux : un qui chante les couleurs à voix haute, un qui appuie." },
-    { code:"LV_06", nom:"L'Arcade",      points:70,  fragment:"0", sprite:"octo",   couleur:"#FFD23F",
-      indice:"Ne tire QUE sur les aliens magenta. Les survivants dessinent la réponse." },
+    { code:"LV_06", nom:"La Cavale",     points:70,  fragment:"0", sprite:"octo",   couleur:"#FFD23F",
+      indice:"Appuie pour sauter, RESTE APPUYÉ pour sauter plus haut. Sur l'échelle : grimpe en tapant, mais fige-toi quand le projecteur arrive." },
     { code:"LV_07", nom:"La Coop",       points:90,  fragment:"2", sprite:"crab",   couleur:"#FF2E88",
       indice:"Séparez-vous. Vous avez 60 secondes entre les deux scans." },
-    { code:"LV_08", nom:"Le Portrait",   points:100, fragment:"6", sprite:"heart",  couleur:"#FFD23F",
-      indice:"Regarde bien qui se dessine…" },
+    { code:"LV_08", nom:"Le Pochoir",    points:100, fragment:"6", sprite:"heart",  couleur:"#FFD23F",
+      indice:"Balaie toute la découpe avec la bombe, couche après couche… et regarde bien qui se dessine." },
   ],
 
   delaiIndiceMs: 4*60*1000,   // INDICE apparaît après 4 min
@@ -1383,6 +1420,11 @@ const AudioFX = (()=>{
     lock(){ note({f:660, f2:330, d:.12, type:"triangle", v:.28}); note({f:1320, d:.06, type:"sine", v:.12, when:.11}); },
     /* pixel qui se pose (révélation du portrait) */
     pixel(f){ note({f, d:.09, type:"triangle", v:.13}); },
+    /* pschitt de bombe de peinture (pochoir) */
+    spray(){ noise({d:.13, v:.08, from:6500, to:4200}); },
+    /* bille qui claque quand on secoue la bombe */
+    clack(){ note({f:2400, f2:1700, d:.03, type:"square", v:.16});
+             note({f:2200, f2:1500, d:.03, type:"square", v:.14, when:.11}); },
     /* allumage de la machine : balayage montant + accord */
     powerOn(){
       note({f:110, f2:880, d:.55, type:"triangle", v:.24});
@@ -2025,7 +2067,10 @@ function renderPlayerCard(){
   const t = totalStars();
   const idx = rankIndex(t);
   const rank = RANKS[idx], next = RANKS[idx+1] || null;
-  $("#pc-hello").textContent = "Agent " + CONFIG.joueur;
+  /* l'accueil suit l'heure de la chasse */
+  const hh = new Date().getHours();
+  const salut = hh < 6 ? "Chasse de nuit" : hh < 12 ? "Bonjour" : hh < 18 ? "Bonne chasse" : "Bonsoir";
+  $("#pc-hello").textContent = `${salut}, agent ${CONFIG.joueur}`;
   const rk = $("#pc-rank");
   rk.textContent = rank.nom;
   rk.style.color = rank.couleur;
@@ -2076,6 +2121,17 @@ function renderHub(){
     s.className = "qseg" + (S.done[st.code] ? " done" : S.flashed[st.code] ? " half" : "");
     q.appendChild(s);
   });
+  /* le prochain objectif, toujours affiché : personne ne se demande "et maintenant ?" */
+  const qn = $("#quest-next");
+  if(qn){
+    const pending = CONFIG.stations.find(st=>S.flashed[st.code] && !S.done[st.code]);
+    const unflashed = CONFIG.stations.find(st=>!S.flashed[st.code]);
+    qn.innerHTML = pending
+      ? `Défi en attente : <b style="color:var(--jaune)">${pending.code} — ${pending.nom}</b>`
+      : unflashed
+      ? `Prochaine pièce à trouver : <b style="color:var(--cyan)">${unflashed.code} — ${unflashed.nom}</b>`
+      : `Toutes les pièces sont à toi — <b style="color:var(--jaune)">entre le code final !</b>`;
+  }
 
   // fragments
   const fr = $("#frags"); fr.innerHTML="";
@@ -2114,9 +2170,19 @@ function renderHub(){
       card.style.cursor = "pointer";
       card.addEventListener("click", ()=>{ AudioFX.select(); startGame(st); });
     }else{
+      /* pièce non trouvée : une silhouette dans l'ombre — le teasing
+         donne plus envie qu'un simple "???" */
       card.innerHTML = `<div class="card-top locked">${st.code}</div>
-                        <div class="card-win"><span class="myst">???</span></div>
+                        <div class="card-win" style="position:relative;"></div>
                         <span class="pts">${st.points} PTS</span>`;
+      const cvL = document.createElement("canvas");
+      cvL.width = 150; cvL.height = 122;
+      cvL.style.cssText = "width:75px;height:61px;opacity:.55;filter:brightness(.5);";
+      const win = card.querySelector(".card-win");
+      win.appendChild(cvL);
+      Voxel.draw(cvL, st.sprite, "#2b2b52", .5, -.3, { cam:{ scale:11, focal:11, dist:7 } });
+      win.insertAdjacentHTML("beforeend",
+        `<span class="myst" style="position:absolute; font-size:17px;">?</span>`);
     }
     g.appendChild(card);
   });
@@ -2172,9 +2238,28 @@ const Scanner = (()=>{
 /* Un code arrive (QR ou clavier) → on décide.
    codeInterceptor : un mini-jeu peut capter les codes (ex : coop LV_07). */
 let codeInterceptor = null;
+let resetArmedScan = false, resetArmTimer = null;
 function handleCode(raw){
   const code = String(raw).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"");
   if(codeInterceptor && codeInterceptor(code)){ restartScanSoon(); return; }
+  /* code secret de remise à zéro → double confirmation puis reload */
+  if(CONFIG.codeReset && code === CONFIG.codeReset.toUpperCase()){
+    if(resetArmedScan){
+      clearTimeout(resetArmTimer);
+      Store.reset();
+      AudioFX.boom();
+      Scanner.msg("PARTIE EFFACÉE — REDÉMARRAGE…");
+      setTimeout(()=>location.reload(), 700);
+      return;
+    }
+    resetArmedScan = true;
+    AudioFX.err();
+    Scanner.msg("⚠ TOUT EFFACER ? RETAPE LE CODE", true);
+    clearTimeout(resetArmTimer);
+    resetArmTimer = setTimeout(()=>{ resetArmedScan = false; }, 6000);
+    restartScanSoon();
+    return;
+  }
   /* code secret → débloque la prochaine pièce verrouillée */
   if(code === CONFIG.codeTriche.toUpperCase()){
     const next = CONFIG.stations.find(s=>!S.flashed[s.code]);
@@ -2398,6 +2483,7 @@ const Menu3D = (()=>{
     { id:"help",    label:"COMMENT JOUER", tint:"#EDEDF7" },
     { id:"succes",  label:"SUCCÈS",        tint:"#FFD23F" },
     { id:"msgs",    label:"TRANSMISSIONS", tint:"#FF2E88" },
+    { id:"cine",    label:"REVOIR L'INTRO", tint:"#4db8ff" },
     { id:"credits", label:"CRÉDITS",       tint:"#EDEDF7" },
     { id:"reset",   label:"RECOMMENCER",   tint:"#FF3F3F" },
   ];
@@ -2483,6 +2569,7 @@ const Menu3D = (()=>{
       case "help":   panel(menuHelpHTML()); break;
       case "succes": panel(succesHTML()); break;
       case "msgs":   panel(msgsHTML()); break;
+      case "cine":   stop(); Cinematic.play(()=>{ renderHub(); show("hub-screen"); }); break;
       case "credits":panel(creditsHTML()); break;
       case "reset":
         if(resetArmed){ Store.reset(); location.reload(); return; }
@@ -2726,6 +2813,345 @@ function fireworks(){
 }
 
 /* ═══════════════════════════════════════════════════════════
+   12bis. CINÉMATIQUE D'INTRO — ~75 s en 6 plans, tout dessiné
+   (la nuit, l'artiste, la pose, l'aube, le radar, la mission).
+   Skippable après 3,5 s. Jouée au premier démarrage, puis
+   revisible depuis le menu (« REVOIR L'INTRO »).
+   ─────────────────────────────────────────────────────────── */
+const Cinematic = (()=>{
+  let raf = null, guard = null, doneCb = null, t0 = 0, ended = false;
+  let cv, c, subEl, skipBt, W = 0, H = 0, dpr = 1;
+  let stars = [], cityFar = [], cityNear = [], mist = [], blips = [];
+  const fired = {};
+  const once = (k, fn)=>{ if(!fired[k]){ fired[k] = true; fn(); } };
+  const ease = k=>k*k*(3-2*k);
+
+  /* ── petits acteurs ── */
+  function buildCity(n, hMin, hMax){
+    const out = []; let x = 0;
+    while(x < 1.4){                                   // en fractions d'écran
+      const bw = .06 + Math.random()*.09, bh = hMin + Math.random()*(hMax - hMin);
+      const wins = [];
+      for(let wy=.06; wy<bh-.03; wy+=.05) for(let wx=.012; wx<bw-.02; wx+=.022)
+        if(Math.random()<.14) wins.push([wx, wy]);
+      out.push({ x, w:bw, h:bh, wins, ant: Math.random()<.4 });
+      x += bw + .008;
+    }
+    return out;
+  }
+  function drawCity(list, base, k, col, winA, pan){
+    list.forEach(b=>{
+      const bx = (b.x - pan)*W, bw = b.w*W, bh = b.h*H*k;
+      c.fillStyle = col;
+      c.fillRect(bx, base - bh, bw, bh);
+      if(b.ant) c.fillRect(bx + bw/2 - 2, base - bh - H*.02, 3, H*.02);
+      c.fillStyle = `rgba(255,216,138,${winA})`;
+      b.wins.forEach(([wx,wy])=>{
+        if(wy < b.h*k) c.fillRect(bx + wx*W, base - bh + wy*H, 4, 6);
+      });
+    });
+  }
+  function drawSky(top, bottom, moonA, moonY){
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, top); g.addColorStop(1, bottom);
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    stars.forEach(s=>{
+      c.globalAlpha = (.3 + Math.sin(performance.now()/700 + s[3])*.25)*moonA;
+      c.fillStyle = "#dfe6ff"; c.fillRect(s[0]*W, s[1]*H, s[2], s[2]);
+    });
+    c.globalAlpha = moonA;
+    c.save();
+    c.shadowColor = "rgba(244,240,214,.9)"; c.shadowBlur = 30;
+    c.fillStyle = "#f4f0d6";
+    c.beginPath(); c.arc(W*.74, H*(moonY != null ? moonY : .16), Math.min(W,H)*.05, 0, 7); c.fill();
+    c.restore();
+    c.globalAlpha = 1;
+  }
+  /* le personnage à capuche, vue de côté (face=1 → vers la droite) */
+  function perso(x, y, s, pose, t, face){
+    c.save(); c.translate(x, y); c.scale(s*(face||1), s);
+    const P4 = Math.floor(t*(pose==="run" ? 11 : 6)) % 4;
+    const LEGS = {
+      run:  [ [[-7,13],[4,11]], [[-3,14],[1,14]], [[3,11],[-6,13]], [[-1,14],[-1,14]] ][P4],
+      walk: [ [[-5,13],[2,12]], [[-2,14],[0,14]], [[1,12],[-4,13]], [[-1,14],[-1,14]] ][P4],
+      stand:[[-4,14],[2,14]], spray:[[-4,14],[2,14]],
+    }[pose];
+    LEGS.forEach(([lx,lh])=>{
+      c.fillStyle = "#20204a"; c.fillRect(lx, -lh, 5, lh);
+      c.fillStyle = "#EDEDF7"; c.fillRect(lx-1, -3, 7, 3);
+    });
+    for(let i=0;i<4;i++){                              // écharpe
+      c.fillStyle = `rgba(43,228,208,${.8 - i*.18})`;
+      c.fillRect(-11 - i*4, -34 + Math.sin(t*12 + i)*2.4, 4, 3);
+    }
+    c.fillStyle = "#d5155f"; c.fillRect(-13, -28, 6, 13);   // sac
+    c.fillStyle = "#2c2c5c"; c.fillRect(-8, -31, 16, 19);   // torse
+    c.fillStyle = "#2BE4D0"; c.fillRect(-1, -30, 2, 17);
+    if(pose === "spray"){                              // bras levé + bombe
+      const sh = Math.sin(t*9)*2;
+      c.fillStyle = "#252550"; c.fillRect(4, -34 + sh, 11, 4);
+      c.fillStyle = "#FFD23F"; c.fillRect(14, -38 + sh, 6, 9);
+      c.fillStyle = "#EDEDF7"; c.fillRect(15, -41 + sh, 4, 3);
+    }else{
+      const ax = pose === "stand" ? 0 : [2,0,-2,0][P4];
+      c.fillStyle = "#252550"; c.fillRect(ax, -27, 4, 11);
+      c.fillStyle = "#FFD23F"; c.fillRect(ax+1, -17, 5, 7);
+    }
+    c.fillStyle = "#2c2c5c"; c.fillRect(-6, -43, 14, 13);   // capuche
+    c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(-6, -43, 14, 2);
+    c.fillStyle = "#e8b98a"; c.fillRect(3, -40, 5, 8);
+    c.fillStyle = "#0B0B1E"; c.fillRect(6, -38, 2, 2);
+    c.restore();
+  }
+  /* une mosaïque : n premières tesselles de la forme */
+  function mosaic(shapeName, col, x, y, cs, n){
+    const shape = SHAPES[shapeName];
+    let i = 0;
+    shape.forEach((row, gy)=>[...row].forEach((ch, gx)=>{
+      if(ch === "." || ch === " ") return;
+      if(i++ >= n) return;
+      const X = x + gx*cs, Y = y + gy*cs;
+      c.fillStyle = shade(col, ((gx*7+gy*13)%5-2)*.04);
+      c.fillRect(X, Y, cs-1, cs-1);
+      c.fillStyle = "rgba(255,255,255,.3)"; c.fillRect(X, Y, cs-1, 2);
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(X, Y+cs-3, cs-1, 2);
+    }));
+  }
+  const cells = shapeName=>{
+    let n = 0; SHAPES[shapeName].forEach(r=>[...r].forEach(ch=>{ if(ch!=="."&&ch!==" ") n++; }));
+    return n;
+  };
+
+  /* ── les 6 plans : d = durée (s), subs = [[t, texte]] ── */
+  const SCENES = [
+    { d:12, subs:[[1.2,"Les Vans, Ardèche.\n3 heures du matin."],[7,"La ville dort."]],
+      draw(t, p){
+        drawSky("#07071c", "#141433", 1);
+        drawCity(cityFar,  H*.74, .55, "#10102a", .30, .02 + p*.05);
+        drawCity(cityNear, H*.80, .85, "#181838", .45, .04 + p*.09);
+        c.fillStyle = "#0d0d22"; c.fillRect(0, H*.80, W, H);
+        c.globalAlpha = Math.min(1, t/1.6); c.globalCompositeOperation = "destination-in";
+        c.fillRect(0, 0, W, H); c.globalCompositeOperation = "source-over"; c.globalAlpha = 1;
+      } },
+    { d:14, subs:[[1.5,"Quelqu'un ne dort pas."],[8.5,"Personne ne l'a jamais vu.\nPersonne ne connaît son nom."]],
+      draw(t, p){
+        drawSky("#08081e", "#10102a", 1);
+        drawCity(cityFar, H*.42, .4, "#0e0e26", .25, .06);
+        c.fillStyle = "#1d1a36"; c.fillRect(0, H*.42, W, H*.36);       // le mur
+        c.fillStyle = "rgba(0,0,0,.18)";
+        for(let y=H*.42; y<H*.78; y+=14){
+          const sh = Math.round(y/14)%2 ? 16 : 0;
+          for(let x=-32; x<W; x+=32) c.fillRect(x+sh, y, 30, 12);
+        }
+        c.fillStyle = "#0d0d22"; c.fillRect(0, H*.78, W, H);
+        const lx = W*.68;                                              // réverbère
+        c.fillStyle = "#33335e"; c.fillRect(lx, H*.42, 5, H*.36);
+        c.fillRect(lx, H*.42, 18, 4);
+        c.fillStyle = "#ffe096"; c.fillRect(lx+12, H*.425, 9, 6);
+        const gl = c.createRadialGradient(lx+16, H*.44, 6, lx+16, H*.44, H*.3);
+        gl.addColorStop(0, "rgba(255,224,150,.22)"); gl.addColorStop(1, "rgba(255,224,150,0)");
+        c.fillStyle = gl; c.beginPath(); c.arc(lx+16, H*.44, H*.3, 0, 7); c.fill();
+        /* il arrive, s'arrête sous la lampe, sort sa bombe */
+        const walkEnd = .52;
+        const px = p < walkEnd ? (-.1 + (p/walkEnd)*.62)*W : W*.52;
+        perso(px, H*.78, Math.min(W,H)/230, p < walkEnd ? "walk" : "stand", t, 1);
+        if(p >= walkEnd && p < .8){                                    // il vérifie…
+          c.fillStyle = "#EDEDF7"; c.font = `bold ${Math.round(W*.05)}px 'Baloo 2', sans-serif`;
+          if(Math.floor(t*2)%2) c.fillText("…", px + 14, H*.78 - Math.min(W,H)/230*52);
+        }
+        if(p >= .8) once("s2clack", ()=>AudioFX.clack());
+      } },
+    { d:18, subs:[[1,"Cette nuit-là…"],[10.5,"…il a signé\nsa plus grande tournée."]],
+      draw(t, p){
+        drawSky("#08081e", "#0e0e26", .8, .075);
+        c.fillStyle = "#1d1a36"; c.fillRect(0, H*.16, W, H*.62);
+        c.fillStyle = "rgba(0,0,0,.18)";
+        for(let y=H*.16; y<H*.78; y+=15){
+          const sh = Math.round(y/15)%2 ? 17 : 0;
+          for(let x=-34; x<W; x+=34) c.fillRect(x+sh, y, 32, 13);
+        }
+        c.fillStyle = "#0d0d22"; c.fillRect(0, H*.78, W, H);
+        const glo = c.createRadialGradient(W*.42, H*.2, 10, W*.42, H*.2, H*.5);
+        glo.addColorStop(0, "rgba(255,224,150,.13)"); glo.addColorStop(1, "rgba(255,224,150,0)");
+        c.fillStyle = glo; c.fillRect(0, 0, W, H);
+        /* la pièce apparaît tesselle par tesselle, à hauteur de bras */
+        const total = cells("squid");
+        const cs = Math.min(W*.4/8, H*.3/8);
+        const mx = W*.5 - cs*8 - 14, my = H*.78 - 46 - cs*8;
+        const n = t < 1 ? 0 : Math.min(total, Math.floor((t-1)/9.5*total));
+        mosaic("squid", "#2BE4D0", mx, my, cs, n);
+        if(n > 0 && n < total){
+          once("c"+n, ()=>{ if(n%2) AudioFX.spray(); else AudioFX.pixel(500 + (n%8)*70); });
+          const cx2 = mx + (n%8)*cs, cy2 = my + Math.floor(n/8)*cs;
+          for(let i=0;i<2;i++) mist.push({ x:cx2, y:cy2, vx:(Math.random()-.5)*1.4,
+            vy:-(.3+Math.random()), life:12, col:"#2BE4D0" });
+        }
+        if(t >= 12) once("sign", ()=>AudioFX.spray());
+        if(t >= 12){
+          c.globalAlpha = Math.min(1, (t-12)/.8);
+          c.fillStyle = "#2BE4D0"; c.font = `italic bold ${Math.round(cs*1.2)}px 'Baloo 2', sans-serif`;
+          c.fillText("A.", mx + cs*8 - 8, my + cs*8 + cs*1.4);
+          c.globalAlpha = 1;
+        }
+        /* l'artiste : il bombe, puis il file */
+        if(p < .82){
+          perso(mx + cs*8 + 46, H*.78, Math.min(W,H)/210, t < 12.5 ? "spray" : "stand", t, -1);
+        }else{
+          const run = (p - .82)/.18;
+          once("s3run", ()=>AudioFX.whoosh());
+          perso(mx + cs*8 + 46 + run*W*.6, H*.78, Math.min(W,H)/210, "run", t, 1);
+        }
+        mist.forEach(m=>{ m.x += m.vx; m.y += m.vy; m.life--; });
+        mist = mist.filter(m=>m.life > 0);
+        c.globalCompositeOperation = "lighter";
+        mist.forEach(m=>{
+          c.globalAlpha = Math.min(.3, m.life/30); c.fillStyle = m.col;
+          c.beginPath(); c.arc(m.x, m.y, 5, 0, 7); c.fill();
+        });
+        c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+      } },
+    { d:12, subs:[[1.5,"Au matin, HUIT pièces\nbrillaient sur les murs."],[8,"Huit défis.\nHuit fragments d'un code."]],
+      draw(t, p){
+        const q = ease(Math.min(1, p*1.6));
+        drawSky(q<.5 ? "#241d4e" : "#3a2c60", "#c96a4e", 1 - q*.8);   // l'aube monte
+        const sun = c.createRadialGradient(W*.3, H*.8, 8, W*.3, H*.8, H*.55);
+        sun.addColorStop(0, `rgba(255,170,90,${.35*q})`); sun.addColorStop(1, "rgba(255,170,90,0)");
+        c.fillStyle = sun; c.fillRect(0, 0, W, H);
+        drawCity(cityFar, H*.72, .5, "#1a1430", .12, .03);
+        c.fillStyle = "#251d3e"; c.fillRect(0, H*.72, W, H);
+        /* trois pièces déjà posées défilent doucement */
+        const cs = Math.min(W, H)*.022;
+        [["crab","#FF2E88",.16],["octo","#FFD23F",.46],["heart","#FF3F3F",.76]].forEach(([sp,col,fx],i)=>{
+          const bx = (fx - p*.06)*W;
+          c.fillStyle = "#1d1a36"; c.fillRect(bx - 14, H*.50, cs*12 + 28, H*.22);
+          mosaic(sp, col, bx, H*.54, cs, 999);
+        });
+        once("s4", ()=>AudioFX.fragment());
+        /* les pigeons du matin */
+        for(let i=0;i<3;i++){
+          const bx2 = ((p*1.4 + i*.3)%1.2)*W, by2 = H*(.2 + i*.06) + Math.sin(t*3 + i)*6;
+          c.fillStyle = "#0d0d22";
+          const wing = Math.sin(t*10 + i) > 0 ? -3 : 2;
+          c.fillRect(bx2, by2, 7, 3); c.fillRect(bx2 + 1, by2 + wing, 5, 2);
+        }
+      } },
+    { d:12, subs:[[2,"Signal capté aux Vans."],[6.5,"Une seule personne\npeut les retrouver toutes…"]],
+      draw(t, p){
+        c.fillStyle = "#020a06"; c.fillRect(0, 0, W, H);
+        const cx2 = W/2, cy2 = H*.44, R = Math.min(W, H)*.34;
+        c.strokeStyle = "rgba(57,224,138,.25)"; c.lineWidth = 1;
+        for(let r=R/3; r<=R; r+=R/3){ c.beginPath(); c.arc(cx2, cy2, r, 0, 7); c.stroke(); }
+        c.beginPath(); c.moveTo(cx2-R, cy2); c.lineTo(cx2+R, cy2);
+        c.moveTo(cx2, cy2-R); c.lineTo(cx2, cy2+R); c.stroke();
+        const a = t*1.9;                                              // le balayage
+        const g2 = c.createConicGradient ? (()=>{ const g3 = c.createConicGradient(a, cx2, cy2);
+          g3.addColorStop(0, "rgba(57,224,138,.55)"); g3.addColorStop(.12, "rgba(57,224,138,0)");
+          g3.addColorStop(1, "rgba(57,224,138,0)"); return g3; })() : "rgba(57,224,138,.2)";
+        c.fillStyle = g2; c.beginPath(); c.moveTo(cx2, cy2); c.arc(cx2, cy2, R, a, a+.5); c.fill();
+        /* huit échos apparaissent un à un */
+        blips.forEach((b, i)=>{
+          const at = 1.2 + i*.85;
+          if(t < at) return;
+          once("blip"+i, ()=>AudioFX.tick());
+          const pu = 1 + Math.sin(t*4 + i)*.25;
+          c.fillStyle = "#39e08a";
+          c.beginPath(); c.arc(cx2 + b[0]*R, cy2 + b[1]*R, 4*pu, 0, 7); c.fill();
+          c.strokeStyle = "rgba(57,224,138,.4)";
+          c.beginPath(); c.arc(cx2 + b[0]*R, cy2 + b[1]*R, 8*pu, 0, 7); c.stroke();
+        });
+        if(t > 8){
+          once("s5sig", ()=>AudioFX.signal());
+          if(Math.floor(t*2.5)%2){
+            c.fillStyle = "#39e08a"; c.textAlign = "center";
+            c.font = `bold ${Math.round(Math.min(W,H)*.05)}px 'Baloo 2', sans-serif`;
+            c.fillText("8 SIGNAUX DÉTECTÉS", cx2, H*.85);
+            c.textAlign = "left";
+          }
+        }
+      } },
+    { d:8, subs:[[3.6,"À toi de jouer."]],
+      draw(t, p){
+        c.fillStyle = "#04040e"; c.fillRect(0, 0, W, H);
+        const k = ease(Math.min(1, t/.7));
+        once("s6", ()=>AudioFX.boom());
+        c.save();
+        c.translate(W/2, H*.42);
+        c.scale(3 - 2*k, 3 - 2*k);
+        c.globalAlpha = k;
+        c.textAlign = "center";
+        c.fillStyle = "#FFD23F";
+        c.font = `900 ${Math.round(Math.min(W,H)*.085)}px 'Baloo 2', sans-serif`;
+        c.shadowColor = "rgba(255,210,63,.6)"; c.shadowBlur = 24;
+        c.fillText("AGENT " + CONFIG.joueur.toUpperCase(), 0, 0);
+        c.restore();
+        if(t > 1.8){
+          c.globalAlpha = Math.min(1, (t-1.8)/.7);
+          c.fillStyle = "#9c9cc4"; c.textAlign = "center";
+          c.font = `bold ${Math.round(Math.min(W,H)*.036)}px 'Baloo 2', sans-serif`;
+          c.fillText("8 pièces · 8 défis · 1 secret", W/2, H*.52);
+          c.textAlign = "left"; c.globalAlpha = 1;
+        }
+        if(p > .8){                                                    // fondu final
+          c.fillStyle = `rgba(4,4,14,${(p-.8)/.2})`; c.fillRect(0, 0, W, H);
+        }
+      } },
+  ];
+  const TOTAL = SCENES.reduce((a,s)=>a+s.d, 0);
+
+  function frame(now){
+    if(ended) return;
+    dpr = Math.min(2, devicePixelRatio || 1);
+    if(cv.width !== innerWidth*dpr){ cv.width = innerWidth*dpr; cv.height = innerHeight*dpr; }
+    W = innerWidth; H = innerHeight;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const T = (now - t0)/1000;
+    let acc = 0, sc = null, t = 0;
+    for(const s of SCENES){ if(T < acc + s.d){ sc = s; t = T - acc; break; } acc += s.d; }
+    if(!sc){ end(); return; }
+    sc.draw(t, t/sc.d);
+    /* sous-titres du plan courant */
+    let line = "";
+    sc.subs.forEach(([at, txt])=>{ if(t >= at) line = txt; });
+    if(subEl.textContent !== line) subEl.textContent = line;
+    /* bandes cinéma + vignette */
+    c.fillStyle = "#04040e";
+    c.fillRect(0, 0, W, H*.085); c.fillRect(0, H*.915, W, H*.085);
+    if(T > 3.5) skipBt.hidden = false;
+    raf = requestAnimationFrame(frame);
+  }
+  function end(){
+    if(ended) return;
+    ended = true;
+    if(raf) cancelAnimationFrame(raf);
+    clearTimeout(guard);
+    skipBt.hidden = true;
+    const cb = doneCb; doneCb = null;
+    if(cb) cb();
+  }
+  function play(done){
+    cv = $("#cine-cv"); c = cv.getContext("2d");
+    subEl = $("#cine-sub"); skipBt = $("#cine-skip");
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches){ done(); return; }
+    doneCb = done; ended = false; t0 = performance.now();
+    Object.keys(fired).forEach(k=>delete fired[k]);
+    stars = Array.from({length:60}, ()=>[Math.random(), Math.random()*.5, Math.random()*1.6+.6, Math.random()*7]);
+    cityFar = buildCity(0, .12, .3); cityNear = buildCity(0, .08, .22);
+    mist = [];
+    blips = Array.from({length:8}, (_,i)=>{
+      const a2 = i/8*Math.PI*2 + .4, r2 = .3 + (i%3)*.22;
+      return [Math.cos(a2)*r2, Math.sin(a2)*r2];
+    });
+    subEl.textContent = "";
+    skipBt.hidden = true;
+    skipBt.onclick = ()=>{ AudioFX.back(); end(); };
+    show("cine-screen");
+    guard = setTimeout(end, (TOTAL + 5)*1000);   // filet si rAF est gelé
+    raf = requestAnimationFrame(frame);
+  }
+  return { play, TOTAL };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    13. TRICHE (?triche=1) + branchements + démarrage
    ─────────────────────────────────────────────────────────── */
 function buildCheat(){
@@ -2745,6 +3171,11 @@ function buildCheat(){
     persist(); renderHub(); show("hub-screen");
   });
   bar.appendChild(all);
+  const ci=document.createElement("button");
+  ci.textContent="CINÉ";
+  ci.addEventListener("click", ()=>{ AudioFX.init();
+    Cinematic.play(()=>{ renderHub(); show("hub-screen"); }); });
+  bar.appendChild(ci);
   const rz=document.createElement("button");
   rz.textContent="RESET";
   rz.addEventListener("click", ()=>{ Store.reset(); location.reload(); });
@@ -2752,13 +3183,70 @@ function buildCheat(){
 }
 
 /* branchements */
-$("#btn-start").addEventListener("click", ()=>{
+/* une partie est-elle déjà commencée ? */
+function hasProgress(){
+  return !!(S.won || S.points > 0 || Object.keys(S.flashed||{}).length > 0);
+}
+function enterGame(){
   AudioFX.init(); AudioFX.powerOn();
   setTimeout(()=>AudioFX.startMusic(), 1000);
   keepAwake();
   if(bootScene) bootScene();          // libère la scène d'accueil
-  renderHub(); show("hub-screen");
+}
+function goHub(){ renderHub(); show("hub-screen"); }
+/* efface tout en mémoire ET sur disque, puis relance une partie neuve */
+function wipeState(){
+  Store.reset();
+  S = { points:0, flashed:{}, done:{}, won:false,
+        msgSeen:0, start:null, end:null, stars:{}, succes:{}, cineSeen:false };
+  persist();
+}
+
+$("#btn-start").addEventListener("click", ()=>{
+  enterGame();
+  if(hasProgress()){
+    goHub();                          // « Reprendre » : droit au but, pas d'intro
+  }else{
+    /* première partie : la cinématique raconte la nuit de l'invasion */
+    S.cineSeen = true; persist();
+    Cinematic.play(goHub);
+  }
 });
+
+/* « Nouvelle partie » : double confirmation puis intro depuis zéro */
+let newgameArmed = false, newgameTimer = null;
+$("#btn-newgame").addEventListener("click", e=>{
+  const btn = e.currentTarget;
+  AudioFX.init();
+  if(!newgameArmed){
+    newgameArmed = true;
+    btn.textContent = "⚠ Effacer ma partie ?";
+    AudioFX.err();
+    clearTimeout(newgameTimer);
+    newgameTimer = setTimeout(()=>{
+      newgameArmed = false; btn.textContent = "✦ Nouvelle partie (voir l'intro)";
+    }, 4000);
+    return;
+  }
+  clearTimeout(newgameTimer); newgameArmed = false;
+  wipeState();
+  S.cineSeen = true; persist();
+  enterGame();
+  Cinematic.play(goHub);
+});
+
+/* libellés de l'écran-titre selon qu'une partie existe ou non */
+function setupBootButtons(){
+  const start = $("#btn-start"), ng = $("#btn-newgame");
+  if(hasProgress()){
+    start.textContent = "▶ Reprendre ma partie";
+    ng.hidden = false;
+  }else{
+    start.textContent = "▶ Commencer l'aventure";
+    ng.hidden = true;
+  }
+}
+setupBootButtons();
 { const hi = Store.hiGet(); const ts = totalStars(); const bits = [];
   if(hi) bits.push("HI-SCORE  " + hi);
   if(ts > 0) bits.push("RANG  " + RANKS[rankIndex(ts)].nom);
@@ -2820,7 +3308,7 @@ const SUCCES = [
   { id:"perfect",ico:"★",  nom:"Sans-faute",       desc:"3 étoiles sur un défi" },
   { id:"noHint", ico:"🧠", nom:"Sans filet",       desc:"Un défi réussi sans indice" },
   { id:"speed",  ico:"⏱",  nom:"Éclair",           desc:"Un défi réussi en moins de 30 s" },
-  { id:"combo5", ico:"⚡", nom:"Enchaînement",     desc:"Combo ×5 à l'arcade" },
+  { id:"combo5", ico:"⚡", nom:"Enchaînement",     desc:"Combo ×5 dans la cavale" },
   { id:"master", ico:"👑", nom:"Maître Invader",   desc:"3 étoiles sur les 8 défis" },
 ];
 S.succes = S.succes || {};
@@ -3062,6 +3550,25 @@ let bootScene = null;
   let ufoT = -6, raf;
   const t0 = performance.now();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* la ville en contre-jour, pré-rendue une fois */
+  const sky = document.createElement("canvas");
+  sky.width = 900; sky.height = 170;
+  {
+    const g = sky.getContext("2d");
+    let x = 0;
+    while(x < 900){
+      const bw = 40 + Math.random()*60, bh = 40 + Math.random()*110;
+      g.fillStyle = "#101026";
+      g.fillRect(x, 170 - bh, bw, bh);
+      if(Math.random() < .5) g.fillRect(x + bw/2 - 2, 170 - bh - 10, 4, 10);
+      g.fillStyle = "rgba(255,216,138,.5)";
+      for(let wy = 170 - bh + 8; wy < 158; wy += 16)
+        for(let wx = x + 6; wx < x + bw - 8; wx += 14)
+          if(Math.random() < .10) g.fillRect(wx, wy, 4, 6);
+      x += bw + 4;
+    }
+  }
+  let meteor = null, nextMeteor = 2600;
   function frame(now){
     const t = (now - t0)/1000;
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -3085,6 +3592,31 @@ let bootScene = null;
       cam:{ scale: Math.min(innerWidth, innerHeight)*dpr/13, focal:13, dist:9,
             x: Math.sin(t*.18)*14*dpr, y: 40*dpr },
     });
+    /* l'escadron survole la ville : silhouette + fenêtres */
+    const c2 = cv.getContext("2d");
+    const sw2 = sky.width*dpr, sh2 = sky.height*dpr;
+    const offx = Math.sin(t*.18)*7*dpr;              // parallaxe douce avec la caméra
+    c2.globalAlpha = .92;
+    for(let x = -offx - sw2; x < cv.width; x += sw2)
+      c2.drawImage(sky, x, cv.height - sh2, sw2, sh2);
+    c2.globalAlpha = 1;
+    /* une étoile filante, de temps en temps */
+    nextMeteor -= 16.7;
+    if(!meteor && nextMeteor <= 0){
+      meteor = { x: cv.width*(.3 + Math.random()*.55), y: cv.height*(.06 + Math.random()*.1), k: 0 };
+      nextMeteor = 5000 + Math.random()*7000;
+    }
+    if(meteor){
+      meteor.k += .03;
+      const mx = meteor.x - meteor.k*130*dpr, my = meteor.y + meteor.k*80*dpr;
+      const fade = Math.sin(Math.min(1, meteor.k)*Math.PI);
+      const gr = c2.createLinearGradient(mx, my, mx + 70*dpr, my - 43*dpr);
+      gr.addColorStop(0, `rgba(255,255,255,${.95*fade})`);
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      c2.strokeStyle = gr; c2.lineWidth = 2*dpr; c2.lineCap = "round";
+      c2.beginPath(); c2.moveTo(mx, my); c2.lineTo(mx + 70*dpr, my - 43*dpr); c2.stroke();
+      if(meteor.k >= 1) meteor = null;
+    }
     if(!reduced) raf = requestAnimationFrame(frame);
   }
   frame(t0);
@@ -4229,380 +4761,1151 @@ MiniGames["LV_05"] = function(box, api){
   return ()=>timers.forEach(clearTimeout);
 };
 
-/* ── LV_08 : LE PORTRAIT 3D ─────────────────────────────────
-   Le portrait ne se « peint » plus à plat : il se CONSTRUIT en
-   volume, bloc par bloc, sur un modèle qui tourne. */
+/* ── LV_08 : LE POCHOIR ─────────────────────────────────────
+   Le final se peint comme une VRAIE pièce de street art :
+   couche par couche, à la bombe, à travers un pochoir posé sur
+   le mur. La peinture ne se dépose QUE dans les découpes — et
+   quand le pochoir se soulève, le portrait apparaît net, avec
+   les bords francs d'un vrai pochoir. */
 MiniGames["LV_08"] = function(box, api){
-  box.insertAdjacentHTML("beforeend",
-    `<p class="sub">TRANSMISSION FINALE…<br>L'identité de l'invader se reconstruit.</p>`);
-
-  const wrap = document.createElement("div");
-  wrap.style.cssText = "position:relative; display:inline-block;";
-  const cv = document.createElement("canvas");
-  cv.width = 320; cv.height = 320;
-  cv.className = "model3d";
-  cv.style.cssText = "width:min(76vw,300px); height:min(76vw,300px);";
-  wrap.appendChild(cv);
-  box.appendChild(wrap);
-
-  const txt = document.createElement("p");
-  txt.style.cssText = "text-align:center; font-size:22px; min-height:60px; white-space:pre-line; font-weight:700;";
-  box.appendChild(txt);
-
   const shape = SHAPES.portrait, pal = PALETTES.portrait;
   const rows = shape.length, cols = shape[0].length;
-  const cells = [];
-  shape.forEach((row, y)=>[...row].forEach((ch, x)=>{
-    if(ch === "." || ch === " ") return;
-    cells.push({ x, y, col:(pal && pal[ch]) || api.station.couleur });
-  }));
-  const SCALE = Math.min(cv.width, cv.height) / (Math.max(cols, rows) + 2);
-  const PENTA = [523, 587, 659, 784, 880, 1046, 1175, 1319];
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const DUR = 3400;
-  let raf = null, notes = 0, finished = false;
-
-  function finish(){
-    if(finished) return;
-    finished = true;
-    const flash = document.createElement("div");
-    flash.style.cssText = "position:absolute; inset:0; background:#fff; opacity:.85; transition:opacity .8s; border-radius:18px; pointer-events:none;";
-    wrap.appendChild(flash);
-    requestAnimationFrame(()=>flash.style.opacity = "0");
-    setTimeout(()=>flash.remove(), 900);
-    AudioFX.fanfare(); Juice.confetti(box, 34);
-    txt.textContent = "L'invader… c'était moi. 😏\nJoyeux anniversaire.";
-    const btn = document.createElement("button");
-    btn.className = "b2";
-    btn.textContent = "Récupérer le dernier fragment";
-    btn.addEventListener("click", ()=>api.win({ stars:3, label:"DÉMASQUÉ !" }));
-    box.appendChild(btn);
-  }
-
-  let guard = null;
-  if(reduced){
-    Voxel.renderCells(cv, cells, cols, rows, .4, -.28, { prog:1, scale:SCALE });
-    finish();
-  }else{
-    const t0 = performance.now();
-    (function frame(now){
-      const t = (now - t0)/1000;
-      const prog = Math.min(1, (now - t0)/DUR);
-      /* prog + pop : les blocs jaillissent un à un, le modèle tourne */
-      Voxel.renderCells(cv, cells, cols, rows,
-        Math.sin(t*.5)*.55, -.28 + Math.sin(t*.4)*.08,
-        { prog, pop:true, scale:SCALE });
-      const want = Math.floor(prog * PENTA.length);
-      while(notes < want && notes < PENTA.length){ AudioFX.pixel(PENTA[notes]); notes++; }
-      if(prog >= 1) finish();
-      raf = requestAnimationFrame(frame);
-    })(performance.now());
-    /* FILET DE SÉCURITÉ : si rAF est gelé (écran en veille, onglet en
-       arrière-plan), la construction ne finirait jamais et le dernier
-       fragment serait inatteignable. Le minuteur, lui, tourne toujours. */
-    guard = setTimeout(()=>{
-      if(finished) return;
-      Voxel.renderCells(cv, cells, cols, rows, .4, -.28, { prog:1, scale:SCALE });
-      finish();
-    }, DUR + 2000);
-  }
-  return ()=>{ if(raf) cancelAnimationFrame(raf); if(guard) clearTimeout(guard); };
-};
-
-/* ── LV_06 : L'ARCADE EN VRAIE 3D ───────────────────────────
-   Vue en perspective (façon Star Fox) : le mur d'aliens est
-   loin et FONCE vers toi en grossissant. Sol en fuite, étoiles
-   qui défilent en profondeur, tir qui part vers le fond.
-   Règle inchangée : détruis les MAGENTA, épargne les CYAN.
-   Le tir vise automatiquement l'alien le plus proche de ta
-   colonne — donc place-toi bien. 3★ = 0 cyan touché. */
-MiniGames["LV_06"] = function(box, api){
-  const DIGITS = {
-    "0":["XXX","X.X","X.X","X.X","XXX"], "1":[".X.","XX.",".X.",".X.","XXX"],
-    "2":["XXX","..X","XXX","X..","XXX"], "3":["XXX","..X","XXX","..X","XXX"],
-    "4":["X.X","X.X","XXX","..X","..X"], "5":["XXX","X..","XXX","..X","XXX"],
-    "6":["XXX","X..","XXX","X.X","XXX"], "7":["XXX","..X","..X","..X","..X"],
-    "8":["XXX","X.X","XXX","X.X","XXX"], "9":["XXX","X.X","XXX","..X","XXX"],
-  };
-  const pattern = DIGITS[api.station.fragment] || DIGITS["0"];
-  const W = 340, H = 450;
-  const CYAN = "#4db8ff", MAG = "#ff5db4";
 
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Détruis les <b style="color:${MAG}">roses</b>, épargne les
-     <b style="color:${CYAN}">bleus</b>.<br>Glisse le doigt : le tir part tout seul vers ta colonne.</p>`);
+    `<p class="sub">Dernier mur, dernière pièce.<br>
+     <b>Glisse le doigt</b> pour peindre à travers le pochoir.</p>`);
+
+  /* HUD : couche en cours + jauge de couverture */
+  const lab = document.createElement("div");
+  lab.className = "pix";
+  lab.style.cssText = "font-size:12px; color:var(--jaune); font-weight:800; min-height:18px;";
+  box.appendChild(lab);
+  const barW = document.createElement("div");
+  barW.className = "bar";
+  barW.style.cssText = "width:min(78vw,300px); height:12px; overflow:hidden;";
+  const barI = document.createElement("i");
+  barI.style.cssText = "display:block; height:100%; width:0%;";
+  barW.appendChild(barI);
+  box.appendChild(barW);
+  /* pastilles : une par couche de couleur, façon nuancier */
+  const chips = document.createElement("div");
+  chips.style.cssText = "display:flex; gap:7px; justify-content:center; min-height:16px;";
+  box.appendChild(chips);
+
+  /* toile principale, nette sur écran haute densité */
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const W = 340, H = 400;
   const cv = document.createElement("canvas");
-  cv.width = W; cv.height = H;
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.cssText = "width:100%; max-width:340px; border-radius:18px; touch-action:none;" +
+    "border:1.5px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.5); cursor:crosshair;";
+  box.appendChild(cv);
+  const c = cv.getContext("2d");
+  c.scale(DPR, DPR);
+
+  const txt = document.createElement("p");
+  txt.style.cssText = "text-align:center; font-size:22px; min-height:30px; white-space:pre-line; font-weight:700;";
+  box.appendChild(txt);
+
+  /* ── géométrie du motif sur le mur ── */
+  const CS = Math.floor(Math.min(260/cols, 260/rows));   // taille d'une découpe
+  const ox = (W - CS*cols)/2, oy = 66;
+  const SM = 18;                                          // marge de la feuille
+  const SX = ox - SM, SY = oy - SM, SW = CS*cols + SM*2, SH = CS*rows + SM*2;
+
+  /* ── couches : une par couleur, grandes zones d'abord ── */
+  const LAYER_NAMES = { H:"les cheveux", S:"la peau", E:"les yeux", M:"la bouche", L:"le sourire" };
+  const byLetter = {};
+  shape.forEach((row, y)=>[...row].forEach((ch, x)=>{
+    if(ch === "." || ch === " ") return;
+    (byLetter[ch] = byLetter[ch] || []).push({ x, y });
+  }));
+  const layers = Object.keys(byLetter)
+    .sort((a,b)=>byLetter[b].length - byLetter[a].length)
+    .map(ch=>({
+      ch, cells: byLetter[ch],
+      col: (pal && pal[ch]) || api.station.couleur,
+      nom: LAYER_NAMES[ch] || "les détails",
+    }));
+
+  /* ── le mur de briques, pré-rendu une fois ── */
+  const wall = document.createElement("canvas");
+  wall.width = W*DPR; wall.height = H*DPR;
+  {
+    const g = wall.getContext("2d");
+    g.scale(DPR, DPR);
+    g.fillStyle = "#221f38"; g.fillRect(0, 0, W, H);
+    const BH = 16, BW = 34;
+    for(let y=0; y<H; y+=BH){
+      const off = (y/BH)%2 ? BW/2 : 0;
+      for(let x=-BW; x<W; x+=BW){
+        const v = ((x*7 + y*13) % 9 - 4) * .012;
+        g.fillStyle = shade("#2a2744", v);
+        g.fillRect(x+off+1, y+1, BW-2, BH-2);
+        g.fillStyle = "rgba(255,255,255,.03)";
+        g.fillRect(x+off+1, y+1, BW-2, 2);
+      }
+    }
+    /* traces de vie du mur : vieux tags à peine lisibles */
+    g.save(); g.globalAlpha = .10; g.fillStyle = "#2BE4D0";
+    g.font = "italic bold 26px 'Baloo 2', sans-serif";
+    g.translate(52, 372); g.rotate(-.06); g.fillText("1998", 0, 0); g.restore();
+    g.save(); g.globalAlpha = .07; g.fillStyle = "#FF2E88";
+    g.font = "italic bold 20px 'Baloo 2', sans-serif";
+    g.translate(252, 40); g.rotate(.05); g.fillText("LV ▦", 0, 0); g.restore();
+    /* halo du réverbère : la scène est éclairée par le haut */
+    const glow = g.createRadialGradient(W/2, -40, 10, W/2, -40, 340);
+    glow.addColorStop(0, "rgba(255,225,160,.16)"); glow.addColorStop(1, "rgba(255,225,160,0)");
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  }
+
+  /* ── la peinture déposée (s'accumule couche après couche) ── */
+  const paint = document.createElement("canvas");
+  paint.width = W*DPR; paint.height = H*DPR;
+  const pc = paint.getContext("2d");
+  pc.scale(DPR, DPR);
+
+  /* ── état ── */
+  let li = 0;                    // couche en cours
+  let acc = [], filled = 0;      // couverture par cellule
+  let holes = null;              // Path2D des découpes de la couche
+  let sheetAnim = null;          // { from, t0, dur } : glissement de feuille
+  let liftAnim = null;           // levée finale du pochoir
+  let spraying = false, sx2 = 0, sy2 = 0, lastHiss = 0, shakeCanT = 0;
+  let mist = [], drips = [];
+  let over = false, raf = null;
+  let sigT = 0, sigHiss = false;                       // la pièce prend vie
+  const eyeCells = byLetter["E"] || [];
+  const skinCol = (pal && pal.S) || null;
+
+  function startLayer(){
+    const L = layers[li];
+    acc = L.cells.map(()=>0); filled = 0;
+    holes = new Path2D();
+    L.cells.forEach(p=>holes.rect(ox + p.x*CS + 1, oy + p.y*CS + 1, CS - 2, CS - 2));
+    lab.textContent = `COUCHE ${li+1}/${layers.length} · ${L.nom.toUpperCase()}`;
+    barI.style.width = "0%";
+    chips.innerHTML = "";
+    layers.forEach((L2, i)=>{
+      const s = document.createElement("i");
+      s.style.cssText = `width:14px; height:14px; border-radius:4px; display:inline-block;` +
+        `background:${L2.col}; opacity:${i < li ? 1 : i === li ? .95 : .22};` +
+        `box-shadow:${i === li ? "0 0 9px " + L2.col : "none"};` +
+        `border:1px solid rgba(255,255,255,.3);`;
+      chips.appendChild(s);
+    });
+    shakeCanT = performance.now() + (reduced ? 0 : (li === 0 ? 1750 : 750));
+    AudioFX.clack();
+  }
+  function layerDone(){
+    /* on complète proprement les dernières cellules (bords nets) */
+    const L = layers[li];
+    pc.save(); pc.clip(holes);
+    pc.globalAlpha = .95; pc.fillStyle = L.col;
+    L.cells.forEach(p=>pc.fillRect(ox + p.x*CS, oy + p.y*CS, CS, CS));
+    pc.restore(); pc.globalAlpha = 1;
+    AudioFX.lock(); Juice.pop(box, "COUCHE TERMINÉE !", L.col);
+    if(li < layers.length - 1){
+      li++;
+      sheetAnim = reduced ? null : { t0: performance.now(), dur: 420 };
+      startLayer();
+    }else{
+      finish();
+    }
+  }
+  function finish(){
+    over = true; spraying = false;
+    lab.textContent = "";
+    barI.style.width = "100%";
+    chips.querySelectorAll("i").forEach(s=>{ s.style.opacity = 1; s.style.boxShadow = "none"; });
+    /* quelques coulures : la signature d'une pièce à la bombe */
+    for(let i=0;i<5;i++){
+      const L = layers[Math.floor(Math.random()*layers.length)];
+      const cell = L.cells[Math.floor(Math.random()*L.cells.length)];
+      drips.push({ x: ox + cell.x*CS + CS/2, y: oy + cell.y*CS + CS,
+        len: 0, max: 14 + Math.random()*26, col: L.col, v: .35 + Math.random()*.4 });
+    }
+    liftAnim = { t0: performance.now(), dur: reduced ? 0 : 1100 };
+    sigT = performance.now() + (reduced ? 250 : 1500);
+    setTimeout(()=>{
+      AudioFX.fanfare(); Juice.confetti(box, 34);
+      txt.textContent = "L'invader… c'était moi. 😏\nJoyeux anniversaire.";
+      const btn = document.createElement("button");
+      btn.className = "b2";
+      btn.textContent = "Récupérer le dernier fragment";
+      btn.addEventListener("click", ()=>api.win({ stars:3, label:"DÉMASQUÉ !" }));
+      box.appendChild(btn);
+    }, reduced ? 150 : 1250);
+  }
+
+  /* ── la bombe crache : uniquement à travers les découpes ── */
+  function spray(now){
+    const L = layers[li];
+    pc.save(); pc.clip(holes);
+    for(let i=0;i<4;i++){
+      const dx = (Math.random()-.5)*24, dy = (Math.random()-.5)*24;
+      const r = 7 + Math.random()*8;
+      const g2 = pc.createRadialGradient(sx2+dx, sy2+dy, 0, sx2+dx, sy2+dy, r);
+      g2.addColorStop(0, L.col); g2.addColorStop(1, "rgba(0,0,0,0)");
+      pc.globalAlpha = .30;
+      pc.fillStyle = g2;
+      pc.beginPath(); pc.arc(sx2+dx, sy2+dy, r, 0, 7); pc.fill();
+    }
+    pc.restore(); pc.globalAlpha = 1;
+    /* brouillard qui s'échappe autour de la buse */
+    for(let i=0;i<3;i++){
+      mist.push({ x: sx2 + (Math.random()-.5)*10, y: sy2 + (Math.random()-.5)*10,
+        vx: (Math.random()-.5)*1.3, vy: -(.3 + Math.random()*.8),
+        life: 14 + Math.random()*12, col: L.col });
+    }
+    /* couverture : les cellules proches de la buse se remplissent */
+    L.cells.forEach((p, i)=>{
+      if(acc[i] >= 1) return;
+      const cx2 = ox + p.x*CS + CS/2, cy2 = oy + p.y*CS + CS/2;
+      const d = Math.hypot(cx2 - sx2, cy2 - sy2);
+      if(d < 34){
+        acc[i] += .16 * (1 - d/40);
+        if(acc[i] >= 1){ filled++; AudioFX.pixel(500 + (filled%8)*90); }
+      }
+    });
+    barI.style.width = Math.round(filled/L.cells.length*100) + "%";
+    if(now - lastHiss > 130){ lastHiss = now; AudioFX.spray(); }
+    if(filled >= L.cells.length) layerDone();
+  }
+
+  const local = e=>{
+    const r = cv.getBoundingClientRect();
+    return [ (e.clientX - r.left)/r.width*W, (e.clientY - r.top)/r.height*H ];
+  };
+  const onDown = e=>{
+    if(over || performance.now() < shakeCanT) return;
+    [sx2, sy2] = local(e); spraying = true;
+    cv.setPointerCapture(e.pointerId);
+  };
+  const onMove = e=>{ if(spraying){ [sx2, sy2] = local(e); } };
+  const onUp = ()=>{ spraying = false; };
+  cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointermove", onMove);
+  cv.addEventListener("pointerup", onUp);
+  cv.addEventListener("pointercancel", onUp);
+
+  /* ── dessin de la feuille de pochoir (découpes évidées) ── */
+  function drawSheet(g, letter, alpha, shadowK){
+    g.save();
+    g.globalAlpha = alpha;
+    /* ombre portée de la feuille sur le mur */
+    g.shadowColor = `rgba(0,0,0,${.55*shadowK})`;
+    g.shadowBlur = 14*shadowK; g.shadowOffsetY = 6*shadowK;
+    const p = new Path2D();
+    p.rect(SX, SY, SW, SH);
+    byLetter[letter].forEach(q=>p.rect(ox + q.x*CS + 1, oy + q.y*CS + 1, CS - 2, CS - 2));
+    const grad = g.createLinearGradient(SX, SY, SX, SY+SH);
+    grad.addColorStop(0, "#cbbb92"); grad.addColorStop(1, "#a89870");
+    g.fillStyle = grad;
+    g.fill(p, "evenodd");
+    g.shadowColor = "transparent";
+    /* bord découpé + repères d'atelier, façon vraie planche */
+    g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 2;
+    g.strokeRect(SX+1, SY+1, SW-2, SH-2);
+    g.strokeStyle = "rgba(255,255,255,.25)"; g.lineWidth = 1;
+    g.strokeRect(SX+3, SY+3, SW-6, SH-6);
+    g.fillStyle = "rgba(60,45,20,.5)";
+    g.font = "bold 10px 'Baloo 2', sans-serif";
+    g.fillText(`POCHOIR ${li+1}/${layers.length}`, SX+8, SY+13);
+    [[SX+6,SY+SH-6],[SX+SW-6,SY+SH-6],[SX+SW-6,SY+13]].forEach(([mx,my])=>{
+      g.beginPath(); g.moveTo(mx-4,my); g.lineTo(mx+4,my);
+      g.moveTo(mx,my-4); g.lineTo(mx,my+4); g.stroke();
+    });
+    g.restore();
+  }
+
+  /* ── boucle de rendu ── */
+  function frame(now){
+    if(raf === undefined) return;
+    c.clearRect(0, 0, W, H);
+    c.drawImage(wall, 0, 0, W, H);
+    c.drawImage(paint, 0, 0, W, H);
+
+    /* coulures de la fin */
+    drips.forEach(d=>{
+      if(d.len < d.max) d.len += d.v;
+      c.strokeStyle = d.col; c.lineWidth = 3; c.globalAlpha = .8;
+      c.beginPath(); c.moveTo(d.x, d.y - 2); c.lineTo(d.x, d.y + d.len); c.stroke();
+      c.globalAlpha = 1;
+    });
+
+    /* la feuille : en place, en train de glisser, ou levée */
+    if(liftAnim){
+      const k = liftAnim.dur ? Math.min(1, (now - liftAnim.t0)/liftAnim.dur) : 1;
+      if(k < 1){
+        const e2 = k*k*(3-2*k);
+        c.save();
+        c.translate(W/2 - e2*260, SY + SH/2 - e2*330);
+        c.rotate(-e2*.5);
+        c.translate(-W/2, -(SY + SH/2));
+        drawSheet(c, layers[layers.length-1].ch, 1 - e2*.25, 1 + e2*2);
+        c.restore();
+      }
+    }else if(sheetAnim){
+      const k = Math.min(1, (now - sheetAnim.t0)/sheetAnim.dur);
+      const e2 = k*k*(3-2*k);
+      if(k >= 1){ sheetAnim = null; drawSheet(c, layers[li].ch, 1, 1); }
+      else{
+        /* l'ancienne feuille file, la nouvelle glisse depuis la droite */
+        c.save();
+        c.translate((1-e2)*(W*.9), (1-e2)*-18);
+        drawSheet(c, layers[li].ch, 1, 1);
+        c.restore();
+      }
+    }else{
+      drawSheet(c, layers[li].ch, 1, 1);
+    }
+
+    /* la pièce prend vie : les yeux clignent, l'artiste signe */
+    if(sigT && now > sigT){
+      if(skinCol && eyeCells.length && (now - sigT) % 3400 > 3180){
+        c.fillStyle = skinCol;
+        eyeCells.forEach(p=>c.fillRect(ox + p.x*CS + 1, oy + p.y*CS + 1, CS - 2, CS - 2));
+        c.fillStyle = "rgba(0,0,0,.45)";
+        eyeCells.forEach(p=>c.fillRect(ox + p.x*CS + 2, oy + p.y*CS + CS/2, CS - 4, 2));
+      }
+      const k = Math.min(1, (now - sigT)/700);
+      if(!sigHiss){ sigHiss = true; AudioFX.spray(); }
+      if(k < 1 && Math.random() < .5)
+        mist.push({ x: ox + cols*CS - 16 + (Math.random()-.5)*10, y: oy + rows*CS + 12,
+          vx: (Math.random()-.5), vy: -.4, life: 10, col: "#2BE4D0" });
+      c.globalAlpha = k;
+      c.fillStyle = "#2BE4D0";
+      c.font = "italic bold 21px 'Baloo 2', sans-serif";
+      c.fillText("A.", ox + cols*CS - 24, oy + rows*CS + 20);
+      c.globalAlpha = 1;
+    }
+
+    /* brouillard de bombe (au-dessus de tout) */
+    c.globalCompositeOperation = "lighter";
+    mist.forEach(m=>{ m.x += m.vx; m.y += m.vy; m.life--; });
+    mist = mist.filter(m=>m.life > 0);
+    mist.forEach(m=>{
+      c.globalAlpha = Math.min(.30, m.life/40);
+      c.fillStyle = m.col;
+      c.beginPath(); c.arc(m.x, m.y, 5, 0, 7); c.fill();
+    });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+
+    /* la bombe suit le doigt (ou attend, posée en bas) */
+    if(!over){
+      const shaking = now < shakeCanT;
+      const bx = spraying ? sx2 : W - 46;
+      const by = spraying ? sy2 : H - 52;
+      const wob = shaking ? Math.sin(now/26)*4 : 0;
+      c.save();
+      c.translate(bx + 16 + wob, by + 14);
+      c.rotate(-.3 + (shaking ? Math.sin(now/30)*.16 : 0));
+      c.fillStyle = "#2c2c50"; c.fillRect(-7, -2, 15, 30);             // corps
+      c.fillStyle = layers[li].col; c.fillRect(-7, 8, 15, 8);          // bague couleur
+      c.fillStyle = "#454577"; c.fillRect(-7, -2, 4, 30);              // reflet
+      c.fillStyle = "#9a9ac2"; c.fillRect(-5, -7, 11, 6);              // valve
+      c.fillStyle = "#EDEDF7"; c.fillRect(-2, -10, 4, 4);              // buse
+      c.restore();
+      if(shaking){
+        c.fillStyle = "#EDEDF7"; c.font = "bold 15px 'Baloo 2', sans-serif";
+        c.textAlign = "center";
+        c.fillText("On secoue la bombe…", W/2, H - 18);
+        c.textAlign = "left";
+      }
+      if(spraying) spray(now);
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  startLayer();
+  Juice.readyGo(box, ()=>{});
+  raf = requestAnimationFrame(frame);
+  return ()=>{
+    if(raf) cancelAnimationFrame(raf); raf = undefined;
+    cv.removeEventListener("pointerdown", onDown);
+    cv.removeEventListener("pointermove", onMove);
+    cv.removeEventListener("pointerup", onUp);
+    cv.removeEventListener("pointercancel", onUp);
+  };
+};
+
+/* ── LV_06 : LA CAVALE ──────────────────────────────────────
+   La pièce est posée : FUIS. Course de nuit dans la rue —
+   APPUIE pour sauter, RESTE APPUYÉ pour sauter plus haut
+   (buffer de saut : un appui juste avant l'atterrissage part
+   quand même). Les obstacles naissent HORS ÉCRAN et l'écart
+   entre eux est garanti par le temps de réaction, jamais par
+   le hasard seul. Au bout de la rue : L'ÉCHELLE — tape pour
+   grimper, fige-toi quand le projecteur balaie le mur.
+   3★ = pas touché une seule fois. */
+MiniGames["LV_06"] = function(box, api){
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const W = 340, H = 440;
+  const GROUND = H - 64, PX = 64;
+
+  box.insertAdjacentHTML("beforeend",
+    `<p class="sub">La pièce est posée — <b>file !</b><br>
+     Appuie pour <b>sauter</b> · reste appuyé pour sauter <b>plus haut</b>.</p>`);
+  const cv = document.createElement("canvas");
+  cv.width = W*DPR; cv.height = H*DPR;
   cv.style.cssText = "width:100%; max-width:340px; border-radius:18px; touch-action:none;" +
     "border:1.5px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.5);";
   box.appendChild(cv);
   const c = cv.getContext("2d");
+  c.scale(DPR, DPR);
 
-  /* ── caméra perspective ── */
-  const F = 4, PS = 90, HOR = H * 0.36;
-  const proj = (x, y, z)=>{ const f = F/(F + z); return [W/2 + x*PS*f, HOR + y*PS*f, f]; };
-
-  /* ── vaisseau (forme voxel) ── */
-  SHAPES.__ship = [
-    "......W......", ".....CWC.....", ".....CCC.....", "....CCCCC....",
-    "...CCGCGCC...", "..CCCCCCCCC..", ".CC.CCCCC.CC.", "CC..CYYYC..CC", "C...CYYYC...C",
-  ];
-  PALETTES.__ship = { C:CYAN, W:"#EDEDF7", G:"#c8fff8", Y:"#ffce4d" };
-
-  const NA = 12;
-  const pr = {
-    cyan: Voxel.spriteSheet("squid", CYAN, NA, 72, 72, -.22),
-    mag:  Voxel.spriteSheet("squid", MAG,  NA, 72, 72, -.22),
-    white: Voxel.sprite("squid", "#FFFFFF", 0, -.22, 72, 72),
-    ship: Array.from({length:7}, (_,i)=>Voxel.sprite("__ship", CYAN, .05, -.30, 92, 92, (i-3)*.13)),
-    heart: Voxel.sprite("heart", "#ff6b6b", .4, -.25, 30, 30),
-  };
-
-  /* ── état ── */
-  const aliens = [];
-  for(let gy=0; gy<5; gy++) for(let gx=0; gx<5; gx++){
-    const inDigit = gx>=1 && gx<=3 && pattern[gy][gx-1] === "X";
-    aliens.push({ gx, gy, cyan:inDigit, alive:true });
+  /* ═══ décors pré-rendus (zéro coût pendant la course) ═══ */
+  function pre(w, h, fn){
+    const t = document.createElement("canvas");
+    t.width = w*DPR; t.height = h*DPR;
+    const g = t.getContext("2d"); g.scale(DPR, DPR);
+    fn(g, w, h);
+    return { img:t, w, h };
   }
-  const alienPos = (a, sweep, zw)=>[ (a.gx-2)*1.15 + sweep, (a.gy-2)*0.85, zw ];
-  const SHIP_Y = 3.2, SHIP_Z = 1.2;
-  const ship = { x:0, tx:0, vx:0 };
-  let zWall = 9.5, bullets = [], parts = [], texts = [];
-  let lives = 3, combo = 0, cyanHits = 0;
-  let running = false, over = false, shakeF = 0, stopUntil = 0, muzzleT = 0, hitT = -9e9;
-  let msg = "", msgUntil = 0;
-  const stars3d = Array.from({length:70}, ()=>({
-    x:(Math.random()-.5)*14, y:(Math.random()-.5)*10, z:.5 + Math.random()*11 }));
-  const t0 = performance.now();
-
-  function spawnParts(x, y, z, color){
-    for(let i=0;i<16;i++){
-      const a = Math.random()*Math.PI*2, e = (Math.random()-.5)*2, sp = .02 + Math.random()*.05;
-      parts.push({ x, y, z, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - .02, vz:e*sp,
-        life:34 + Math.random()*18, color, sz:9 });
-    }
-    for(let i=0;i<8;i++){
-      const a = Math.random()*Math.PI*2, sp = .05 + Math.random()*.07;
-      parts.push({ x, y, z, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, vz:(Math.random()-.5)*.06,
-        life:14 + Math.random()*10, color:"#fff", sz:5 });
-    }
-  }
-  function resetWave(){
-    aliens.forEach(a=>{ if(!a.cyan) a.alive = true; });
-    bullets = []; lives = 3; combo = 0; zWall = 9.5;
-    msg = "ILS REVIENNENT !"; msgUntil = performance.now() + 1500;
-    AudioFX.err(); Juice.shake(box);
-  }
-  function track(e){
-    const r = cv.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width;          // 0..1
-    ship.tx = Math.max(-2.2, Math.min(2.2, (px - .5) * 5.2));
-  }
-  cv.addEventListener("pointerdown", track);
-  cv.addEventListener("pointermove", e=>{ if(e.buttons || e.pointerType === "touch") track(e); });
-
-  /* tir auto : vise l'alien VIVANT le plus BAS de la colonne la plus proche */
-  const fire = setInterval(()=>{
-    if(!running || over) return;
-    const sweep = Math.sin(performance.now()/900) * .55;
-    let best = null, bestD = 9e9;
-    aliens.forEach(a=>{
-      if(!a.alive) return;
-      const p = alienPos(a, sweep, zWall);
-      const d = Math.abs(p[0] - ship.x);
-      /* on privilégie la colonne alignée, puis l'alien le plus bas (gy max) */
-      const score = d * 10 - a.gy;
-      if(d < 1.0 && score < bestD){ bestD = score; best = a; }
+  /* une rangée d'immeubles qui se raccorde en boucle */
+  function skyline(tileW, hMin, hMax, base, winCol, litChance){
+    const t = pre(tileW, 240, (g)=>{
+      let x = 0;
+      while(x < tileW - 20){
+        const bw = 36 + Math.random()*46;
+        const bh = hMin + Math.random()*(hMax - hMin);
+        g.fillStyle = base;
+        g.fillRect(x, 240 - bh, bw, bh);
+        g.fillStyle = "rgba(255,255,255,.05)";
+        g.fillRect(x, 240 - bh, bw, 2);
+        if(Math.random() < .4){                       // antenne / citerne
+          g.fillStyle = base;
+          if(Math.random() < .5) g.fillRect(x + bw/2 - 1, 240 - bh - 12, 2, 12);
+          else g.fillRect(x + 6, 240 - bh - 8, 14, 8);
+        }
+        for(let wy = 240 - bh + 7; wy < 232; wy += 13)
+          for(let wx = x + 5; wx < x + bw - 7; wx += 11)
+            if(Math.random() < litChance){
+              g.fillStyle = Math.random() < .12 ? "rgba(43,228,208,.75)" : winCol;
+              g.fillRect(wx, wy, 5, 7);
+            }
+        x += bw + 2 + Math.random()*10;
+      }
     });
-    bullets.push({ t:0, from:[ship.x, SHIP_Y - .5, SHIP_Z], target:best, miss:!best });
-    muzzleT = performance.now(); AudioFX.laser();
-  }, 380);
+    return t;
+  }
+  const far  = skyline(680, 90, 190, "#171736", "rgba(255,216,138,.35)", .16);
+  const near = skyline(680, 40, 120, "#20204a", "rgba(255,216,138,.8)",  .22);
+  const OBS = [
+    pre(26, 34, (g,w,h)=>{                            // poubelle
+      g.fillStyle = "#3c4468"; g.fillRect(2, 6, w-4, h-6);
+      g.fillStyle = "#4d5680"; for(let x=5; x<w-5; x+=5) g.fillRect(x, 9, 2, h-12);
+      g.fillStyle = "#59639b"; g.fillRect(0, 3, w, 5); g.fillRect(w/2-3, 0, 6, 4);
+      g.fillStyle = "rgba(255,255,255,.14)"; g.fillRect(0, 3, w, 2);
+    }),
+    pre(22, 26, (g,w,h)=>{                            // cône de chantier
+      g.fillStyle = "#ff7f2e";
+      g.beginPath(); g.moveTo(w/2-3, 0); g.lineTo(w/2+3, 0);
+      g.lineTo(w-2, h-4); g.lineTo(2, h-4); g.closePath(); g.fill();
+      g.fillStyle = "#ffe9d2"; g.fillRect(5, h-15, w-10, 5);
+      g.fillStyle = "#d95f14"; g.fillRect(0, h-4, w, 4);
+    }),
+    pre(30, 30, (g,w,h)=>{                            // caisse
+      g.fillStyle = "#8f6c39"; g.fillRect(0, 0, w, h);
+      g.strokeStyle = "#5d431f"; g.lineWidth = 3;
+      g.strokeRect(1.5, 1.5, w-3, h-3);
+      g.beginPath(); g.moveTo(2, 2); g.lineTo(w-2, h-2);
+      g.moveTo(w-2, 2); g.lineTo(2, h-2); g.stroke();
+      g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(2, 2, w-4, 3);
+    }),
+    pre(40, 28, (g,w,h)=>{                            // barrière
+      g.fillStyle = "#8a92b8"; g.fillRect(4, 8, 4, h-8); g.fillRect(w-8, 8, 4, h-8);
+      for(let i=0;i<5;i++){ g.fillStyle = i%2 ? "#ffe9e9" : "#ff4d4d"; g.fillRect(i*w/5, 3, w/5, 11); }
+      g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(0, 12, w, 2);
+    }),
+  ];
+  const heart = Voxel.sprite("heart", "#ff6b6b", .4, -.25, 30, 30);
+  const skyStars = Array.from({length:46}, ()=>({
+    x: Math.random()*W, y: Math.random()*(GROUND-160), r: Math.random()*1.4 + .5, ph: Math.random()*7 }));
 
-  let raf;
+  /* ═══ état ═══ */
+  let phase = "run";                     // run → arrive → ladder → done
+  let dist = 0, speed = 3.0;
+  const SPEED_MAX = 5.3, DIST_GOAL = 8800;
+  const player = { y:GROUND, vy:0, ground:true, inv:-9e9, holds:false, buffer:0, squash:0 };
+  let obstacles = [], cans = [], lamps = [], parts = [], texts = [];
+  let nextGapPx = 430, nextLampPx = 260;
+  let hearts = 3, hits = 0, combo = 0, bombes = 0;
+  let shakeF = 0, stopUntil = 0, hitT = -9e9, flashT = -9e9, msg = "", msgUntil = 0;
+  let running = false, over = false, lastT = 0;
+  let mile = 0, cop = null, nextCopMs = 9000, birds = [];
+  /* assistance invisible : après des échecs répétés, le jeu
+     s'adoucit sans le dire (écarts plus larges, vitesse plafonnée,
+     projecteur plus lent) — personne n'aime rester bloqué */
+  let resets = 0, ladderMiss = 0;
+  /* échelle */
+  const RUNGS = 22;
+  let wallX = 0, rung = 0, camY = 0, climbT = -9e9, caughtT = -9e9, doneT = 0;
+  let prevDanger = false, newRec = false;
+
+  /* ═══ entrées : pointeur + clavier (buffer de saut inclus) ═══ */
+  function press(){
+    AudioFX.resume();
+    if(!running || over) return;
+    if(phase === "run" || phase === "arrive"){ player.buffer = 9; player.holds = true; }
+    else if(phase === "ladder") climb();
+  }
+  function release(){ player.holds = false; }
+  const onDown = e=>{ e.preventDefault(); press(); };
+  const onUp = ()=>release();
+  const onKey = e=>{
+    if(e.code === "Space" || e.code === "ArrowUp"){ if(!e.repeat) press(); e.preventDefault(); }
+  };
+  const onKeyUp = e=>{ if(e.code === "Space" || e.code === "ArrowUp") release(); };
+  cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointerup", onUp);
+  cv.addEventListener("pointercancel", onUp);
+  window.addEventListener("keydown", onKey);
+  window.addEventListener("keyup", onKeyUp);
+
+  function dust(x, y, n, col){
+    for(let i=0;i<n;i++) parts.push({ x: x + (Math.random()-.5)*10, y,
+      vx: -(.5 + Math.random()*1.4), vy: -(.2 + Math.random()*1.1),
+      life: 12 + Math.random()*10, col: col || "rgba(200,200,230,.5)", sz: 2 + Math.random()*2 });
+  }
+  function ouch(now, why){
+    hearts--; hits++; combo = 0;
+    player.inv = now + 1400; shakeF = 12; hitT = now; stopUntil = now + 90;
+    AudioFX.err();
+    msg = why; msgUntil = now + 1300;
+    if(phase === "run") speed = Math.max(2.4, speed*.65);
+    if(hearts <= 0){
+      hearts = 3; resets++;
+      if(phase === "ladder"){ rung = Math.max(0, rung - 6); }
+      else{
+        dist = Math.max(0, dist - DIST_GOAL*.12);
+        obstacles = []; cans = []; nextGapPx = 430;
+      }
+      msg = "ILS T'ONT VU ! ON REPART…"; msgUntil = now + 1800;
+      Juice.shake(box);
+    }
+  }
+
+  /* ═══ génération ÉQUITABLE : l'écart entre deux obstacles est
+     calibré sur le temps de réaction (≥ 1,05 s), et tout naît
+     hors écran, donc visible de loin ═══ */
+  function spawn(dd, now){
+    if(phase !== "run" || dist > DIST_GOAL - 900) return;
+    nextLampPx -= dd;
+    if(nextLampPx <= 0){
+      nextLampPx = 430 + Math.random()*220;
+      lamps.push({ x: W + 60 });
+      if(Math.random() < .4) birds.push({ x: W + 120 + Math.random()*80, y: GROUND,
+        vx:0, vy:0, fly:false, flap: Math.random()*7 });
+    }
+    nextGapPx -= dd;
+    if(nextGapPx > 0) return;
+    const secs = 1.05 + Math.min(.5, resets*.18) + Math.random()*1.05;   // fenêtre de réaction
+    nextGapPx = speed * 60 * secs;
+    const o = OBS[Math.floor(Math.random()*OBS.length)];
+    obstacles.push({ x: W + 60, img:o.img, w:o.w, h:o.h });
+    /* des bombes à ramasser : en cloche AU-DESSUS de l'obstacle
+       (le saut rapporte) ou en ligne au sol dans le trou suivant */
+    const r = Math.random();
+    if(r < .42){
+      for(let i=0;i<3;i++) cans.push({ x: W + 60 + o.w/2 - 26 + i*26,
+        y: GROUND - o.h - 42 - Math.sin((i+.5)/3*Math.PI)*22, ph: Math.random()*7 });
+    }else if(r < .72){
+      const bx = W + 60 + o.w + 90 + Math.random()*60;
+      for(let i=0;i<3;i++) cans.push({ x: bx + i*26, y: GROUND - 26, ph: Math.random()*7 });
+    }
+  }
+
+  /* ═══ le fuyard (pixel-art paramétrique, 4 poses de course) ═══ */
+  function drawRunner(g, cx, feetY, now){
+    const p = Math.floor(now/75) % 4;
+    const inv = now < player.inv;
+    g.save();
+    if(inv) g.globalAlpha = Math.floor(now/90)%2 ? .35 : .85;
+    g.translate(cx, feetY);
+    g.scale(1 + player.squash*.5, 1 - player.squash);
+    /* écharpe qui flotte — dorée quand le combo chauffe */
+    const sc = combo >= 5 ? [255,210,63] : [43,228,208];
+    for(let i=0;i<4;i++){
+      g.fillStyle = `rgba(${sc[0]},${sc[1]},${sc[2]},${.8 - i*.18})`;
+      g.fillRect(-11 - i*4, -34 + Math.sin(now/80 + i)*2.4, 4, 3);
+    }
+    /* jambes : 4 poses, ou repliées en l'air */
+    const legs = player.ground
+      ? [ [[-7,13],[4,11]], [[-3,14],[1,14]], [[3,11],[-6,13]], [[-1,14],[-1,14]] ][p]
+      : [[-6,9],[4,10]];
+    legs.forEach(([lx,lh])=>{
+      g.fillStyle = "#20204a"; g.fillRect(lx, -lh, 5, lh);
+      g.fillStyle = "#EDEDF7"; g.fillRect(lx-1, -Math.min(3,lh), 7, 3);
+    });
+    /* sac à dos, torse à capuche, zip */
+    g.fillStyle = "#d5155f"; g.fillRect(-13, -28, 6, 13);
+    g.fillStyle = "#2c2c5c"; g.fillRect(-8, -31, 16, 19);
+    g.fillStyle = "#2BE4D0"; g.fillRect(-1, -30, 2, 17);
+    /* bras + bombe en main */
+    const ax = player.ground ? [2,0,-2,0][p] : 3;
+    g.fillStyle = "#252550"; g.fillRect(ax, -27, 4, 11);
+    g.fillStyle = "#FFD23F"; g.fillRect(ax+1, -17, 5, 7);
+    /* tête sous capuche */
+    g.fillStyle = "#2c2c5c"; g.fillRect(-6, -43, 14, 13);
+    g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(-6, -43, 14, 2);
+    g.fillStyle = "#e8b98a"; g.fillRect(3, -40, 5, 8);
+    g.fillStyle = "#0B0B1E"; g.fillRect(6, -38, 2, 2);
+    g.restore();
+  }
+  /* le même, de dos, accroché à l'échelle */
+  function drawClimber(g, cx, sy, now){
+    const inv = now < player.inv;
+    const k = Math.max(0, 1 - (now - climbT)/140);     // impulsion de montée
+    const up = rung % 2;
+    g.save();
+    if(inv) g.globalAlpha = Math.floor(now/90)%2 ? .35 : .85;
+    g.translate(cx, sy - k*6);
+    /* jambes + baskets */
+    g.fillStyle = "#20204a";
+    g.fillRect(-8, -12, 5, 12); g.fillRect(3, -12 - up*4, 5, 12 + up*4);
+    g.fillStyle = "#EDEDF7";
+    g.fillRect(-9, -3, 7, 3); g.fillRect(2, -3 - up*4, 7, 3);
+    /* torse, puis sac à dos PAR-DESSUS (on le voit de dos) */
+    g.fillStyle = "#3a3a74"; g.fillRect(-9, -32, 18, 18);
+    g.fillStyle = "#d5155f"; g.fillRect(-6, -29, 12, 13);
+    g.fillStyle = "#ff5ba3"; g.fillRect(-6, -29, 12, 2);
+    g.fillStyle = "#8e0e46"; g.fillRect(-1, -29, 2, 13);
+    /* bras alternés + mains sur les barreaux */
+    g.fillStyle = "#3a3a74";
+    g.fillRect(-13, up ? -44 : -34, 4, 12);
+    g.fillRect(9, up ? -34 : -44, 4, 12);
+    g.fillStyle = "#e8b98a";
+    g.fillRect(-13, (up ? -44 : -34) - 3, 4, 3);
+    g.fillRect(9, (up ? -34 : -44) - 3, 4, 3);
+    /* capuche + liseré */
+    g.fillStyle = "#3a3a74"; g.fillRect(-6, -45, 13, 12);
+    g.fillStyle = "rgba(255,255,255,.22)"; g.fillRect(-6, -45, 13, 2);
+    /* écharpe cyan qui flotte */
+    for(let i=0;i<3;i++){
+      g.fillStyle = `rgba(43,228,208,${.85 - i*.25})`;
+      g.fillRect(8 + i*4, -36 + Math.sin(now/80 + i)*2.5, 4, 3);
+    }
+    g.restore();
+  }
+
+  /* ═══ phase échelle : faisceau à phase continue — il peut
+     ralentir (assistance) sans jamais se téléporter ═══ */
+  let beamP = Math.PI/2, beamXv = W/2 + 175, dangerNow = false;
+  function climb(){
+    const now = performance.now();
+    if(now < player.inv + 150 && now < caughtT + 500) return;   // le temps d'encaisser
+    if(dangerNow && now > player.inv){
+      caughtT = now; ladderMiss++;
+      const before = hearts;
+      ouch(now, "REPÉRÉ PAR LE PROJECTEUR !");
+      if(before > 1) rung = Math.max(0, rung - 3);   // sinon ouch a déjà fait redescendre
+      return;
+    }
+    rung++; climbT = now;
+    AudioFX.combo(2 + (rung % 6));
+    if(rung >= RUNGS && phase === "ladder"){
+      phase = "done"; doneT = now;
+      /* record personnel de bombes ramassées */
+      let rec = 0;
+      try{ rec = +localStorage.getItem("invasionLesVans:cavaleRec") || 0; }catch(e){}
+      newRec = bombes > rec;
+      if(newRec){ try{ localStorage.setItem("invasionLesVans:cavaleRec", bombes); }catch(e){} }
+      AudioFX.fanfare(); Juice.confetti(box, 26);
+      const stars = hits === 0 ? 3 : hits <= 2 ? 2 : 1;
+      setTimeout(()=>api.win({ stars,
+        label: stars === 3 ? "PAS VU, PAS PRIS !" : "SEMÉ !" }), 1600);
+    }
+  }
+
+  /* ═══ boucle ═══ */
+  let raf = null;
   function loop(now){
     if(over) return;
-    const t = (now - t0)/1000;
+    const dt = lastT ? Math.min(2.2, (now - lastT)/16.667) : 1;
+    lastT = now;
     const hitstop = now < stopUntil;
-    const sweep = Math.sin(now/900) * .55;
-    ship.vx = (ship.tx - ship.x) * .22;
-    ship.x += ship.vx;
-
-    if(running && !hitstop){
-      zWall -= .0016;                       // le mur avance vers toi
-      if(zWall < 2.4){ resetWave(); }
-    }
 
     c.save();
-    if(shakeF > 0){ c.translate((Math.random()-.5)*shakeF, (Math.random()-.5)*shakeF); shakeF *= .86; if(shakeF < .5) shakeF = 0; }
+    c.clearRect(0, 0, W, H);
+    if(shakeF > 0){ c.translate((Math.random()-.5)*shakeF, (Math.random()-.5)*shakeF);
+      shakeF *= .86; if(shakeF < .5) shakeF = 0; }
 
-    /* ── fond spatial ── */
-    const bg = c.createLinearGradient(0,0,0,H);
-    bg.addColorStop(0, "#10102e"); bg.addColorStop(.55, "#181643"); bg.addColorStop(1, "#080a1e");
-    c.fillStyle = bg; c.fillRect(0,0,W,H);
-
-    /* étoiles en profondeur (défilent vers toi) */
-    stars3d.forEach(s=>{
-      if(!hitstop && running){ s.z -= .05; if(s.z < .4){ s.z = 11; s.x = (Math.random()-.5)*14; s.y = (Math.random()-.5)*10; } }
-      const [sx, sy, f] = proj(s.x, s.y, s.z);
-      c.fillStyle = `rgba(200,220,255,${Math.min(.9, f*1.6)})`;
-      const sz = Math.max(1, f*4);
-      c.fillRect(sx, sy, sz, sz);
+    /* ── ciel de nuit, lune, étoiles ── */
+    const sky = c.createLinearGradient(0, 0, 0, GROUND);
+    sky.addColorStop(0, "#0d0d26"); sky.addColorStop(.6, "#181640"); sky.addColorStop(1, "#241d4e");
+    c.fillStyle = sky; c.fillRect(0, 0, W, GROUND);
+    skyStars.forEach(s=>{
+      c.globalAlpha = .35 + Math.sin(now/700 + s.ph)*.3;
+      c.fillStyle = "#dfe6ff"; c.fillRect(s.x, s.y, s.r, s.r);
     });
+    c.globalAlpha = 1;
+    c.save();
+    c.shadowColor = "rgba(244,240,214,.8)"; c.shadowBlur = 26;
+    c.fillStyle = "#f4f0d6"; c.beginPath(); c.arc(272, 62, 24, 0, 7); c.fill();
+    c.shadowColor = "transparent";
+    c.fillStyle = "rgba(0,0,0,.08)";
+    c.beginPath(); c.arc(264, 56, 6, 0, 7); c.fill();
+    c.beginPath(); c.arc(280, 70, 4, 0, 7); c.fill();
+    c.restore();
 
-    /* ── sol en fuite (grille perspective) ── */
-    c.strokeStyle = "rgba(120,150,255,.22)"; c.lineWidth = 1;
-    const GY = 3.8;
-    for(let i=-6;i<=6;i++){
-      const a = proj(i*1.1, GY, 1), b = proj(i*1.1, GY, 12);
-      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
-    }
-    const scroll = running ? (t*1.2) % 1 : 0;
-    for(let k=0;k<12;k++){
-      const z = 1 + ((k + scroll) % 12);
-      const a = proj(-7, GY, z), b = proj(7, GY, z);
-      const f = F/(F+z);
-      c.strokeStyle = `rgba(120,150,255,${(f*.5).toFixed(3)})`;
-      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    if(phase === "ladder" || phase === "done"){
+      drawLadderScene(now, dt, hitstop);
+    }else{
+      drawRunScene(now, dt, hitstop);
     }
 
-    /* ── aliens : triés du plus loin au plus près ── */
-    const drawList = aliens.filter(a=>a.alive)
-      .map(a=>({ a, p: alienPos(a, sweep, zWall) }))
-      .sort((u,v)=>v.p[2] - u.p[2]);
-    drawList.forEach(({a, p})=>{
-      const [sx, sy, f] = proj(p[0], p[1], p[2]);
-      const sheet = a.cyan ? pr.cyan : pr.mag;
-      const frame = Math.floor((now/70 + a.gx*1.7 + a.gy*.9) % NA + NA) % NA;
-      const img = sheet[frame];
-      const size = 102 * f;
-      const bob = Math.sin(now/430 + a.gx) * 2 * f;
-      c.drawImage(img, sx - size/2, sy - size/2 + bob, size, size);
-    });
-
-    /* ── projectiles : ils partent VERS LE FOND ── */
-    if(running && !hitstop){
-      bullets.forEach(b=>{ b.t += .052; });
-      for(let i=bullets.length-1;i>=0;i--){
-        const b = bullets[i];
-        if(b.t >= 1){
-          const a = b.target;
-          if(a && a.alive){
-            const p = alienPos(a, sweep, zWall);
-            if(a.cyan){
-              lives--; cyanHits++; combo = 0; shakeF = 14; hitT = now;
-              AudioFX.err();
-              spawnParts(p[0], p[1], p[2], "#ff6b6b");
-              msg = "BLEU TOUCHÉ ! ♥ −1"; msgUntil = now + 1200;
-              if(lives <= 0) resetWave();
-            }else{
-              a.alive = false; combo++;
-              stopUntil = now + 60; shakeF = 8;
-              AudioFX.boom();
-              if(combo > 1) AudioFX.combo(combo);
-              if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
-              spawnParts(p[0], p[1], p[2], MAG);
-              texts.push({ x:p[0], y:p[1], z:p[2], life:44,
-                txt:"+10" + (combo > 1 ? " ×" + combo : ""), color: combo > 2 ? "#ffce4d" : "#fff" });
-            }
-          }
-          bullets.splice(i, 1);
-        }
-      }
-    }
-    /* rendu additif : plasma, particules */
-    c.globalCompositeOperation = "lighter";
-    bullets.forEach(b=>{
-      const dst = b.target && b.target.alive
-        ? alienPos(b.target, sweep, zWall)
-        : [b.from[0]*3, b.from[1] - 5, 11];
-      const x = b.from[0] + (dst[0] - b.from[0]) * b.t;
-      const y = b.from[1] + (dst[1] - b.from[1]) * b.t;
-      const z = b.from[2] + (dst[2] - b.from[2]) * b.t;
-      const [sx, sy, f] = proj(x, y, z);
-      const sz = Math.max(2, 14*f);
-      c.fillStyle = "#cfefff";
-      c.fillRect(sx - sz/2, sy - sz/2, sz, sz*1.5);
-      c.fillStyle = "rgba(77,184,255,.5)";
-      c.fillRect(sx - sz, sy - sz, sz*2, sz*3);
-    });
-    if(running && !hitstop){
-      parts.forEach(p=>{ p.x += p.vx; p.y += p.vy; p.z += p.vz; p.vy += .004; p.life--; });
-      parts = parts.filter(p=>p.life > 0 && p.z > .3);
-      texts.forEach(t2=>{ t2.y -= .012; t2.life--; });
+    /* ── particules + textes flottants (communs) ── */
+    if(!hitstop){
+      parts.forEach(p=>{ p.x += p.vx*dt; p.y += p.vy*dt; p.vy += .06*dt; p.life -= dt; });
+      parts = parts.filter(p=>p.life > 0);
+      texts.forEach(t2=>{ t2.y -= .7*dt; t2.life -= dt; });
       texts = texts.filter(t2=>t2.life > 0);
     }
     parts.forEach(p=>{
-      const [sx, sy, f] = proj(p.x, p.y, p.z);
-      c.globalAlpha = Math.min(1, p.life/14);
-      c.fillStyle = p.color;
-      const sz = Math.max(1, p.sz * f);
-      c.fillRect(sx - sz/2, sy - sz/2, sz, sz);
+      c.globalAlpha = Math.min(1, p.life/10);
+      c.fillStyle = p.col; c.fillRect(p.x, p.y, p.sz, p.sz);
     });
-    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
-
-    /* ── vaisseau (près de la caméra) ── */
-    {
-      const k = Math.max(0, Math.min(6, Math.round(3 + ship.vx * 6)));
-      const img = pr.ship[k];
-      const [sx, sy, f] = proj(ship.x, SHIP_Y, SHIP_Z);
-      const size = 96 * f;
-      c.drawImage(img, sx - size/2, sy - size/2, size, size);
-      if(now - muzzleT < 70){
-        c.fillStyle = "#ffce4d";
-        c.fillRect(sx - 4, sy - size/2 - 4, 8, 9);
-      }
-    }
-
-    /* textes flottants projetés */
+    c.globalAlpha = 1;
+    c.font = "bold 15px 'Baloo 2', sans-serif"; c.textAlign = "center";
     texts.forEach(t2=>{
-      const [sx, sy, f] = proj(t2.x, t2.y, t2.z);
-      c.fillStyle = t2.color;
-      c.font = `bold ${Math.round(15*f + 8)}px 'Baloo 2', sans-serif`;
-      c.textAlign = "center";
-      c.fillText(t2.txt, sx, sy);
+      c.globalAlpha = Math.min(1, t2.life/12);
+      c.fillStyle = t2.col; c.fillText(t2.txt, t2.x, t2.y);
     });
-    c.textAlign = "left";
+    c.globalAlpha = 1; c.textAlign = "left";
 
-    /* vignette rouge à l'erreur */
-    if(now - hitT < 220){
-      c.strokeStyle = `rgba(255,107,107,${(1-(now-hitT)/220)*.85})`;
-      c.lineWidth = 11; c.strokeRect(5, 5, W-10, H-10);
+    /* flash blanc de transition (arrivée au mur) */
+    if(now - flashT < 260){
+      c.fillStyle = `rgba(255,255,255,${(1-(now-flashT)/260)*.8})`;
+      c.fillRect(0, 0, W, H);
+    }
+    /* vignette rouge quand ça pique */
+    if(now - hitT < 240){
+      c.strokeStyle = `rgba(255,107,107,${(1-(now-hitT)/240)*.85})`;
+      c.lineWidth = 10; c.strokeRect(4, 4, W-8, H-8);
     }
 
     /* ── HUD ── */
-    for(let k=0;k<lives;k++) c.drawImage(pr.heart, 10 + k*30, 6);
-    const left = aliens.filter(a=>a.alive && !a.cyan).length;
-    c.fillStyle = "#ffce4d"; c.font = "bold 15px 'Baloo 2', sans-serif";
-    c.fillText("reste : " + left, 108, 25);
-    if(combo > 1){ c.fillStyle = CYAN; c.fillText("COMBO ×" + combo, W - 118, 25); }
-    /* jauge de danger : le mur approche */
-    const danger = Math.max(0, Math.min(1, (9.5 - zWall) / (9.5 - 2.4)));
-    c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(10, H-16, W-20, 6);
-    c.fillStyle = danger > .75 ? "#ff6b6b" : danger > .45 ? "#ffce4d" : "#39e08a";
-    c.fillRect(10, H-16, (W-20)*danger, 6);
+    for(let k=0;k<hearts;k++){
+      const pu = now - hitT < 420 ? 1 + Math.sin((now - hitT)/420*Math.PI)*.3 : 1;
+      const s = 30*pu;
+      c.drawImage(heart, 8 + k*28 - (s-30)/2, 4 - (s-30)/2, s, s);
+    }
+    c.fillStyle = "#FFD23F"; c.fillRect(W-86, 12, 9, 13);
+    c.fillStyle = "#EDEDF7"; c.fillRect(W-84, 8, 5, 4);
+    c.font = "bold 15px 'Baloo 2', sans-serif"; c.fillStyle = "#ffce4d";
+    c.fillText("× " + bombes, W-70, 24);
+    if(combo > 1){ c.fillStyle = "#2BE4D0"; c.fillText("COMBO ×" + combo, W-86, 44); }
+    /* progression : la rue, puis l'échelle */
+    const prog = phase === "run" || phase === "arrive"
+      ? Math.min(1, dist/DIST_GOAL) : Math.min(1, rung/RUNGS);
+    c.fillStyle = "rgba(255,255,255,.13)"; c.fillRect(10, H-14, W-20, 6);
+    c.fillStyle = phase === "ladder" || phase === "done" ? "#2BE4D0" : "#39e08a";
+    c.fillRect(10, H-14, (W-20)*prog, 6);
+    c.fillStyle = "#9c9cc4"; c.font = "bold 11px 'Baloo 2', sans-serif";
+    c.fillText(phase === "ladder" || phase === "done" ? "L'ÉCHELLE" : "LA RUE", 10, H-20);
     if(msg && now < msgUntil){
-      c.fillStyle = "#ff6b6b"; c.font = "bold 16px 'Baloo 2', sans-serif";
-      c.fillText(msg, 12, H-26);
+      c.fillStyle = "#ff8484"; c.font = "bold 16px 'Baloo 2', sans-serif"; c.textAlign = "center";
+      c.fillText(msg, W/2, H-32); c.textAlign = "left";
     }
     c.restore();
-
-    if(running && left === 0){
-      over = true; clearInterval(fire);
-      AudioFX.fanfare();
-      c.fillStyle = "rgba(6,8,24,.7)"; c.fillRect(0,0,W,H);
-      c.fillStyle = "#ffce4d"; c.font = "bold 30px 'Baloo 2', sans-serif"; c.textAlign = "center";
-      c.fillText("STAGE CLEAR !", W/2, H/2);
-      c.textAlign = "left";
-      const stars = cyanHits === 0 ? 3 : cyanHits <= 2 ? 2 : 1;
-      setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? "SANS UNE ÉGRATIGNURE !" : "STAGE CLEAR !" }), 1500);
-      return;
-    }
     raf = requestAnimationFrame(loop);
   }
-  loop(performance.now());                 // première image tout de suite
+
+  /* ── la rue : parallaxe, course, obstacles, bombes ── */
+  function drawRunScene(now, dt, hitstop){
+    const dd = (running && !hitstop) ? speed*dt : 0;
+
+    /* nuages paresseux devant la lune */
+    for(let i=0;i<2;i++){
+      const cxx = ((i*260 + 40 - dist*.05) % (W + 200) + W + 200) % (W + 200) - 100;
+      const cyy = 58 + i*46;
+      c.fillStyle = "rgba(205,215,255,.07)";
+      c.beginPath();
+      c.ellipse(cxx, cyy, 46, 11, 0, 0, 7);
+      c.ellipse(cxx + 26, cyy - 7, 26, 9, 0, 0, 7);
+      c.fill();
+    }
+
+    /* parallaxe : deux rangées d'immeubles */
+    [[far, .18, GROUND-118], [near, .45, GROUND-64]].forEach(([L2, f, yy])=>{
+      const off = (dist*f) % L2.w;
+      c.drawImage(L2.img, -off, yy - 176, L2.w, 240);
+      c.drawImage(L2.img, L2.w - off, yy - 176, L2.w, 240);
+    });
+    /* voile d'ambiance devant les immeubles lointains */
+    c.fillStyle = "rgba(13,13,38,.35)"; c.fillRect(0, 0, W, GROUND);
+
+    /* trottoir */
+    c.fillStyle = "#16162e"; c.fillRect(0, GROUND, W, H-GROUND);
+    c.fillStyle = "rgba(255,255,255,.09)"; c.fillRect(0, GROUND, W, 2);
+    c.strokeStyle = "rgba(255,255,255,.05)"; c.lineWidth = 1;
+    for(let x = -(dist % 46); x < W; x += 46){
+      c.beginPath(); c.moveTo(x, GROUND+2); c.lineTo(x-8, H); c.stroke();
+    }
+
+    if(running && !hitstop){
+      /* vitesse : elle monte doucement avec la distance */
+      const target = phase === "arrive" ? 2.3
+        : 3.0 + (SPEED_MAX - 3.0)*Math.min(1, dist/(DIST_GOAL*.85))
+              * (1 - Math.min(.25, resets*.08));
+      speed += (target - speed)*.02*dt;
+      dist += dd;
+      spawn(dd, now);
+      lamps.forEach(l=>l.x -= dd);
+      obstacles.forEach(o=>o.x -= dd);
+      cans.forEach(k=>k.x -= dd);
+      lamps = lamps.filter(l=>l.x > -40);
+      obstacles = obstacles.filter(o=>o.x > -60);
+      cans = cans.filter(k=>k.x > -30);
+      /* jalons de rythme : la course a des actes */
+      const frac = dist/DIST_GOAL;
+      if(frac > .35 && mile < 1){ mile = 1; msg = "ÇA S'ACCÉLÈRE !"; msgUntil = now + 1400; AudioFX.signal(); }
+      if(frac > .70 && mile < 2){ mile = 2; msg = "DERNIÈRE LIGNE DROITE !"; msgUntil = now + 1500; AudioFX.signal(); }
+      /* pigeons : ils picorent, puis s'envolent quand tu arrives */
+      birds.forEach(bd=>{
+        bd.x -= dd;
+        if(!bd.fly && bd.x - PX < 86){
+          bd.fly = true; bd.vx = 1.4 + Math.random(); bd.vy = -(2.4 + Math.random()*1.2);
+        }
+        if(bd.fly){ bd.x += bd.vx*dt; bd.y += bd.vy*dt; bd.vy -= .015*dt; }
+      });
+      birds = birds.filter(bd=>bd.x > -30 && bd.x < W + 260 && bd.y > -40);
+      /* la patrouille passe en silhouette au premier plan */
+      nextCopMs -= dt*16.667;
+      if(!cop && nextCopMs <= 0 && phase === "run" && dist < DIST_GOAL - 1200){
+        cop = { x: W + 80 }; AudioFX.signal();
+      }
+      if(cop){
+        cop.x -= (speed + 3.4)*dt;
+        if(cop.x < -140){ cop = null; nextCopMs = 11000 + Math.random()*9000; }
+      }
+      /* traînée dorée quand le combo chauffe */
+      if(combo >= 5 && Math.random() < .4)
+        parts.push({ x: PX - 10 - Math.random()*6, y: player.y - 22 + Math.random()*16,
+          vx: -1.2, vy: -.2, life: 12, col: "rgba(255,210,63,.85)", sz: 2.4 });
+    }
+
+    /* réverbères + flaques de lumière */
+    lamps.forEach(l=>{
+      const g2 = c.createRadialGradient(l.x, GROUND-2, 4, l.x, GROUND-2, 60);
+      g2.addColorStop(0, "rgba(255,224,150,.16)"); g2.addColorStop(1, "rgba(255,224,150,0)");
+      c.fillStyle = g2; c.fillRect(l.x-60, GROUND-60, 120, 62);
+      c.fillStyle = "#33335e"; c.fillRect(l.x-2, GROUND-92, 4, 92);
+      c.fillRect(l.x-2, GROUND-92, 14, 3);
+      c.fillStyle = "#ffe096"; c.fillRect(l.x+8, GROUND-90, 7, 5);
+      c.save(); c.globalCompositeOperation = "lighter";
+      const g3 = c.createRadialGradient(l.x+11, GROUND-87, 1, l.x+11, GROUND-87, 15);
+      g3.addColorStop(0, "rgba(255,224,150,.5)"); g3.addColorStop(1, "rgba(255,224,150,0)");
+      c.fillStyle = g3; c.fillRect(l.x-10, GROUND-105, 44, 40); c.restore();
+    });
+
+    /* bombes à ramasser */
+    cans.forEach(k=>{
+      const bob = Math.sin(now/260 + k.ph)*3;
+      c.save(); c.translate(k.x, k.y + bob); c.rotate(Math.sin(now/420 + k.ph)*.18);
+      c.fillStyle = "#FFD23F"; c.fillRect(-5, -8, 10, 15);
+      c.fillStyle = "#EDEDF7"; c.fillRect(-3, -12, 6, 4);
+      c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(-4, -7, 3, 12);
+      c.restore();
+      c.globalAlpha = .35 + Math.sin(now/180 + k.ph)*.3;
+      c.fillStyle = "#fff";
+      c.fillRect(k.x + 8, k.y + bob - 12, 2, 2);
+      c.globalAlpha = 1;
+    });
+
+    /* pigeons */
+    birds.forEach(bd=>{
+      c.save(); c.translate(bd.x, bd.y);
+      c.fillStyle = "#9a9ac2";
+      c.fillRect(-4, -6, 8, 5);                                    // corps
+      const peck = !bd.fly && Math.sin(now/300 + bd.flap) > .6 ? 2 : 0;
+      c.fillRect(3, -9 + peck, 4, 4);                              // tête
+      c.fillStyle = "#ffb14d"; c.fillRect(7, -8 + peck, 3, 2);     // bec
+      if(bd.fly){                                                  // battement d'ailes
+        const wing = Math.sin(now/60 + bd.flap) > 0 ? -5 : 2;
+        c.fillStyle = "#b8b8dc"; c.fillRect(-3, -6 + wing, 6, 3);
+      }
+      c.restore();
+    });
+
+    /* obstacles */
+    obstacles.forEach(o=>{
+      c.fillStyle = "rgba(0,0,0,.4)";
+      c.beginPath(); c.ellipse(o.x + o.w/2, GROUND+3, o.w*.55, 4, 0, 0, 7); c.fill();
+      c.drawImage(o.img, o.x, GROUND - o.h, o.w, o.h);
+    });
+
+    /* ── physique du saut ── */
+    if(running && !hitstop){
+      if(player.buffer > 0){
+        player.buffer -= dt;
+        if(player.ground){
+          player.vy = -10.6; player.ground = false; player.buffer = 0;
+          player.squash = -.22;
+          AudioFX.nav(); dust(PX, GROUND, 6);
+        }
+      }
+      if(!player.ground){
+        const g2 = player.vy < 0 ? (player.holds ? .42 : .60) : .78;
+        player.vy += g2*dt;
+        player.y += player.vy*dt;
+        if(player.y >= GROUND){
+          player.y = GROUND; player.vy = 0; player.ground = true;
+          player.squash = .28; AudioFX.tick(); dust(PX, GROUND, 8);
+        }
+      }
+      player.squash *= Math.pow(.82, dt);
+
+      /* collisions & ramassage */
+      const pw = 18, phh = 34;
+      for(const o of obstacles){
+        if(now < player.inv) break;
+        if(PX + pw/2 > o.x + 5 && PX - pw/2 < o.x + o.w - 5 &&
+           player.y > GROUND - o.h + 6){
+          ouch(now, "AÏE ! SAUTE PAR-DESSUS !");
+          dust(PX, player.y - 10, 10, "rgba(255,120,120,.7)");
+          break;
+        }
+      }
+      /* saut « au ras » : frôler un obstacle en le sautant paie */
+      for(const o of obstacles){
+        if(!o.scored && o.x + o.w < PX - 9){
+          o.scored = true;
+          if(!player.ground && player.y > GROUND - o.h - 34){
+            bombes++; combo++;
+            if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
+            AudioFX.star(1);
+            texts.push({ x: PX + 26, y: player.y - 48, life: 36, txt: "AU RAS ! +1", col: "#2BE4D0" });
+            for(let j=0;j<5;j++) parts.push({ x: PX + 8, y: player.y - 20,
+              vx: (Math.random()-.5)*2, vy: -(1 + Math.random()), life: 12, col: "#2BE4D0", sz: 2 });
+          }
+        }
+      }
+      for(let i = cans.length-1; i >= 0; i--){
+        const k = cans[i];
+        if(Math.abs(k.x - PX) < 17 && Math.abs(k.y - (player.y - 18)) < 26){
+          cans.splice(i, 1);
+          bombes++; combo++;
+          if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
+          AudioFX.combo(combo + 2);
+          texts.push({ x:k.x, y:k.y - 8, life:34,
+            txt: "+1" + (combo > 1 ? "  ×" + combo : ""), col: combo > 2 ? "#ffce4d" : "#fff" });
+          for(let j=0;j<6;j++) parts.push({ x:k.x, y:k.y, vx:(Math.random()-.5)*2.4,
+            vy:-(1+Math.random()*1.6), life:14+Math.random()*8, col:"#FFD23F", sz:2.5 });
+        }
+      }
+      /* fin de la rue : le mur du QG entre en scène */
+      if(phase === "run" && dist >= DIST_GOAL){
+        phase = "arrive"; wallX = W + 30;
+        obstacles = []; cans = [];
+        msg = "LE MUR ! L'ÉCHELLE !"; msgUntil = now + 1600;
+      }
+      if(phase === "arrive"){
+        wallX -= dd;
+        if(wallX <= PX + 26){
+          phase = "ladder"; flashT = now; camY = 0;
+          msg = "TAPE POUR GRIMPER — GARE AU PROJECTEUR !"; msgUntil = now + 2400;
+          AudioFX.ok();
+        }
+      }
+    }
+    /* le mur qui arrive (phase "arrive") */
+    if(phase === "arrive"){
+      c.fillStyle = "#2a2744"; c.fillRect(wallX, 0, W - wallX + 10, GROUND);
+      c.fillStyle = "rgba(255,255,255,.06)"; c.fillRect(wallX, 0, 3, GROUND);
+      c.fillStyle = "#565d8c";
+      for(let y = 60; y < GROUND; y += 26){                 // l'échelle promise
+        c.fillRect(wallX + 18, y, 3, 26); c.fillRect(wallX + 39, y, 3, 26);
+        c.fillRect(wallX + 18, y + 6, 24, 3);
+      }
+    }
+
+    /* traînée de vitesse + ombre + coureur */
+    if(speed > 4.4 && player.ground){
+      c.globalAlpha = .2;
+      for(let i=1;i<4;i++) drawRunner(c, PX - i*7, player.y, now - i*40);
+      c.globalAlpha = 1;
+    }
+    const airH = GROUND - player.y;
+    c.fillStyle = "rgba(0,0,0,.45)";
+    c.beginPath();
+    c.ellipse(PX, GROUND + 4, Math.max(6, 15 - airH*.05), 4, 0, 0, 7);
+    c.fill();
+    drawRunner(c, PX, player.y, now);
+
+    /* la patrouille : silhouette qui traverse le premier plan,
+       gyrophare qui teinte toute la scène — pure pression */
+    if(cop){
+      const gy = Math.floor(now/140) % 2;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const tint = c.createRadialGradient(cop.x + 45, H - 20, 8, cop.x + 45, H - 20, 220);
+      tint.addColorStop(0, gy ? "rgba(255,70,70,.20)" : "rgba(80,140,255,.20)");
+      tint.addColorStop(1, "rgba(0,0,0,0)");
+      c.fillStyle = tint; c.fillRect(0, 0, W, H);
+      c.restore();
+      c.fillStyle = "#07071a";
+      c.fillRect(cop.x, H - 34, 96, 22);                           // caisse
+      c.fillRect(cop.x + 18, H - 48, 52, 16);                      // habitacle
+      c.fillStyle = "#1c2246";
+      c.fillRect(cop.x + 24, H - 45, 18, 11); c.fillRect(cop.x + 48, H - 45, 16, 11);
+      c.fillStyle = gy ? "#ff4d4d" : "#4d8cff";
+      c.fillRect(cop.x + 38, H - 53, 12, 5);                       // gyrophare
+      c.fillStyle = "#04040f";
+      c.beginPath(); c.arc(cop.x + 22, H - 11, 9, 0, 7); c.arc(cop.x + 74, H - 11, 9, 0, 7); c.fill();
+      c.fillStyle = "#2a2a52";
+      c.beginPath(); c.arc(cop.x + 22, H - 11, 4, 0, 7); c.arc(cop.x + 74, H - 11, 4, 0, 7); c.fill();
+    }
+
+    /* rappel du geste au tout début */
+    if(dist < 260 && running){
+      c.globalAlpha = .55 + Math.sin(now/220)*.35;
+      c.fillStyle = "#EDEDF7"; c.font = "bold 15px 'Baloo 2', sans-serif"; c.textAlign = "center";
+      c.fillText("TAPE = SAUT ✦ APPUI LONG = PLUS HAUT", W/2, 120);
+      c.textAlign = "left"; c.globalAlpha = 1;
+    }
+  }
+
+  /* ── l'échelle : grimpe, mais pas sous le projecteur ── */
+  function drawLadderScene(now, dt, hitstop){
+    camY += (rung*26 - camY)*Math.min(1, .12*dt);
+    const yOf = h => (H - 90) - (h - camY);            // hauteur monde → écran
+
+    /* le mur de briques */
+    c.fillStyle = "#2a2744"; c.fillRect(0, 0, W, H);
+    const BH = 15, BW = 32;
+    const off = camY % (BH*2);
+    c.fillStyle = "rgba(0,0,0,.16)";
+    for(let y = -BH*2 + off; y < H; y += BH){
+      const sh = (Math.round((y - off)/BH) % 2) ? BW/2 : 0;
+      for(let x = -BW; x < W; x += BW) c.fillRect(x + sh, y, BW - 2, BH - 2);
+    }
+    /* fenêtres au fil de la montée (déterministes) */
+    for(let b = Math.floor(camY/84) - 1; b < Math.floor((camY + H)/84) + 2; b++){
+      if(b < 0) continue;
+      const wx = (b*137) % 2 ? 30 + (b*53) % 80 : W - 66 - (b*71) % 80;
+      const wy = yOf(b*84 + 40);
+      if(wy < -50 || wy > H + 20) continue;
+      c.fillStyle = "#141430"; c.fillRect(wx, wy - 34, 30, 34);
+      if((b*29) % 3 === 0){
+        c.fillStyle = "rgba(255,216,138,.5)"; c.fillRect(wx + 3, wy - 31, 24, 28);
+        c.fillStyle = "rgba(0,0,0,.25)";
+        for(let ly = wy - 28; ly < wy - 8; ly += 6) c.fillRect(wx + 3, ly, 24, 2);
+        if((b*31) % 4 === 0){                       // un chat te regarde passer
+          c.fillStyle = "#0d0d20";
+          c.fillRect(wx + 17, wy - 10, 8, 10);      // assis sur le rebord
+          c.fillRect(wx + 18, wy - 15, 6, 6);
+          c.beginPath(); c.moveTo(wx+18, wy-14); c.lineTo(wx+19, wy-18); c.lineTo(wx+20, wy-14);
+          c.moveTo(wx+22, wy-14); c.lineTo(wx+23, wy-18); c.lineTo(wx+24, wy-14);
+          c.fill();
+          c.fillRect(wx + 13, wy - 4, 5, 2);        // la queue
+        }
+      }
+      c.fillStyle = "#3a3a66"; c.fillRect(wx - 3, wy, 36, 4);
+    }
+    /* le toit approche */
+    const roofY = yOf(RUNGS*26 + 66);
+    if(roofY > -30){
+      c.fillStyle = "#12122a"; c.fillRect(0, Math.max(-230, roofY - 200), W, 200);
+      c.fillStyle = "#454577"; c.fillRect(0, roofY, W, 8);
+      c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(0, roofY, W, 2);
+      /* le fanion du but flotte sur le toit */
+      const fx = W/2 + 58;
+      c.fillStyle = "#6a72a8"; c.fillRect(fx, roofY - 30, 3, 30);
+      const wav = Math.sin(now/240)*3;
+      c.fillStyle = "#2BE4D0";
+      c.beginPath(); c.moveTo(fx + 3, roofY - 30);
+      c.lineTo(fx + 24, roofY - 25 + wav); c.lineTo(fx + 3, roofY - 19);
+      c.closePath(); c.fill();
+    }
+    /* l'échelle */
+    const lx = W/2;
+    c.fillStyle = "#565d8c";
+    c.fillRect(lx - 16, 0, 4, H); c.fillRect(lx + 12, 0, 4, H);
+    c.fillStyle = "rgba(255,255,255,.14)";
+    c.fillRect(lx - 16, 0, 1, H); c.fillRect(lx + 12, 0, 1, H);
+    for(let k = 0; k <= RUNGS + 4; k++){
+      const ry = yOf(k*26);
+      if(ry < -6 || ry > H + 6) continue;
+      c.fillStyle = "#6a72a8"; c.fillRect(lx - 14, ry, 28, 4);
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(lx - 14, ry + 3, 28, 1);
+    }
+
+    /* l'hélico et son projecteur */
+    const hx = W/2 + Math.sin(now/1700)*30, hy = 46;
+    if(!hitstop) beamP += dt*16.667/(1300 + Math.min(600, ladderMiss*160));
+    beamXv = W/2 + Math.sin(beamP)*175;
+    const bx = beamXv;
+    const danger = dangerNow = Math.abs(bx - W/2) < 44;
+    if(danger && !prevDanger && phase === "ladder") AudioFX.back();   // alerte sonore
+    prevDanger = danger;
+    c.save(); c.globalCompositeOperation = "lighter";
+    const grad = c.createLinearGradient(0, hy, 0, H);
+    grad.addColorStop(0, danger ? "rgba(255,240,200,.42)" : "rgba(210,225,255,.3)");
+    grad.addColorStop(1, "rgba(210,225,255,.03)");
+    c.fillStyle = grad;
+    c.beginPath();
+    c.moveTo(hx, hy + 8);
+    c.lineTo(bx - 40, H); c.lineTo(bx + 40, H);
+    c.closePath(); c.fill();
+    const pool = c.createRadialGradient(bx, H - 40, 4, bx, H - 40, 70);
+    pool.addColorStop(0, "rgba(255,250,220,.30)"); pool.addColorStop(1, "rgba(255,250,220,0)");
+    c.fillStyle = pool; c.fillRect(bx - 70, H - 110, 140, 110);
+    c.restore();
+    /* fuselage */
+    c.fillStyle = "#10102a"; c.fillRect(hx - 16, hy - 6, 32, 12);
+    c.fillRect(hx + 14, hy - 3, 15, 5);
+    c.fillStyle = "#0a0a20"; c.fillRect(hx - 7, hy + 6, 14, 3);
+    c.fillStyle = "#4db8ff"; c.fillRect(hx - 14, hy - 4, 8, 7);
+    const rr = Math.sin(now/28)*27;
+    c.strokeStyle = "rgba(220,230,255,.75)"; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(hx - rr, hy - 9); c.lineTo(hx + rr, hy - 9); c.stroke();
+    if(Math.floor(now/380) % 2){ c.fillStyle = "#ff4d4d"; c.fillRect(hx + 27, hy - 6, 3, 3); }
+
+    /* alerte : le faisceau touche l'échelle */
+    if(danger && phase === "ladder"){
+      c.fillStyle = "#ff8484"; c.font = "bold 17px 'Baloo 2', sans-serif"; c.textAlign = "center";
+      c.globalAlpha = .7 + Math.sin(now/90)*.3;
+      c.fillText("NE BOUGE PLUS !", W/2, 150);
+      c.globalAlpha = 1; c.textAlign = "left";
+    }
+
+    /* le grimpeur (ou la victoire sur le toit) */
+    if(phase === "done"){
+      const k = Math.min(1, (now - doneT)/500);
+      drawClimber(c, W/2, roofY - 2 - k*8, now);
+      c.textAlign = "center";
+      c.fillStyle = "#ffce4d"; c.font = "bold 26px 'Baloo 2', sans-serif";
+      c.fillText("SEMÉ !", W/2, roofY - 62);
+      c.fillStyle = "#EDEDF7"; c.font = "bold 14px 'Baloo 2', sans-serif";
+      c.fillText(`BOMBES : ${bombes}` + (newRec && bombes > 0 ? "  ✦ RECORD !" : ""), W/2, roofY - 42);
+      c.textAlign = "left";
+    }else{
+      /* le faisceau éclaire le grimpeur quand il passe dessus */
+      if(dangerNow){
+        const gy2 = yOf(rung*26) - 22;
+        const gl = c.createRadialGradient(W/2, gy2, 4, W/2, gy2, 48);
+        gl.addColorStop(0, "rgba(255,250,220,.30)"); gl.addColorStop(1, "rgba(255,250,220,0)");
+        c.save(); c.globalCompositeOperation = "lighter";
+        c.fillStyle = gl; c.fillRect(W/2 - 48, gy2 - 48, 96, 96); c.restore();
+      }
+      drawClimber(c, W/2, yOf(rung*26) - 2, now);
+    }
+  }
+
+  loop(performance.now());
   Juice.readyGo(box, ()=>{ running = true; });
-  return ()=>{ over = true; clearInterval(fire); cancelAnimationFrame(raf); };
+  return ()=>{
+    over = true;
+    if(raf) cancelAnimationFrame(raf);
+    cv.removeEventListener("pointerdown", onDown);
+    cv.removeEventListener("pointerup", onUp);
+    cv.removeEventListener("pointercancel", onUp);
+    window.removeEventListener("keydown", onKey);
+    window.removeEventListener("keyup", onKeyUp);
+  };
 };
 
 /* ── LV_04 : LE VRAI CUBE 3D ────────────────────────────────
