@@ -4716,7 +4716,7 @@ MiniGames["LV_06"] = function(box, api){
   /* échelle */
   const RUNGS = 22;
   let wallX = 0, rung = 0, camY = 0, climbT = -9e9, caughtT = -9e9, doneT = 0;
-  let prevDanger = false;
+  let prevDanger = false, newRec = false;
 
   /* ═══ entrées : pointeur + clavier (buffer de saut inclus) ═══ */
   function press(){
@@ -4881,6 +4881,11 @@ MiniGames["LV_06"] = function(box, api){
     AudioFX.combo(2 + (rung % 6));
     if(rung >= RUNGS && phase === "ladder"){
       phase = "done"; doneT = now;
+      /* record personnel de bombes ramassées */
+      let rec = 0;
+      try{ rec = +localStorage.getItem("invasionLesVans:cavaleRec") || 0; }catch(e){}
+      newRec = bombes > rec;
+      if(newRec){ try{ localStorage.setItem("invasionLesVans:cavaleRec", bombes); }catch(e){} }
       AudioFX.fanfare(); Juice.confetti(box, 26);
       const stars = hits === 0 ? 3 : hits <= 2 ? 2 : 1;
       setTimeout(()=>api.win({ stars,
@@ -4956,7 +4961,11 @@ MiniGames["LV_06"] = function(box, api){
     }
 
     /* ── HUD ── */
-    for(let k=0;k<hearts;k++) c.drawImage(heart, 8 + k*28, 4, 30, 30);
+    for(let k=0;k<hearts;k++){
+      const pu = now - hitT < 420 ? 1 + Math.sin((now - hitT)/420*Math.PI)*.3 : 1;
+      const s = 30*pu;
+      c.drawImage(heart, 8 + k*28 - (s-30)/2, 4 - (s-30)/2, s, s);
+    }
     c.fillStyle = "#FFD23F"; c.fillRect(W-86, 12, 9, 13);
     c.fillStyle = "#EDEDF7"; c.fillRect(W-84, 8, 5, 4);
     c.font = "bold 15px 'Baloo 2', sans-serif"; c.fillStyle = "#ffce4d";
@@ -5134,6 +5143,20 @@ MiniGames["LV_06"] = function(box, api){
           break;
         }
       }
+      /* saut « au ras » : frôler un obstacle en le sautant paie */
+      for(const o of obstacles){
+        if(!o.scored && o.x + o.w < PX - 9){
+          o.scored = true;
+          if(!player.ground && player.y > GROUND - o.h - 34){
+            bombes++; combo++;
+            if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
+            AudioFX.star(1);
+            texts.push({ x: PX + 26, y: player.y - 48, life: 36, txt: "AU RAS ! +1", col: "#2BE4D0" });
+            for(let j=0;j<5;j++) parts.push({ x: PX + 8, y: player.y - 20,
+              vx: (Math.random()-.5)*2, vy: -(1 + Math.random()), life: 12, col: "#2BE4D0", sz: 2 });
+          }
+        }
+      }
       for(let i = cans.length-1; i >= 0; i--){
         const k = cans[i];
         if(Math.abs(k.x - PX) < 17 && Math.abs(k.y - (player.y - 18)) < 26){
@@ -5243,6 +5266,15 @@ MiniGames["LV_06"] = function(box, api){
         c.fillStyle = "rgba(255,216,138,.5)"; c.fillRect(wx + 3, wy - 31, 24, 28);
         c.fillStyle = "rgba(0,0,0,.25)";
         for(let ly = wy - 28; ly < wy - 8; ly += 6) c.fillRect(wx + 3, ly, 24, 2);
+        if((b*31) % 4 === 0){                       // un chat te regarde passer
+          c.fillStyle = "#0d0d20";
+          c.fillRect(wx + 17, wy - 10, 8, 10);      // assis sur le rebord
+          c.fillRect(wx + 18, wy - 15, 6, 6);
+          c.beginPath(); c.moveTo(wx+18, wy-14); c.lineTo(wx+19, wy-18); c.lineTo(wx+20, wy-14);
+          c.moveTo(wx+22, wy-14); c.lineTo(wx+23, wy-18); c.lineTo(wx+24, wy-14);
+          c.fill();
+          c.fillRect(wx + 13, wy - 4, 5, 2);        // la queue
+        }
       }
       c.fillStyle = "#3a3a66"; c.fillRect(wx - 3, wy, 36, 4);
     }
@@ -5317,10 +5349,21 @@ MiniGames["LV_06"] = function(box, api){
     if(phase === "done"){
       const k = Math.min(1, (now - doneT)/500);
       drawClimber(c, W/2, roofY - 2 - k*8, now);
-      c.fillStyle = "#ffce4d"; c.font = "bold 26px 'Baloo 2', sans-serif"; c.textAlign = "center";
-      c.fillText("SEMÉ !", W/2, roofY - 60);
+      c.textAlign = "center";
+      c.fillStyle = "#ffce4d"; c.font = "bold 26px 'Baloo 2', sans-serif";
+      c.fillText("SEMÉ !", W/2, roofY - 62);
+      c.fillStyle = "#EDEDF7"; c.font = "bold 14px 'Baloo 2', sans-serif";
+      c.fillText(`BOMBES : ${bombes}` + (newRec && bombes > 0 ? "  ✦ RECORD !" : ""), W/2, roofY - 42);
       c.textAlign = "left";
     }else{
+      /* le faisceau éclaire le grimpeur quand il passe dessus */
+      if(dangerNow){
+        const gy2 = yOf(rung*26) - 22;
+        const gl = c.createRadialGradient(W/2, gy2, 4, W/2, gy2, 48);
+        gl.addColorStop(0, "rgba(255,250,220,.30)"); gl.addColorStop(1, "rgba(255,250,220,0)");
+        c.save(); c.globalCompositeOperation = "lighter";
+        c.fillStyle = gl; c.fillRect(W/2 - 48, gy2 - 48, 96, 96); c.restore();
+      }
       drawClimber(c, W/2, yOf(rung*26) - 2, now);
     }
   }
