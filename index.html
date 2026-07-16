@@ -5238,7 +5238,7 @@ MiniGames["LV_06"] = function(box, api){
 
   box.insertAdjacentHTML("beforeend",
     `<p class="sub">La pièce est posée — <b>file !</b><br>
-     Appuie pour <b>sauter</b> · reste appuyé pour sauter <b>plus haut</b>.</p>`);
+     Tape en <b>haut</b> = saut (appui long = plus haut) · tape en <b>bas</b> ou glisse ↓ = <b>glissade</b>.</p>`);
   const cv = document.createElement("canvas");
   cv.width = W*DPR; cv.height = H*DPR;
   cv.style.cssText = "width:100%; max-width:340px; border-radius:18px; touch-action:none;" +
@@ -5312,6 +5312,16 @@ MiniGames["LV_06"] = function(box, api){
       g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(0, 12, w, 2);
     }),
   ];
+  /* obstacles HAUTS : à passer en GLISSANT dessous (échafaudage /
+     poutre rayée à hauteur de tête, laisse un passage au sol) */
+  const OVERH = 20;                                   // épaisseur de la poutre
+  const OVER = pre(52, OVERH, (g,w,h)=>{
+    g.fillStyle = "#3a3f66"; g.fillRect(0, 0, w, h);
+    for(let i=0;i<w;i+=12){ g.fillStyle = ((i/12)|0)%2 ? "#ffd23f" : "#20204a";
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i+12, 0); g.lineTo(i+6, h); g.closePath(); g.fill(); }
+    g.fillStyle = "rgba(255,255,255,.15)"; g.fillRect(0, 0, w, 2);
+    g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(0, h-2, w, 2);
+  });
   const heart = Voxel.sprite("heart", "#ff6b6b", .4, -.25, 30, 30);
   const skyStars = Array.from({length:46}, ()=>({
     x: Math.random()*W, y: Math.random()*(GROUND-160), r: Math.random()*1.4 + .5, ph: Math.random()*7 }));
@@ -5319,8 +5329,12 @@ MiniGames["LV_06"] = function(box, api){
   /* ═══ état ═══ */
   let phase = "run";                     // run → arrive → ladder → done
   let dist = 0, speed = 3.0;
-  const SPEED_MAX = 5.3, DIST_GOAL = 8800;
-  const player = { y:GROUND, vy:0, ground:true, inv:-9e9, holds:false, buffer:0, squash:0 };
+  /* la RUE est un peu plus courte, l'ÉCHELLE plus longue : le gros
+     du défi se joue en hauteur (demande du joueur) */
+  const SPEED_MAX = 5.3, DIST_GOAL = 6000;
+  const STAND_H = 42, SLIDE_H = 20;
+  const player = { y:GROUND, vy:0, ground:true, inv:-9e9, holds:false, buffer:0,
+                   squash:0, sliding:false, slideT:0 };
   let obstacles = [], cans = [], lamps = [], parts = [], texts = [];
   let nextGapPx = 430, nextLampPx = 260;
   let hearts = 3, hits = 0, combo = 0, bombes = 0;
@@ -5331,26 +5345,79 @@ MiniGames["LV_06"] = function(box, api){
      s'adoucit sans le dire (écarts plus larges, vitesse plafonnée,
      projecteur plus lent) — personne n'aime rester bloqué */
   let resets = 0, ladderMiss = 0;
-  /* échelle */
-  const RUNGS = 22;
+  /* échelle : plus haute + déplacement latéral (rails G/D),
+     débris qui tombent à esquiver, bombes à récupérer */
+  const RUNGS = 42;
   let wallX = 0, rung = 0, camY = 0, climbT = -9e9, caughtT = -9e9, doneT = 0;
   let prevDanger = false, newRec = false;
+  let sideTarget = 0, sideX = 0;         // rail : -1 gauche, 0 centre, +1 droite
+  let fallers = [], lcans = [], nextFallMs = 2600, nextLcanH = 5;
+  let ladderCatch = 0;                   // bombes ramassées sur l'échelle
 
-  /* ═══ entrées : pointeur + clavier (buffer de saut inclus) ═══ */
-  function press(){
-    AudioFX.resume();
-    if(!running || over) return;
-    if(phase === "run" || phase === "arrive"){ player.buffer = 9; player.holds = true; }
-    else if(phase === "ladder") climb();
+  /* ═══ entrées : tap haut = saut · tap bas / glissé ↓ = glissade ·
+     sur l'échelle : tap = grimper, glissé ↔ = changer de rail ═══ */
+  const local = e=>{ const r = cv.getBoundingClientRect();
+    return [ (e.clientX - r.left)/r.width*W, (e.clientY - r.top)/r.height*H ]; };
+  function startSlide(){
+    if(phase !== "run" && phase !== "arrive") return false;
+    if(!player.ground || player.sliding) return false;
+    player.sliding = true; player.slideT = 0;
+    AudioFX.whoosh(); dust(PX, GROUND, 9, "rgba(210,210,240,.6)");
+    return true;
   }
-  function release(){ player.holds = false; }
-  const onDown = e=>{ e.preventDefault(); press(); };
-  const onUp = ()=>release();
-  const onKey = e=>{
-    if(e.code === "Space" || e.code === "ArrowUp"){ if(!e.repeat) press(); e.preventDefault(); }
+  function jump(){
+    if(phase !== "run" && phase !== "arrive") return;
+    player.buffer = 9; player.holds = true; player.sliding = false;
+  }
+  let ptr = null;
+  const onDown = e=>{
+    e.preventDefault(); AudioFX.resume();
+    if(!running || over) return;
+    const [x,y] = local(e);
+    ptr = { x0:x, y0:y, act:null };
+    if(cv.setPointerCapture){ try{ cv.setPointerCapture(e.pointerId); }catch(_){} }
+    if(phase === "run" || phase === "arrive"){
+      if(y > H*0.58){ startSlide(); ptr.act = "slide"; }     // bas = glisse (instantané)
+      else { jump(); ptr.act = "jump"; }                     // haut = saut (instantané)
+    }
   };
-  const onKeyUp = e=>{ if(e.code === "Space" || e.code === "ArrowUp") release(); };
+  const onMoveP = e=>{
+    if(!ptr || !running || over) return;
+    const [x,y] = local(e);
+    const dx = x - ptr.x0, dy = y - ptr.y0;
+    if(phase === "run" || phase === "arrive"){
+      if(ptr.act === "jump" && dy > 28 && Math.abs(dy) > Math.abs(dx)){
+        player.holds = false;
+        if(player.ground) startSlide();                      // au sol → glisse
+        else if(player.vy < 6) player.vy = 8;                // en l'air → plongeon
+        ptr.act = "slide";
+      }
+    } else if(phase === "ladder"){
+      if(ptr.act === null && Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy)){
+        sideTarget = dx > 0 ? 1 : -1; ptr.act = "side"; AudioFX.nav();
+      }
+    }
+  };
+  const onUp = ()=>{
+    player.holds = false;
+    if(ptr && phase === "ladder" && ptr.act === null) climb();  // tap franc = grimper
+    ptr = null;
+  };
+  const onKey = e=>{
+    if(!running || over) return;
+    if(e.code === "Space" || e.code === "ArrowUp"){
+      if(!e.repeat){ if(phase === "ladder") climb(); else jump(); } e.preventDefault();
+    } else if(e.code === "ArrowDown" || e.code === "KeyS"){
+      if(!e.repeat) startSlide(); e.preventDefault();
+    } else if(phase === "ladder" && (e.code === "ArrowLeft" || e.code === "KeyA")){
+      sideTarget = -1;
+    } else if(phase === "ladder" && (e.code === "ArrowRight" || e.code === "KeyD")){
+      sideTarget = 1;
+    }
+  };
+  const onKeyUp = e=>{ if(e.code === "Space" || e.code === "ArrowUp") player.holds = false; };
   cv.addEventListener("pointerdown", onDown);
+  cv.addEventListener("pointermove", onMoveP);
   cv.addEventListener("pointerup", onUp);
   cv.addEventListener("pointercancel", onUp);
   window.addEventListener("keydown", onKey);
@@ -5395,6 +5462,17 @@ MiniGames["LV_06"] = function(box, api){
     if(nextGapPx > 0) return;
     const secs = 1.05 + Math.min(.5, resets*.18) + Math.random()*1.05;   // fenêtre de réaction
     nextGapPx = speed * 60 * secs;
+    /* après quelques mètres, une chance sur trois : obstacle HAUT
+       (poutre) → il faut GLISSER dessous au lieu de sauter */
+    const wantOver = dist > 1400 && Math.random() < .34;
+    if(wantOver){
+      const clr = SLIDE_H + 4;                         // passage juste pour un glissé
+      obstacles.push({ x: W + 60, img:OVER.img, w:OVER.w, h:OVER.h, over:true, clr });
+      /* bombes AU SOL sous la poutre : on les gobe en glissant */
+      for(let i=0;i<3;i++) cans.push({ x: W + 60 + OVER.w/2 - 26 + i*26,
+        y: GROUND - 12, ph: Math.random()*7 });
+      return;
+    }
     const o = OBS[Math.floor(Math.random()*OBS.length)];
     obstacles.push({ x: W + 60, img:o.img, w:o.w, h:o.h });
     /* des bombes à ramasser : en cloche AU-DESSUS de l'obstacle
@@ -5416,6 +5494,27 @@ MiniGames["LV_06"] = function(box, api){
     g.save();
     if(inv) g.globalAlpha = Math.floor(now/90)%2 ? .35 : .85;
     g.translate(cx, feetY);
+    /* ── pose GLISSADE : le fuyard file au ras du sol, jambes tendues ── */
+    if(player.sliding){
+      const sc2 = combo >= 5 ? [255,210,63] : [43,228,208];
+      for(let i=0;i<4;i++){                              // écharpe étirée derrière
+        g.fillStyle = `rgba(${sc2[0]},${sc2[1]},${sc2[2]},${.8 - i*.18})`;
+        g.fillRect(-16 - i*5, -14 + Math.sin(now/60 + i)*1.5, 5, 3);
+      }
+      g.fillStyle = "#20204a"; g.fillRect(2, -8, 16, 6);      // jambes tendues
+      g.fillStyle = "#EDEDF7"; g.fillRect(16, -8, 4, 6);      // baskets
+      g.fillStyle = "#d5155f"; g.fillRect(-14, -14, 8, 8);    // sac
+      g.fillStyle = "#2c2c5c"; g.fillRect(-10, -18, 20, 11);  // torse allongé
+      g.fillStyle = "#2c2c5c"; g.fillRect(6, -20, 13, 10);    // tête capuche en avant
+      g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(6, -20, 13, 2);
+      g.fillStyle = "#e8b98a"; g.fillRect(15, -18, 5, 6);
+      g.fillStyle = "#0B0B1E"; g.fillRect(18, -16, 2, 2);
+      /* poussière de dérapage */
+      g.fillStyle = "rgba(210,210,240,.4)";
+      for(let i=0;i<3;i++) g.fillRect(-18 - i*5, -3, 3, 3);
+      g.restore();
+      return;
+    }
     g.scale(1 + player.squash*.5, 1 - player.squash);
     /* écharpe qui flotte — dorée quand le combo chauffe */
     const sc = combo >= 5 ? [255,210,63] : [43,228,208];
@@ -5499,6 +5598,7 @@ MiniGames["LV_06"] = function(box, api){
     AudioFX.combo(2 + (rung % 6));
     if(rung >= RUNGS && phase === "ladder"){
       phase = "done"; doneT = now;
+      fallers = []; lcans = [];
       /* record personnel de bombes ramassées */
       let rec = 0;
       try{ rec = +localStorage.getItem("invasionLesVans:cavaleRec") || 0; }catch(e){}
@@ -5722,20 +5822,41 @@ MiniGames["LV_06"] = function(box, api){
       c.restore();
     });
 
-    /* obstacles */
+    /* obstacles (au sol → drawImage posé ; hauts → poutre suspendue) */
     obstacles.forEach(o=>{
-      c.fillStyle = "rgba(0,0,0,.4)";
-      c.beginPath(); c.ellipse(o.x + o.w/2, GROUND+3, o.w*.55, 4, 0, 0, 7); c.fill();
-      c.drawImage(o.img, o.x, GROUND - o.h, o.w, o.h);
+      if(o.over){
+        const bottom = GROUND - o.clr;                 // bord bas de la poutre
+        c.strokeStyle = "rgba(120,130,180,.5)"; c.lineWidth = 3;   // supports jusqu'au ciel
+        c.beginPath(); c.moveTo(o.x + 6, bottom - o.h); c.lineTo(o.x + 6, 0);
+        c.moveTo(o.x + o.w - 6, bottom - o.h); c.lineTo(o.x + o.w - 6, 0); c.stroke();
+        c.drawImage(o.img, o.x, bottom - o.h, o.w, o.h);
+        /* flèche « glisse dessous » quand elle approche */
+        if(o.x < W - 40 && o.x > PX){
+          c.fillStyle = "rgba(255,210,63,.8)"; c.font = "bold 13px 'Baloo 2', sans-serif"; c.textAlign = "center";
+          c.fillText("▼ GLISSE", o.x + o.w/2, bottom + 16); c.textAlign = "left";
+        }
+      }else{
+        c.fillStyle = "rgba(0,0,0,.4)";
+        c.beginPath(); c.ellipse(o.x + o.w/2, GROUND+3, o.w*.55, 4, 0, 0, 7); c.fill();
+        c.drawImage(o.img, o.x, GROUND - o.h, o.w, o.h);
+      }
     });
 
-    /* ── physique du saut ── */
+    /* ── physique du saut + glissade ── */
     if(running && !hitstop){
+      /* glissade : dure ~0,5 s, annulée si on saute ou si on décolle */
+      if(player.sliding){
+        player.slideT += dt;
+        if(player.slideT > 30 || !player.ground) player.sliding = false;
+        if(player.sliding && Math.random() < .4)
+          parts.push({ x: PX - 12, y: GROUND - 2, vx:-(1+Math.random()*1.6), vy:-(.2+Math.random()*.6),
+            life: 10, col:"rgba(210,210,240,.5)", sz: 2 });
+      }
       if(player.buffer > 0){
         player.buffer -= dt;
         if(player.ground){
           player.vy = -10.6; player.ground = false; player.buffer = 0;
-          player.squash = -.22;
+          player.sliding = false; player.squash = -.22;
           AudioFX.nav(); dust(PX, GROUND, 6);
         }
       }
@@ -5751,26 +5872,38 @@ MiniGames["LV_06"] = function(box, api){
       player.squash *= Math.pow(.82, dt);
 
       /* collisions & ramassage */
-      const pw = 18, phh = 34;
+      const pw = 18;
+      const headY = player.y - (player.sliding ? SLIDE_H : STAND_H);
       for(const o of obstacles){
         if(now < player.inv) break;
-        if(PX + pw/2 > o.x + 5 && PX - pw/2 < o.x + o.w - 5 &&
-           player.y > GROUND - o.h + 6){
+        const overlapX = PX + pw/2 > o.x + 5 && PX - pw/2 < o.x + o.w - 5;
+        if(!overlapX) continue;
+        if(o.over){
+          if(headY < GROUND - o.clr){                  // tête trop haute → on percute
+            ouch(now, "AÏE ! GLISSE DESSOUS !");
+            dust(PX, GROUND - o.clr, 10, "rgba(255,120,120,.7)");
+            break;
+          } else o.cleared = true;                      // passé en glissant
+        }else if(player.y > GROUND - o.h + 6){
           ouch(now, "AÏE ! SAUTE PAR-DESSUS !");
           dust(PX, player.y - 10, 10, "rgba(255,120,120,.7)");
           break;
         }
       }
-      /* saut « au ras » : frôler un obstacle en le sautant paie */
+      /* bonus « au ras » : saut serré OU glissade sous une poutre */
       for(const o of obstacles){
         if(!o.scored && o.x + o.w < PX - 9){
           o.scored = true;
-          if(!player.ground && player.y > GROUND - o.h - 34){
+          const clutch = o.over ? o.cleared
+                                : (!player.ground && player.y > GROUND - o.h - 34);
+          if(clutch){
             bombes++; combo++;
             if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
             AudioFX.star(1);
-            texts.push({ x: PX + 26, y: player.y - 48, life: 36, txt: "AU RAS ! +1", col: "#2BE4D0" });
-            for(let j=0;j<5;j++) parts.push({ x: PX + 8, y: player.y - 20,
+            const yy = o.over ? GROUND - o.clr - 18 : player.y - 48;
+            texts.push({ x: PX + 26, y: yy, life: 36,
+              txt: (o.over ? "GLISSÉ ! +1" : "AU RAS ! +1"), col: "#2BE4D0" });
+            for(let j=0;j<5;j++) parts.push({ x: PX + 8, y: GROUND - 20,
               vx: (Math.random()-.5)*2, vy: -(1 + Math.random()), life: 12, col: "#2BE4D0", sz: 2 });
           }
         }
@@ -5798,7 +5931,8 @@ MiniGames["LV_06"] = function(box, api){
         wallX -= dd;
         if(wallX <= PX + 26){
           phase = "ladder"; flashT = now; camY = 0;
-          msg = "TAPE POUR GRIMPER — GARE AU PROJECTEUR !"; msgUntil = now + 2400;
+          sideTarget = 0; sideX = 0;
+          msg = "GRIMPE ! ESQUIVE LES DÉBRIS, GARE AU PROJECTEUR"; msgUntil = now + 2600;
           AudioFX.ok();
         }
       }
@@ -5850,19 +5984,73 @@ MiniGames["LV_06"] = function(box, api){
       c.beginPath(); c.arc(cop.x + 22, H - 11, 4, 0, 7); c.arc(cop.x + 74, H - 11, 4, 0, 7); c.fill();
     }
 
-    /* rappel du geste au tout début */
-    if(dist < 260 && running){
+    /* rappel des gestes au tout début */
+    if(dist < 320 && running){
       c.globalAlpha = .55 + Math.sin(now/220)*.35;
-      c.fillStyle = "#EDEDF7"; c.font = "bold 15px 'Baloo 2', sans-serif"; c.textAlign = "center";
-      c.fillText("TAPE = SAUT ✦ APPUI LONG = PLUS HAUT", W/2, 120);
+      c.fillStyle = "#EDEDF7"; c.font = "bold 14px 'Baloo 2', sans-serif"; c.textAlign = "center";
+      c.fillText("HAUT = SAUTER  ✦  BAS = GLISSER", W/2, 116);
       c.textAlign = "left"; c.globalAlpha = 1;
     }
   }
 
-  /* ── l'échelle : grimpe, mais pas sous le projecteur ── */
+  /* ── l'échelle : grimpe, esquive les débris, change de rail ── */
   function drawLadderScene(now, dt, hitstop){
     camY += (rung*26 - camY)*Math.min(1, .12*dt);
     const yOf = h => (H - 90) - (h - camY);            // hauteur monde → écran
+    const climberY = yOf(rung*26);
+    sideX += (sideTarget*20 - sideX) * Math.min(1, .22*dt);   // glisse vers le rail
+    const climberX = W/2 + sideX;
+
+    /* ═══ mécanique échelle : débris qui tombent + bombes à gober ═══ */
+    if(phase === "ladder" && running && !hitstop){
+      /* apparition des débris : télégraphiés, sur un rail au hasard */
+      nextFallMs -= dt*16.667;
+      if(nextFallMs <= 0 && rung > 2 && rung < RUNGS - 3){
+        const side = Math.random() < .5 ? -1 : 1;
+        fallers.push({ side, x: W/2 + side*20, y: -30, v: 3.4 + Math.random()*1.8,
+          warn: 620 - Math.min(260, ladderMiss*60) });
+        AudioFX.laser();
+        nextFallMs = 1500 + Math.random()*1100 + Math.max(0, 400 - rung*8);
+      }
+      /* bombes à récupérer, alignées sur un rail */
+      if(rung >= nextLcanH){
+        const side = Math.random() < .5 ? -1 : 1;
+        lcans.push({ side, h: (rung + 4)*26 });
+        nextLcanH = rung + 4 + Math.floor(Math.random()*3);
+      }
+      /* mise à jour des débris + collision (selon le rail où tu es) */
+      for(let i = fallers.length - 1; i >= 0; i--){
+        const f = fallers[i];
+        if(f.warn > 0){ f.warn -= dt*16.667; }
+        else f.y += f.v*dt;
+        if(f.y > climberY - 16 && f.y < climberY + 14 && !f.done){
+          if(Math.abs(f.x - climberX) < 15 && now > player.inv){
+            f.done = true; fallers.splice(i, 1);
+            ouch(now, "TOUCHÉ PAR UN DÉBRIS !");
+            continue;
+          } else if(f.y > climberY + 6){                 // esquivé de justesse
+            f.done = true;
+            if(Math.abs(f.side*20 - sideX) > 24){ combo++; AudioFX.combo(combo + 1);
+              texts.push({ x: climberX, y: climberY - 30, life: 30, txt: "ESQUIVE !", col: "#2BE4D0" }); }
+          }
+        }
+        if(f.y > H + 30) fallers.splice(i, 1);
+      }
+      /* ramassage des bombes (il faut être sur le bon rail) */
+      for(let i = lcans.length - 1; i >= 0; i--){
+        const k = lcans[i], ky = yOf(k.h);
+        if(Math.abs(ky - climberY) < 16 && Math.abs((W/2 + k.side*20) - climberX) < 16){
+          lcans.splice(i, 1);
+          bombes++; ladderCatch++; combo++;
+          if(combo >= 5 && typeof unlockSucces === "function") unlockSucces("combo5");
+          AudioFX.combo(combo + 2);
+          texts.push({ x: climberX, y: ky - 12, life: 32,
+            txt: "+1" + (combo > 1 ? " ×" + combo : ""), col: "#ffce4d" });
+          for(let j=0;j<6;j++) parts.push({ x: W/2 + k.side*20, y: ky,
+            vx:(Math.random()-.5)*2.4, vy:-(1+Math.random()*1.4), life:14, col:"#FFD23F", sz:2.4 });
+        } else if(ky > H + 20) lcans.splice(i, 1);
+      }
+    }
 
     /* le mur de briques */
     c.fillStyle = "#2a2744"; c.fillRect(0, 0, W, H);
@@ -5963,6 +6151,35 @@ MiniGames["LV_06"] = function(box, api){
       c.globalAlpha = 1; c.textAlign = "left";
     }
 
+    /* ── bombes à récupérer sur les rails ── */
+    lcans.forEach(k=>{
+      const ky = yOf(k.h), kx = W/2 + k.side*20;
+      if(ky < -20 || ky > H + 20) return;
+      const bob = Math.sin(now/240 + k.h)*2;
+      c.save(); c.translate(kx, ky + bob);
+      c.fillStyle = "#FFD23F"; c.fillRect(-5, -8, 10, 15);
+      c.fillStyle = "#EDEDF7"; c.fillRect(-3, -12, 6, 4);
+      c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(-4, -7, 3, 12);
+      c.restore();
+      c.globalAlpha = .35 + Math.sin(now/180 + k.h)*.3;
+      c.fillStyle = "#fff"; c.fillRect(kx + 8, ky + bob - 12, 2, 2); c.globalAlpha = 1;
+    });
+
+    /* ── débris qui tombent (avertissement puis chute) ── */
+    fallers.forEach(f=>{
+      if(f.warn > 0){                                   // télégraphe en haut
+        c.globalAlpha = .5 + Math.sin(now/70)*.4;
+        c.fillStyle = "#ff8484"; c.font = "bold 20px 'Baloo 2', sans-serif"; c.textAlign = "center";
+        c.fillText("▼", f.x, 60); c.globalAlpha = 1; c.textAlign = "left";
+        return;
+      }
+      c.save(); c.translate(f.x, f.y); c.rotate(f.y*.04);
+      c.fillStyle = "#8a6a3a"; c.fillRect(-7, -7, 14, 14);        // pot / brique
+      c.fillStyle = "#5d431f"; c.fillRect(-7, -7, 14, 3);
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(-7, 4, 14, 3);
+      c.restore();
+    });
+
     /* le grimpeur (ou la victoire sur le toit) */
     if(phase === "done"){
       const k = Math.min(1, (now - doneT)/500);
@@ -5976,13 +6193,20 @@ MiniGames["LV_06"] = function(box, api){
     }else{
       /* le faisceau éclaire le grimpeur quand il passe dessus */
       if(dangerNow){
-        const gy2 = yOf(rung*26) - 22;
-        const gl = c.createRadialGradient(W/2, gy2, 4, W/2, gy2, 48);
+        const gy2 = climberY - 22;
+        const gl = c.createRadialGradient(climberX, gy2, 4, climberX, gy2, 48);
         gl.addColorStop(0, "rgba(255,250,220,.30)"); gl.addColorStop(1, "rgba(255,250,220,0)");
         c.save(); c.globalCompositeOperation = "lighter";
-        c.fillStyle = gl; c.fillRect(W/2 - 48, gy2 - 48, 96, 96); c.restore();
+        c.fillStyle = gl; c.fillRect(climberX - 48, gy2 - 48, 96, 96); c.restore();
       }
-      drawClimber(c, W/2, yOf(rung*26) - 2, now);
+      drawClimber(c, climberX, climberY - 2, now);
+      /* rappel des gestes au tout début de l'échelle */
+      if(rung < 3){
+        c.globalAlpha = .55 + Math.sin(now/220)*.35;
+        c.fillStyle = "#EDEDF7"; c.font = "bold 13px 'Baloo 2', sans-serif"; c.textAlign = "center";
+        c.fillText("TAPE = GRIMPER  ✦  GLISSE ↔ = ESQUIVER", W/2, 176);
+        c.textAlign = "left"; c.globalAlpha = 1;
+      }
     }
   }
 
@@ -5992,6 +6216,7 @@ MiniGames["LV_06"] = function(box, api){
     over = true;
     if(raf) cancelAnimationFrame(raf);
     cv.removeEventListener("pointerdown", onDown);
+    cv.removeEventListener("pointermove", onMoveP);
     cv.removeEventListener("pointerup", onUp);
     cv.removeEventListener("pointercancel", onUp);
     window.removeEventListener("keydown", onKey);
