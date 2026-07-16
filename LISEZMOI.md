@@ -53,6 +53,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v26) — graphismes & textures enrichis
+
+- **Pièces 3D plus « premium »** : chaque cube du moteur voxel reçoit maintenant une **glaçure céramique** (dégradé clair→ombre), une **lumière du ciel** sur les faces tournées vers le haut et un **contraste** plus marqué — les squids/crabes/cœurs paraissent vernis et lisent mieux le volume. Visible partout (galerie du hub, flash de capture, victoire, menu).
+- **Fond étoilé enrichi** : de discrètes **nébuleuses colorées** (rose/cyan/violet) pré-rendues, des **étoiles teintées** de plusieurs couleurs, et quelques **étoiles brillantes qui scintillent en croix**.
+- **Mosaïques 2D plus réalistes** : les tesselles ont un **émail** (dégradé), un **joint sombre** (grout) qui les détache, et un **reflet spéculaire** net.
+
 ## Nouveautés (v25) — écran de victoire en récap célébratoire
 
 - L'écran de fin passe d'une simple liste de texte à un **vrai tableau de fin** : les 8 pièces qui explosent en vedette, une **carte cadeau** (🎁) qui met en avant le message d'anniversaire, un **bandeau « RANG ATTEINT »**, et des **tuiles de statistiques** (Score ✦ record, Étoiles ★/24, Succès /8, Durée de la chasse).
