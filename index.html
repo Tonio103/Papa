@@ -1647,15 +1647,28 @@ function shade(hex, pct){
      déterministe selon (x,y) — l'effet céramique ───────────── */
 function paintTile(c, X, Y, S, col, vx, vy){
   const v = (((vx*7 + vy*13) % 5) - 2) * .04;
-  c.fillStyle = shade(col, v);
+  /* corps émaillé : léger dégradé vertical (glaçure) */
+  if(S >= 10){
+    const g = c.createLinearGradient(X, Y, X, Y+S);
+    g.addColorStop(0, shade(col, .14 + v));
+    g.addColorStop(.55, shade(col, v));
+    g.addColorStop(1, shade(col, -.16 + v));
+    c.fillStyle = g;
+  }else c.fillStyle = shade(col, v);
   c.fillRect(X, Y, S, S);
   const e = Math.max(1, Math.floor(S/6));
-  c.fillStyle = shade(col, .38 + v);
+  /* biseau clair haut/gauche, ombre bas/droite (relief de tesselle) */
+  c.fillStyle = shade(col, .42 + v);
   c.fillRect(X, Y, S, e); c.fillRect(X, Y, e, S);
-  c.fillStyle = shade(col, -.36 + v);
+  c.fillStyle = shade(col, -.40 + v);
   c.fillRect(X, Y+S-e, S, e); c.fillRect(X+S-e, Y, e, S);
-  c.fillStyle = "rgba(255,255,255,.3)";
-  c.fillRect(X+e, Y+e, e, e);
+  /* joint sombre fin autour (grout) : détache chaque tesselle */
+  c.strokeStyle = "rgba(0,0,0,.22)"; c.lineWidth = 1;
+  c.strokeRect(X+.5, Y+.5, S-1, S-1);
+  /* reflet spéculaire net + petite lueur diffuse */
+  c.fillStyle = "rgba(255,255,255,.55)";
+  c.fillRect(X+e, Y+e, Math.max(1, e-1), Math.max(1, e-1));
+  if(S >= 12){ c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(X+e, Y+e, e*2, e); }
 }
 /* fabrique un sprite pré-rendu hors écran — perf + réutilisable */
 function makeSprite(shape, palOrColor, px){
@@ -1812,19 +1825,34 @@ const Voxel = (()=>{
         c.globalAlpha = 1;
         return;
       }
-      const lum = Math.max(0, -(P.nn[0]*L[0] + P.nn[1]*L[1] + P.nn[2]*L[2]));
-      const spec = Math.pow(Math.max(0, -(P.nn[0]*HALF[0] + P.nn[1]*HALF[1] + P.nn[2]*HALF[2])), 22);
+      const nn = P.nn;
+      const lum = Math.max(0, -(nn[0]*L[0] + nn[1]*L[1] + nn[2]*L[2]));
+      const up  = Math.max(0, -nn[1]);             // face tournée vers le haut (écran)
+      const spec = Math.pow(Math.max(0, -(nn[0]*HALF[0] + nn[1]*HALF[1] + nn[2]*HALF[2])), 18);
       const pts = P.verts.map(proj);
       if(P.alpha != null) c.globalAlpha = P.alpha;
-      c.fillStyle = shade(P.col, -0.44 + lum*0.80);
+      /* base : ombre + lumière clé + un soupçon de lumière du ciel
+         sur les faces vers le haut (rend le volume plus lisible) */
+      c.fillStyle = shade(P.col, -0.46 + lum*0.86 + up*0.10);
       c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
       for(let k=1;k<4;k++) c.lineTo(pts[k][0], pts[k][1]);
       c.closePath(); c.fill();
-      if(spec > .04){                              // reflet spéculaire
-        c.fillStyle = `rgba(255,255,255,${(spec*.55).toFixed(3)})`;
+      /* glaçure céramique : dégradé clair→ombre du haut vers le bas
+         (seulement si la face est assez grande à l'écran → perf) */
+      const y0 = Math.min(pts[0][1],pts[1][1],pts[2][1],pts[3][1]);
+      const y1 = Math.max(pts[0][1],pts[1][1],pts[2][1],pts[3][1]);
+      if(y1 - y0 > 11){
+        const gg = c.createLinearGradient(0, y0, 0, y1);
+        gg.addColorStop(0, `rgba(255,255,255,${(0.14 + up*0.14).toFixed(3)})`);
+        gg.addColorStop(.5, "rgba(255,255,255,0)");
+        gg.addColorStop(1, "rgba(0,0,0,0.12)");
+        c.fillStyle = gg; c.fill();
+      }
+      if(spec > .03){                              // reflet spéculaire (brillance)
+        c.fillStyle = `rgba(255,255,255,${(spec*.5).toFixed(3)})`;
         c.fill();
       }
-      c.strokeStyle = "rgba(0,0,0,.30)"; c.lineWidth = 1; c.stroke();
+      c.strokeStyle = "rgba(0,0,0,.34)"; c.lineWidth = 1; c.stroke();
       c.globalAlpha = 1;
     });
     /* sol en grille, projeté dans la même perspective */
@@ -3640,25 +3668,58 @@ function maybeTransmission(next){
   }
 })();
 
-/* champ d'étoiles : dérive lente + scintillement */
+/* champ d'étoiles : nébuleuses colorées + étoiles qui scintillent,
+   quelques-unes brillantes avec un halo en croix */
 (function starfield(){
   const cv = $("#stars"), c = cv.getContext("2d");
-  let stars = [];
+  const TINTS = ["237,237,247", "180,210,255", "255,224,180", "200,180,255"];
+  let stars = [], neb = null;
+  function buildNebula(w, h){
+    /* nébuleuse pré-rendue : quelques taches colorées floues, une
+       seule fois → texture de fond sans coût par frame */
+    const t = document.createElement("canvas"); t.width = w; t.height = h;
+    const g = t.getContext("2d");
+    const blobs = [
+      [w*.22, h*.18, "rgba(255,46,136,.10)"],
+      [w*.80, h*.26, "rgba(43,228,208,.09)"],
+      [w*.50, h*.80, "rgba(96,64,255,.11)"],
+      [w*.12, h*.62, "rgba(43,228,208,.06)"],
+      [w*.88, h*.70, "rgba(255,46,136,.06)"],
+    ];
+    blobs.forEach(([x,y,col])=>{
+      const r = Math.max(w,h)*(.28 + Math.random()*.14);
+      const rg = g.createRadialGradient(x,y,0,x,y,r);
+      rg.addColorStop(0, col); rg.addColorStop(1, "transparent");
+      g.fillStyle = rg; g.fillRect(0,0,w,h);
+    });
+    return t;
+  }
   function size(){
     cv.width = innerWidth; cv.height = innerHeight;
-    stars = Array.from({length:70}, ()=>({
+    neb = buildNebula(cv.width, cv.height);
+    stars = Array.from({length:96}, ()=>({
       x:Math.random()*cv.width, y:Math.random()*cv.height,
-      s:Math.random()<.8?1:2, v:.05+Math.random()*.22,
-      tw:Math.random()*Math.PI*2,
+      s:Math.random()<.72?1:(Math.random()<.85?2:3), v:.05+Math.random()*.22,
+      tw:Math.random()*Math.PI*2, sp:Math.random()<.14,
+      col:TINTS[Math.random()<.55?0:1+((Math.random()*3)|0)],
     }));
   }
   size(); addEventListener("resize", size);
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function draw(now){
     c.clearRect(0,0,cv.width,cv.height);
+    if(neb) c.drawImage(neb, 0, 0);
     stars.forEach(st=>{
-      c.fillStyle = `rgba(237,237,247,${.2+.4*Math.abs(Math.sin(now/900+st.tw))})`;
+      const tw = .2 + .55*Math.abs(Math.sin(now/900 + st.tw));
+      c.fillStyle = `rgba(${st.col},${tw.toFixed(2)})`;
       c.fillRect(st.x, st.y, st.s*2, st.s*2);
+      /* les rares étoiles brillantes ont un petit scintillement en croix */
+      if(st.sp && tw > .55){
+        c.globalAlpha = (tw - .55) * 1.4;
+        c.fillRect(st.x - st.s*2, st.y + st.s/2, st.s*6, st.s);
+        c.fillRect(st.x + st.s/2, st.y - st.s*2, st.s, st.s*6);
+        c.globalAlpha = 1;
+      }
       if(!reduced){ st.y += st.v; if(st.y > cv.height){ st.y = -2; st.x = Math.random()*cv.width; } }
     });
     if(!reduced) requestAnimationFrame(draw);
