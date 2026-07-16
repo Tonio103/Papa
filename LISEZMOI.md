@@ -52,6 +52,13 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v20) — cinématique d'intro
+
+- **Une vraie cinématique de ~75 secondes** se joue au premier « Appuyer pour démarrer », en 6 plans entièrement dessinés : la nuit aux Vans (panorama, lune, ville), l'artiste qui arrive sous le réverbère, la pose de la pièce tesselle par tesselle (avec pschitts et signature), l'aube sur trois mosaïques, le radar qui capte les 8 signaux, et le carton de mission « AGENT PAPA ».
+- Sous-titres, bandes cinéma, bruitages synchronisés ; la musique de chasse tourne dessous.
+- **Passable** après 3,5 s (bouton « Passer ► » en haut à droite) ; jouée une seule fois (mémorisé), puis revisible via le menu ☰ → **REVOIR L'INTRO**, ou le bouton CINÉ de la barre de triche.
+- Respecte « mouvement réduit » (la cinématique est sautée, l'intro machine à écrire raconte déjà l'histoire).
+
 ## Nouveautés (v19) — habillage général
 
 - **Écran titre** : l'escadron survole maintenant une **ville en contre-jour** (fenêtres allumées, parallaxe douce avec la caméra), des **étoiles filantes** traversent le ciel, et un badge doré « ✦ ÉDITION LES VANS ✦ » signe le jeu sous le logo.
