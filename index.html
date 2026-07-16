@@ -4261,6 +4261,10 @@ MiniGames["LV_08"] = function(box, api){
   barI.style.cssText = "display:block; height:100%; width:0%;";
   barW.appendChild(barI);
   box.appendChild(barW);
+  /* pastilles : une par couche de couleur, façon nuancier */
+  const chips = document.createElement("div");
+  chips.style.cssText = "display:flex; gap:7px; justify-content:center; min-height:16px;";
+  box.appendChild(chips);
 
   /* toile principale, nette sur écran haute densité */
   const DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -4344,6 +4348,9 @@ MiniGames["LV_08"] = function(box, api){
   let spraying = false, sx2 = 0, sy2 = 0, lastHiss = 0, shakeCanT = 0;
   let mist = [], drips = [];
   let over = false, raf = null;
+  let sigT = 0, sigHiss = false;                       // la pièce prend vie
+  const eyeCells = byLetter["E"] || [];
+  const skinCol = (pal && pal.S) || null;
 
   function startLayer(){
     const L = layers[li];
@@ -4352,6 +4359,15 @@ MiniGames["LV_08"] = function(box, api){
     L.cells.forEach(p=>holes.rect(ox + p.x*CS + 1, oy + p.y*CS + 1, CS - 2, CS - 2));
     lab.textContent = `COUCHE ${li+1}/${layers.length} · ${L.nom.toUpperCase()}`;
     barI.style.width = "0%";
+    chips.innerHTML = "";
+    layers.forEach((L2, i)=>{
+      const s = document.createElement("i");
+      s.style.cssText = `width:14px; height:14px; border-radius:4px; display:inline-block;` +
+        `background:${L2.col}; opacity:${i < li ? 1 : i === li ? .95 : .22};` +
+        `box-shadow:${i === li ? "0 0 9px " + L2.col : "none"};` +
+        `border:1px solid rgba(255,255,255,.3);`;
+      chips.appendChild(s);
+    });
     shakeCanT = performance.now() + (reduced ? 0 : (li === 0 ? 1750 : 750));
     AudioFX.clack();
   }
@@ -4375,6 +4391,7 @@ MiniGames["LV_08"] = function(box, api){
     over = true; spraying = false;
     lab.textContent = "";
     barI.style.width = "100%";
+    chips.querySelectorAll("i").forEach(s=>{ s.style.opacity = 1; s.style.boxShadow = "none"; });
     /* quelques coulures : la signature d'une pièce à la bombe */
     for(let i=0;i<5;i++){
       const L = layers[Math.floor(Math.random()*layers.length)];
@@ -4383,6 +4400,7 @@ MiniGames["LV_08"] = function(box, api){
         len: 0, max: 14 + Math.random()*26, col: L.col, v: .35 + Math.random()*.4 });
     }
     liftAnim = { t0: performance.now(), dur: reduced ? 0 : 1100 };
+    sigT = performance.now() + (reduced ? 250 : 1500);
     setTimeout(()=>{
       AudioFX.fanfare(); Juice.confetti(box, 34);
       txt.textContent = "L'invader… c'était moi. 😏\nJoyeux anniversaire.";
@@ -4515,6 +4533,26 @@ MiniGames["LV_08"] = function(box, api){
       }
     }else{
       drawSheet(c, layers[li].ch, 1, 1);
+    }
+
+    /* la pièce prend vie : les yeux clignent, l'artiste signe */
+    if(sigT && now > sigT){
+      if(skinCol && eyeCells.length && (now - sigT) % 3400 > 3180){
+        c.fillStyle = skinCol;
+        eyeCells.forEach(p=>c.fillRect(ox + p.x*CS + 1, oy + p.y*CS + 1, CS - 2, CS - 2));
+        c.fillStyle = "rgba(0,0,0,.45)";
+        eyeCells.forEach(p=>c.fillRect(ox + p.x*CS + 2, oy + p.y*CS + CS/2, CS - 4, 2));
+      }
+      const k = Math.min(1, (now - sigT)/700);
+      if(!sigHiss){ sigHiss = true; AudioFX.spray(); }
+      if(k < 1 && Math.random() < .5)
+        mist.push({ x: ox + cols*CS - 16 + (Math.random()-.5)*10, y: oy + rows*CS + 12,
+          vx: (Math.random()-.5), vy: -.4, life: 10, col: "#2BE4D0" });
+      c.globalAlpha = k;
+      c.fillStyle = "#2BE4D0";
+      c.font = "italic bold 21px 'Baloo 2', sans-serif";
+      c.fillText("A.", ox + cols*CS - 24, oy + rows*CS + 20);
+      c.globalAlpha = 1;
     }
 
     /* brouillard de bombe (au-dessus de tout) */
@@ -4670,9 +4708,15 @@ MiniGames["LV_06"] = function(box, api){
   let hearts = 3, hits = 0, combo = 0, bombes = 0;
   let shakeF = 0, stopUntil = 0, hitT = -9e9, flashT = -9e9, msg = "", msgUntil = 0;
   let running = false, over = false, lastT = 0;
+  let mile = 0, cop = null, nextCopMs = 9000, birds = [];
+  /* assistance invisible : après des échecs répétés, le jeu
+     s'adoucit sans le dire (écarts plus larges, vitesse plafonnée,
+     projecteur plus lent) — personne n'aime rester bloqué */
+  let resets = 0, ladderMiss = 0;
   /* échelle */
   const RUNGS = 22;
   let wallX = 0, rung = 0, camY = 0, climbT = -9e9, caughtT = -9e9, doneT = 0;
+  let prevDanger = false;
 
   /* ═══ entrées : pointeur + clavier (buffer de saut inclus) ═══ */
   function press(){
@@ -4706,7 +4750,7 @@ MiniGames["LV_06"] = function(box, api){
     msg = why; msgUntil = now + 1300;
     if(phase === "run") speed = Math.max(2.4, speed*.65);
     if(hearts <= 0){
-      hearts = 3;
+      hearts = 3; resets++;
       if(phase === "ladder"){ rung = Math.max(0, rung - 6); }
       else{
         dist = Math.max(0, dist - DIST_GOAL*.12);
@@ -4723,10 +4767,15 @@ MiniGames["LV_06"] = function(box, api){
   function spawn(dd, now){
     if(phase !== "run" || dist > DIST_GOAL - 900) return;
     nextLampPx -= dd;
-    if(nextLampPx <= 0){ nextLampPx = 430 + Math.random()*220; lamps.push({ x: W + 60 }); }
+    if(nextLampPx <= 0){
+      nextLampPx = 430 + Math.random()*220;
+      lamps.push({ x: W + 60 });
+      if(Math.random() < .4) birds.push({ x: W + 120 + Math.random()*80, y: GROUND,
+        vx:0, vy:0, fly:false, flap: Math.random()*7 });
+    }
     nextGapPx -= dd;
     if(nextGapPx > 0) return;
-    const secs = 1.05 + Math.random()*1.05;           // fenêtre de réaction
+    const secs = 1.05 + Math.min(.5, resets*.18) + Math.random()*1.05;   // fenêtre de réaction
     nextGapPx = speed * 60 * secs;
     const o = OBS[Math.floor(Math.random()*OBS.length)];
     obstacles.push({ x: W + 60, img:o.img, w:o.w, h:o.h });
@@ -4750,9 +4799,10 @@ MiniGames["LV_06"] = function(box, api){
     if(inv) g.globalAlpha = Math.floor(now/90)%2 ? .35 : .85;
     g.translate(cx, feetY);
     g.scale(1 + player.squash*.5, 1 - player.squash);
-    /* écharpe qui flotte */
+    /* écharpe qui flotte — dorée quand le combo chauffe */
+    const sc = combo >= 5 ? [255,210,63] : [43,228,208];
     for(let i=0;i<4;i++){
-      g.fillStyle = `rgba(43,228,208,${.8 - i*.18})`;
+      g.fillStyle = `rgba(${sc[0]},${sc[1]},${sc[2]},${.8 - i*.18})`;
       g.fillRect(-11 - i*4, -34 + Math.sin(now/80 + i)*2.4, 4, 3);
     }
     /* jambes : 4 poses, ou repliées en l'air */
@@ -4814,16 +4864,17 @@ MiniGames["LV_06"] = function(box, api){
     g.restore();
   }
 
-  /* ═══ phase échelle ═══ */
-  const beamX = now => W/2 + Math.sin(now/1300)*175;
-  const beamOnLadder = now => Math.abs(beamX(now) - W/2) < 44;
+  /* ═══ phase échelle : faisceau à phase continue — il peut
+     ralentir (assistance) sans jamais se téléporter ═══ */
+  let beamP = Math.PI/2, beamXv = W/2 + 175, dangerNow = false;
   function climb(){
     const now = performance.now();
     if(now < player.inv + 150 && now < caughtT + 500) return;   // le temps d'encaisser
-    if(beamOnLadder(now) && now > player.inv){
-      caughtT = now;
+    if(dangerNow && now > player.inv){
+      caughtT = now; ladderMiss++;
+      const before = hearts;
       ouch(now, "REPÉRÉ PAR LE PROJECTEUR !");
-      rung = Math.max(0, rung - 3);
+      if(before > 1) rung = Math.max(0, rung - 3);   // sinon ouch a déjà fait redescendre
       return;
     }
     rung++; climbT = now;
@@ -4931,6 +4982,17 @@ MiniGames["LV_06"] = function(box, api){
   function drawRunScene(now, dt, hitstop){
     const dd = (running && !hitstop) ? speed*dt : 0;
 
+    /* nuages paresseux devant la lune */
+    for(let i=0;i<2;i++){
+      const cxx = ((i*260 + 40 - dist*.05) % (W + 200) + W + 200) % (W + 200) - 100;
+      const cyy = 58 + i*46;
+      c.fillStyle = "rgba(205,215,255,.07)";
+      c.beginPath();
+      c.ellipse(cxx, cyy, 46, 11, 0, 0, 7);
+      c.ellipse(cxx + 26, cyy - 7, 26, 9, 0, 0, 7);
+      c.fill();
+    }
+
     /* parallaxe : deux rangées d'immeubles */
     [[far, .18, GROUND-118], [near, .45, GROUND-64]].forEach(([L2, f, yy])=>{
       const off = (dist*f) % L2.w;
@@ -4951,7 +5013,8 @@ MiniGames["LV_06"] = function(box, api){
     if(running && !hitstop){
       /* vitesse : elle monte doucement avec la distance */
       const target = phase === "arrive" ? 2.3
-        : 3.0 + (SPEED_MAX - 3.0)*Math.min(1, dist/(DIST_GOAL*.85));
+        : 3.0 + (SPEED_MAX - 3.0)*Math.min(1, dist/(DIST_GOAL*.85))
+              * (1 - Math.min(.25, resets*.08));
       speed += (target - speed)*.02*dt;
       dist += dd;
       spawn(dd, now);
@@ -4961,6 +5024,32 @@ MiniGames["LV_06"] = function(box, api){
       lamps = lamps.filter(l=>l.x > -40);
       obstacles = obstacles.filter(o=>o.x > -60);
       cans = cans.filter(k=>k.x > -30);
+      /* jalons de rythme : la course a des actes */
+      const frac = dist/DIST_GOAL;
+      if(frac > .35 && mile < 1){ mile = 1; msg = "ÇA S'ACCÉLÈRE !"; msgUntil = now + 1400; AudioFX.signal(); }
+      if(frac > .70 && mile < 2){ mile = 2; msg = "DERNIÈRE LIGNE DROITE !"; msgUntil = now + 1500; AudioFX.signal(); }
+      /* pigeons : ils picorent, puis s'envolent quand tu arrives */
+      birds.forEach(bd=>{
+        bd.x -= dd;
+        if(!bd.fly && bd.x - PX < 86){
+          bd.fly = true; bd.vx = 1.4 + Math.random(); bd.vy = -(2.4 + Math.random()*1.2);
+        }
+        if(bd.fly){ bd.x += bd.vx*dt; bd.y += bd.vy*dt; bd.vy -= .015*dt; }
+      });
+      birds = birds.filter(bd=>bd.x > -30 && bd.x < W + 260 && bd.y > -40);
+      /* la patrouille passe en silhouette au premier plan */
+      nextCopMs -= dt*16.667;
+      if(!cop && nextCopMs <= 0 && phase === "run" && dist < DIST_GOAL - 1200){
+        cop = { x: W + 80 }; AudioFX.signal();
+      }
+      if(cop){
+        cop.x -= (speed + 3.4)*dt;
+        if(cop.x < -140){ cop = null; nextCopMs = 11000 + Math.random()*9000; }
+      }
+      /* traînée dorée quand le combo chauffe */
+      if(combo >= 5 && Math.random() < .4)
+        parts.push({ x: PX - 10 - Math.random()*6, y: player.y - 22 + Math.random()*16,
+          vx: -1.2, vy: -.2, life: 12, col: "rgba(255,210,63,.85)", sz: 2.4 });
     }
 
     /* réverbères + flaques de lumière */
@@ -4989,6 +5078,21 @@ MiniGames["LV_06"] = function(box, api){
       c.fillStyle = "#fff";
       c.fillRect(k.x + 8, k.y + bob - 12, 2, 2);
       c.globalAlpha = 1;
+    });
+
+    /* pigeons */
+    birds.forEach(bd=>{
+      c.save(); c.translate(bd.x, bd.y);
+      c.fillStyle = "#9a9ac2";
+      c.fillRect(-4, -6, 8, 5);                                    // corps
+      const peck = !bd.fly && Math.sin(now/300 + bd.flap) > .6 ? 2 : 0;
+      c.fillRect(3, -9 + peck, 4, 4);                              // tête
+      c.fillStyle = "#ffb14d"; c.fillRect(7, -8 + peck, 3, 2);     // bec
+      if(bd.fly){                                                  // battement d'ailes
+        const wing = Math.sin(now/60 + bd.flap) > 0 ? -5 : 2;
+        c.fillStyle = "#b8b8dc"; c.fillRect(-3, -6 + wing, 6, 3);
+      }
+      c.restore();
     });
 
     /* obstacles */
@@ -5082,6 +5186,29 @@ MiniGames["LV_06"] = function(box, api){
     c.fill();
     drawRunner(c, PX, player.y, now);
 
+    /* la patrouille : silhouette qui traverse le premier plan,
+       gyrophare qui teinte toute la scène — pure pression */
+    if(cop){
+      const gy = Math.floor(now/140) % 2;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const tint = c.createRadialGradient(cop.x + 45, H - 20, 8, cop.x + 45, H - 20, 220);
+      tint.addColorStop(0, gy ? "rgba(255,70,70,.20)" : "rgba(80,140,255,.20)");
+      tint.addColorStop(1, "rgba(0,0,0,0)");
+      c.fillStyle = tint; c.fillRect(0, 0, W, H);
+      c.restore();
+      c.fillStyle = "#07071a";
+      c.fillRect(cop.x, H - 34, 96, 22);                           // caisse
+      c.fillRect(cop.x + 18, H - 48, 52, 16);                      // habitacle
+      c.fillStyle = "#1c2246";
+      c.fillRect(cop.x + 24, H - 45, 18, 11); c.fillRect(cop.x + 48, H - 45, 16, 11);
+      c.fillStyle = gy ? "#ff4d4d" : "#4d8cff";
+      c.fillRect(cop.x + 38, H - 53, 12, 5);                       // gyrophare
+      c.fillStyle = "#04040f";
+      c.beginPath(); c.arc(cop.x + 22, H - 11, 9, 0, 7); c.arc(cop.x + 74, H - 11, 9, 0, 7); c.fill();
+      c.fillStyle = "#2a2a52";
+      c.beginPath(); c.arc(cop.x + 22, H - 11, 4, 0, 7); c.arc(cop.x + 74, H - 11, 4, 0, 7); c.fill();
+    }
+
     /* rappel du geste au tout début */
     if(dist < 260 && running){
       c.globalAlpha = .55 + Math.sin(now/220)*.35;
@@ -5122,9 +5249,17 @@ MiniGames["LV_06"] = function(box, api){
     /* le toit approche */
     const roofY = yOf(RUNGS*26 + 66);
     if(roofY > -30){
-      c.fillStyle = "#12122a"; c.fillRect(0, Math.max(-30, roofY - 200), W, 200);
+      c.fillStyle = "#12122a"; c.fillRect(0, Math.max(-230, roofY - 200), W, 200);
       c.fillStyle = "#454577"; c.fillRect(0, roofY, W, 8);
       c.fillStyle = "rgba(255,255,255,.1)"; c.fillRect(0, roofY, W, 2);
+      /* le fanion du but flotte sur le toit */
+      const fx = W/2 + 58;
+      c.fillStyle = "#6a72a8"; c.fillRect(fx, roofY - 30, 3, 30);
+      const wav = Math.sin(now/240)*3;
+      c.fillStyle = "#2BE4D0";
+      c.beginPath(); c.moveTo(fx + 3, roofY - 30);
+      c.lineTo(fx + 24, roofY - 25 + wav); c.lineTo(fx + 3, roofY - 19);
+      c.closePath(); c.fill();
     }
     /* l'échelle */
     const lx = W/2;
@@ -5141,8 +5276,12 @@ MiniGames["LV_06"] = function(box, api){
 
     /* l'hélico et son projecteur */
     const hx = W/2 + Math.sin(now/1700)*30, hy = 46;
-    const bx = beamX(now);
-    const danger = beamOnLadder(now);
+    if(!hitstop) beamP += dt*16.667/(1300 + Math.min(600, ladderMiss*160));
+    beamXv = W/2 + Math.sin(beamP)*175;
+    const bx = beamXv;
+    const danger = dangerNow = Math.abs(bx - W/2) < 44;
+    if(danger && !prevDanger && phase === "ladder") AudioFX.back();   // alerte sonore
+    prevDanger = danger;
     c.save(); c.globalCompositeOperation = "lighter";
     const grad = c.createLinearGradient(0, hy, 0, H);
     grad.addColorStop(0, danger ? "rgba(255,240,200,.42)" : "rgba(210,225,255,.3)");

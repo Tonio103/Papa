@@ -52,6 +52,13 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v18) — polish « comme un vrai jeu »
+
+- **La Cavale, mise en scène** : jalons de rythme annoncés (« ÇA S'ACCÉLÈRE ! », « DERNIÈRE LIGNE DROITE ! »), voiture de patrouille qui traverse en silhouette au premier plan avec gyrophare qui teinte la scène, pigeons qui picorent et s'envolent au passage, nuages devant la lune, écharpe et traînée **dorées** à partir du combo ×5, fanion cyan qui flotte au sommet de l'échelle.
+- **L'échelle** : alerte sonore quand le faisceau entre sur l'échelle, faisceau à phase continue (jamais de téléportation).
+- **Assistance invisible** (façon Nintendo) : après des échecs répétés, le jeu s'adoucit sans le dire — écarts entre obstacles élargis, vitesse maximale plafonnée, projecteur ralenti. Personne ne reste bloqué, personne ne s'en aperçoit.
+- **Le Pochoir** : nuancier des couches (pastilles de couleur qui s'allument), et après la révélation la pièce **prend vie** — les yeux clignent, puis l'artiste signe « A. » à la bombe en bas à droite.
+
 ## Nouveautés (v17) — la Cavale et le Pochoir
 
 - **LV_06 « La Cavale »** (remplace l'Arcade) : la pièce est posée, il faut fuir ! Course de nuit dans la rue — un appui = un saut, appui long = saut plus haut, avec « jump buffer » (un appui juste avant l'atterrissage part quand même). Les obstacles naissent **hors écran** et l'écart entre eux est calibré sur le temps de réaction (≥ 1 s), jamais sur le hasard seul : on les voit toujours venir de loin. Les bombes de peinture à ramasser sont souvent en cloche au-dessus des obstacles : sauter rapporte. Au bout de la rue, **l'échelle** : on tape pour grimper, barreau par barreau, mais il faut se figer quand le projecteur de l'hélicoptère balaie le mur. 3★ = pas touché une seule fois.
