@@ -53,6 +53,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v22) — cinématique de cinéma + écrans à encoche
+
+- **Cinématique nettement enrichie** : bandes noires de cinéma qui entrent/sortent, léger **travelling/zoom « Ken Burns »** sur chaque plan, **fondus au noir** entre les plans (vrais « cuts »), **pluie fine** sur les scènes de nuit, **vignette** et **grain de pellicule** argentique, sous-titres en fondu doux. Tout reste dessiné au canvas, sans image externe.
+- **Adapté aux téléphones à encoche (iPhone 13, Pixel…)** : `viewport-fit=cover` + zones sûres (`env(safe-area-inset-*)`) sur tous les écrans, le HUD, la barre de triche, le cadre et le bouton « Passer ». Plus rien ne passe sous l'encoche ni sous la barre d'accueil.
+
 ## Nouveautés (v21) — reprendre / recommencer + fin du cache bloqué
 
 - **Écran-titre intelligent** : si aucune partie n'existe, un seul bouton « ▶ Commencer l'aventure » (qui lance la cinématique). Si une partie est en cours, deux boutons : « ▶ Reprendre ma partie » (droit au HUB) et « ✦ Nouvelle partie (voir l'intro) » qui, après **double confirmation**, efface tout et rejoue la cinématique depuis zéro.
