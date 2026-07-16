@@ -487,13 +487,44 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 #keypad button.k-ok:disabled{ color:#6f6f95; background:linear-gradient(180deg,#3a3a5c,#2c2c48);
   box-shadow:inset 0 2px 0 rgba(255,255,255,.06), 0 5px 0 #191930; opacity:.85; }
 #fx{ position:fixed; inset:0; z-index:5; pointer-events:none; }
-#victory-screen .screen-inner{ position:relative; z-index:6; justify-content:center; text-align:center; }
+#victory-screen .screen-inner{ position:relative; z-index:6; justify-content:flex-start; text-align:center; }
 #victory-screen h1{
-  color:var(--jaune);
+  color:var(--jaune); margin-top:6px;
   text-shadow:
     0 0 8px rgba(255,210,63,.9), 0 0 26px rgba(255,210,63,.5),
     3px 3px 0 var(--magenta), 3px 3px 14px rgba(255,46,136,.5);
 }
+/* les 8 pièces qui explosent, en vedette juste sous le titre */
+#victory-strip{ display:flex; justify-content:center; margin-top:6px; }
+#victory-strip canvas{ width:100%; max-width:330px; }
+/* carte cadeau : le message d'anniversaire */
+#victory-gift{ display:flex; align-items:center; gap:13px; text-align:left;
+  margin-top:8px; padding:14px 16px; border-radius:16px;
+  background:linear-gradient(180deg, rgba(255,206,77,.14), rgba(255,46,136,.10));
+  border:1.5px solid rgba(255,206,77,.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 22px rgba(0,0,0,.45); }
+#victory-gift .vg-ico{ font-size:36px; flex:0 0 auto;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.5)); animation:giftWob 2.4s ease-in-out infinite; }
+@keyframes giftWob{ 25%{ transform:rotate(-8deg); } 75%{ transform:rotate(8deg); } }
+#victory-txt{ font-size:20px; line-height:1.35; white-space:pre-line; color:var(--blanc); }
+#victory-rank{ margin-top:14px; font-family:var(--f-pix); font-size:13px; line-height:1.5;
+  color:var(--jaune); text-shadow:0 0 12px rgba(255,206,77,.55); }
+#victory-rank .rk-badge{ display:inline-block; margin-bottom:6px; padding:5px 14px; border-radius:99px;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d); color:#3a2a06;
+  box-shadow:0 3px 0 #b8791a, 0 0 16px rgba(255,206,77,.4); }
+/* tuiles de statistiques */
+#victory-stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:14px; }
+.vstat{ background:linear-gradient(180deg, rgba(27,27,62,.9), rgba(16,16,36,.9));
+  border:1.5px solid var(--line); border-radius:13px; padding:11px 8px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 5px 14px rgba(0,0,0,.4); }
+.vstat .v{ font-family:var(--f-pix); font-size:16px; color:var(--blanc);
+  display:flex; align-items:baseline; gap:4px; }
+.vstat .v small{ font-size:10px; color:var(--gris); }
+.vstat .l{ font-size:14px; color:#9c9cc4; }
+.vstat.gold .v{ color:var(--jaune); text-shadow:0 0 10px rgba(255,206,77,.5); }
+.vstat.cyan .v{ color:var(--cyan); text-shadow:0 0 10px rgba(43,228,208,.5); }
+#victory-actions{ margin-top:20px; }
 
 /* ── Intro / boot ─────────────────────────────────────────── */
 #boot-screen{ overflow:hidden; }
@@ -1195,9 +1226,17 @@ button:disabled{ color:#7683ad;
   <canvas id="fx"></canvas>
   <div class="screen-inner">
     <h1>INVASION<br>TERMINÉE</h1>
-    <p id="victory-txt" style="text-align:center; font-size:24px; margin-top:20px;"></p>
-    <p class="sub" id="victory-score" style="margin-top:14px;"></p>
-    <div id="victory-strip" style="display:flex; justify-content:center; gap:6px; flex-wrap:wrap; margin-top:18px;"></div>
+    <div id="victory-strip"></div>
+    <div id="victory-gift">
+      <span class="vg-ico">🎁</span>
+      <p id="victory-txt"></p>
+    </div>
+    <div id="victory-rank"></div>
+    <div id="victory-stats"></div>
+    <div class="btn-row" id="victory-actions">
+      <button id="btn-victory-replay" class="b3">↻ Revoir l'intro</button>
+      <button id="btn-victory-hub" class="b2">← Retour au repaire</button>
+    </div>
   </div>
 </section>
 
@@ -2829,22 +2868,35 @@ function victory(){
   let duree = "";
   if(S.start && S.end){
     const m = Math.round((S.end - S.start)/60000);
-    duree = m >= 60 ? Math.floor(m/60) + " h " + String(m%60).padStart(2,"0") : m + " min";
+    duree = m >= 60 ? Math.floor(m/60) + "h" + String(m%60).padStart(2,"0") : m + " min";
   }
   const ts = totalStars();
   const nSucces = Object.keys(S.succes || {}).filter(k=>S.succes[k]).length;
-  $("#victory-score").innerHTML =
-    `SCORE : ${S.points}/${maxPts} PTS<br>` +
-    `<span style="color:var(--cyan)">RANG : ${rang}</span><br>` +
-    `<span style="color:var(--jaune)">★ ${ts} / 24 étoiles</span><br>` +
-    `<span class="dim">${nSucces}/${SUCCES.length} succès débloqués</span>` +
-    (duree ? `<br><span class="dim">Chasse bouclée en ${duree}</span>` : "");
+  const isHi = S.points >= Store.hiGet();
+
+  /* bandeau du rang gagné */
+  $("#victory-rank").innerHTML = `<span class="rk-badge">RANG ATTEINT</span><br>${rang}`;
+
+  /* tuiles de stats : score, étoiles, succès, (temps) */
+  const tiles = [
+    { cls:"gold", v:`${S.points}<small>/${maxPts}</small>`, l:"Score" + (isHi ? " ✦ record" : "") },
+    { cls:"cyan", v:`★ ${ts}<small>/24</small>`, l:"Étoiles" },
+    { cls:"gold", v:`${nSucces}<small>/${SUCCES.length}</small>`, l:"Succès" },
+  ];
+  if(duree) tiles.push({ cls:"cyan", v:duree, l:"Durée de la chasse" });
+  const stats = $("#victory-stats"); stats.innerHTML = "";
+  tiles.forEach(t=>{
+    const d = document.createElement("div");
+    d.className = "vstat " + t.cls;
+    d.innerHTML = `<span class="v">${t.v}</span><span class="l">${t.l}</span>`;
+    stats.appendChild(d);
+  });
 
   // le mur des 8 pièces capturées
   const strip = $("#victory-strip"); strip.innerHTML = "";
   const ring = document.createElement("canvas");
-  ring.width = 660; ring.height = 440;
-  ring.style.cssText = "width:100%; max-width:340px;";
+  ring.width = 620; ring.height = 300;
+  ring.style.cssText = "width:100%; max-width:320px;";
   strip.appendChild(ring);
   if(victoryOrbit) victoryOrbit();
   /* les 8 pièces se rassemblent en anneau… puis EXPLOSENT en cubes 3D */
@@ -3462,6 +3514,14 @@ window.addEventListener("keydown", e=>{
   else if(e.key === "Enter"){ checkFinal(); e.preventDefault(); }
 });
 $("#btn-final-back").addEventListener("click", ()=>{ AudioFX.back(); show("hub-screen"); });
+/* ── actions de l'écran de victoire ── */
+$("#btn-victory-hub").addEventListener("click", ()=>{
+  AudioFX.back(); renderHub(); show("hub-screen");
+});
+$("#btn-victory-replay").addEventListener("click", ()=>{
+  AudioFX.select();
+  Cinematic.play(()=>victory());     // rejoue l'intro puis revient fêter
+});
 /* ── menu 3D ── */
 $("#btn-menu").addEventListener("click", ()=>{ show("menu-screen"); Menu3D.start(); });
 $("#btn-panel-close").addEventListener("click", ()=>{

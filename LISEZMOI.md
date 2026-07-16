@@ -53,6 +53,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v25) — écran de victoire en récap célébratoire
+
+- L'écran de fin passe d'une simple liste de texte à un **vrai tableau de fin** : les 8 pièces qui explosent en vedette, une **carte cadeau** (🎁) qui met en avant le message d'anniversaire, un **bandeau « RANG ATTEINT »**, et des **tuiles de statistiques** (Score ✦ record, Étoiles ★/24, Succès /8, Durée de la chasse).
+- Deux **boutons** : « ↻ Revoir l'intro » (rejoue la cinématique puis re-fête) et « ← Retour au repaire » (revenir au hub pour rejouer les défis).
+
 ## Nouveautés (v24) — écran du code final repensé
 
 - **Le code final devient un vrai moment** : un **cadenas doré** (qui s'ouvre à la réussite) surmonte huit **molettes** qui se remplissent en or, avec un **clavier numérique** arcade (⌫ pour effacer, ✓ qui s'illumine dès les 8 chiffres saisis). Fini les minuscules cases et le grand vide — la saisie est claire, tactile et satisfaisante sur mobile. Le clavier physique marche toujours (chiffres, Retour arrière, Entrée).
