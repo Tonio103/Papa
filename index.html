@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>L'INVASION DES VANS</title>
 <meta name="theme-color" content="#0B0B1E">
 <link rel="manifest" href="manifest.json">
@@ -88,7 +88,9 @@ body::before{
 }
 
 /* ── Cadre de borne d'arcade ──────────────────────────────── */
-#frame{ position:fixed; inset:6px; z-index:950; pointer-events:none;
+#frame{ position:fixed; z-index:950; pointer-events:none;
+  top:calc(6px + var(--sat)); bottom:calc(6px + var(--sab));
+  left:calc(6px + var(--sal)); right:calc(6px + var(--sar));
   border:2px solid rgba(43,228,208,.16); }
 #frame i{ position:absolute; width:20px; height:20px;
   border:3px solid var(--cyan);
@@ -106,12 +108,23 @@ body::after{
     radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.4) 100%);
 }
 
+/* ── Zones sûres (encoche iPhone 13, Pixel, barre d'accueil) ─ */
+:root{
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
 /* ── Écrans ───────────────────────────────────────────────── */
 .screen{ display:none; position:fixed; inset:0; z-index:1;
-  flex-direction:column; overflow-y:auto; overscroll-behavior:contain; }
+  flex-direction:column; overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch; }
 .screen.active{ display:flex; }
 .screen-inner{ width:100%; max-width:520px; margin:0 auto;
-  padding:16px 16px 96px; flex:1; display:flex; flex-direction:column; }
+  padding:calc(16px + var(--sat)) calc(16px + var(--sar))
+          calc(96px + var(--sab)) calc(16px + var(--sal));
+  flex:1; display:flex; flex-direction:column; }
 @media (prefers-reduced-motion: no-preference){
   .screen.active .screen-inner{ animation:enter .28s ease-out; }
   @keyframes enter{ from{ opacity:0; transform:translateY(12px); } }
@@ -124,8 +137,11 @@ body::after{
   background:linear-gradient(180deg, #181838, #101026);
   border-bottom:3px solid var(--line);
   box-shadow:0 4px 14px rgba(0,0,0,.5);
-  padding:12px 10px; font-family:var(--f-pix); font-size:11px;
-  margin:-16px -16px 0; padding-left:16px; padding-right:16px;
+  font-family:var(--f-pix); font-size:11px;
+  /* remonte SOUS l'encoche et déborde jusqu'aux bords, puis
+     repousse son contenu en dessous de la zone sûre */
+  margin:calc(-16px - var(--sat)) calc(-16px - var(--sar)) 0 calc(-16px - var(--sal));
+  padding:calc(12px + var(--sat)) calc(16px + var(--sar)) 12px calc(16px + var(--sal));
 }
 #hud .hud-item{
   display:flex; align-items:center; gap:8px; padding:7px 12px;
@@ -436,13 +452,16 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 /* ── Cinématique d'intro ──────────────────────────────────── */
 #cine-screen{ background:#04040e; overflow:hidden; }
 #cine-cv{ position:absolute; inset:0; width:100%; height:100%; }
-#cine-sub{ position:absolute; left:0; right:0; bottom:13%; z-index:2;
+#cine-sub{ position:absolute; left:0; right:0; bottom:calc(13% + var(--sab)); z-index:2;
   text-align:center; font-size:clamp(19px, 5.4vw, 24px); color:var(--blanc);
   padding:0 30px; white-space:pre-line; min-height:64px; pointer-events:none;
+  letter-spacing:.3px;
   text-shadow:0 2px 8px rgba(0,0,0,.95), 0 0 22px rgba(0,0,0,.7);
-  transition:opacity .4s; }
-#cine-skip{ position:absolute; right:14px; top:14px; z-index:3;
-  font-size:10px; padding:10px 14px; opacity:.85; }
+  opacity:0; transform:translateY(8px);
+  transition:opacity .5s ease, transform .5s ease; }
+#cine-sub.show{ opacity:1; transform:translateY(0); }
+#cine-skip{ position:absolute; right:calc(14px + var(--sar)); top:calc(14px + var(--sat)); z-index:3;
+  font-size:10px; padding:10px 14px; opacity:.7; }
 #boot-ribbon{ text-align:center; font-size:9px; color:#3a2a06; margin:12px auto 0;
   width:max-content; padding:6px 16px; letter-spacing:2px;
   background:linear-gradient(180deg,#ffe08a,#ffce4d); border-radius:99px;
@@ -465,7 +484,8 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 
 /* ── Barre de triche ──────────────────────────────────────── */
 #cheat{ display:none; position:fixed; bottom:0; left:0; right:0; z-index:50;
-  background:#000; border-top:3px solid var(--rouge); padding:8px;
+  background:#000; border-top:3px solid var(--rouge);
+  padding:8px calc(8px + var(--sar)) calc(8px + var(--sab)) calc(8px + var(--sal));
   overflow-x:auto; white-space:nowrap; }
 #cheat button{ font-size:9px; padding:8px; margin-right:6px;
   background:linear-gradient(180deg,#ff5b5b,#d92626);
@@ -2822,9 +2842,34 @@ const Cinematic = (()=>{
   let raf = null, guard = null, doneCb = null, t0 = 0, ended = false;
   let cv, c, subEl, skipBt, W = 0, H = 0, dpr = 1;
   let stars = [], cityFar = [], cityNear = [], mist = [], blips = [];
+  let rain = [], grainTile = null, curLine = "";
   const fired = {};
   const once = (k, fn)=>{ if(!fired[k]){ fired[k] = true; fn(); } };
   const ease = k=>k*k*(3-2*k);
+
+  /* grain de pellicule : une tuile de bruit pré-rendue, repositionnée
+     au hasard chaque frame → texture argentique sans coût */
+  function makeGrain(){
+    const g = document.createElement("canvas"); g.width = g.height = 96;
+    const gc = g.getContext("2d"), id = gc.createImageData(96, 96);
+    for(let i=0;i<id.data.length;i+=4){
+      const v = 120 + Math.random()*135;
+      id.data[i]=id.data[i+1]=id.data[i+2]=v; id.data[i+3]=255;
+    }
+    gc.putImageData(id, 0, 0); return g;
+  }
+  /* pluie fine, en biais : gouttes qui tombent et se recyclent */
+  function drawRain(intensity){
+    c.save(); c.strokeStyle = "rgba(180,205,255,.28)"; c.lineWidth = 1;
+    rain.forEach(d=>{
+      if(d.on > intensity) return;
+      c.globalAlpha = .18 + d.a*.4;
+      c.beginPath(); c.moveTo(d.x, d.y); c.lineTo(d.x - d.l*.28, d.y + d.l); c.stroke();
+      d.y += d.v; d.x -= d.v*.28;
+      if(d.y > H){ d.y = -20; d.x = Math.random()*W*1.2; }
+    });
+    c.restore(); c.globalAlpha = 1;
+  }
 
   /* ── petits acteurs ── */
   function buildCity(n, hMin, hMax){
@@ -3069,7 +3114,7 @@ const Cinematic = (()=>{
           }
         }
       } },
-    { d:8, subs:[[3.6,"À toi de jouer."]],
+    { d:8, noKB:true, subs:[[3.6,"À toi de jouer."]],
       draw(t, p){
         c.fillStyle = "#04040e"; c.fillRect(0, 0, W, H);
         const k = ease(Math.min(1, t/.7));
@@ -3098,6 +3143,7 @@ const Cinematic = (()=>{
   ];
   const TOTAL = SCENES.reduce((a,s)=>a+s.d, 0);
 
+  const DIP = 0.5;                       // durée du fondu au noir entre plans
   function frame(now){
     if(ended) return;
     dpr = Math.min(2, devicePixelRatio || 1);
@@ -3105,17 +3151,54 @@ const Cinematic = (()=>{
     W = innerWidth; H = innerHeight;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const T = (now - t0)/1000;
-    let acc = 0, sc = null, t = 0;
-    for(const s of SCENES){ if(T < acc + s.d){ sc = s; t = T - acc; break; } acc += s.d; }
+    let acc = 0, sc = null, t = 0, idx = 0;
+    for(let i=0;i<SCENES.length;i++){ if(T < acc + SCENES[i].d){ sc = SCENES[i]; t = T - acc; idx = i; break; } acc += SCENES[i].d; }
     if(!sc){ end(); return; }
-    sc.draw(t, t/sc.d);
-    /* sous-titres du plan courant */
+    const p = t / sc.d, last = idx === SCENES.length - 1, first = idx === 0;
+
+    /* ── Ken Burns : lent zoom/travelling, alterné selon le plan ── */
+    c.save();
+    if(!sc.noKB){
+      const dir = idx % 2 ? -1 : 1;
+      const z = 1.06 + ease(p) * .05;                    // 1.06 → 1.11
+      const panX = dir * (p - .5) * W * .05;
+      c.translate(W/2, H/2); c.scale(z, z); c.translate(-W/2 + panX, -H/2);
+    }
+    sc.draw(t, p);
+    /* pluie sur les plans de nuit (les trois premiers) */
+    if(idx <= 2) drawRain(idx === 1 ? 1 : .6);
+    c.restore();
+
+    /* ── fondu au noir entre les plans (« cut » cinéma) ── */
+    let blackA = 0;
+    if(!last && t > sc.d - DIP) blackA = Math.max(blackA, (t - (sc.d - DIP)) / DIP);
+    if(!first && t < DIP)       blackA = Math.max(blackA, 1 - t / DIP);
+    if(blackA > 0){ c.fillStyle = `rgba(2,2,10,${blackA.toFixed(3)})`; c.fillRect(0, 0, W, H); }
+
+    /* ── vignette + grain argentique ── */
+    const vg = c.createRadialGradient(W/2, H*.45, Math.min(W,H)*.3, W/2, H*.5, Math.max(W,H)*.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)");
+    c.fillStyle = vg; c.fillRect(0, 0, W, H);
+    if(grainTile){
+      c.globalAlpha = .05; c.globalCompositeOperation = "overlay";
+      const ox = -Math.random()*96, oy = -Math.random()*96;
+      for(let x=ox; x<W; x+=96) for(let y=oy; y<H; y+=96) c.drawImage(grainTile, x, y);
+      c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    }
+
+    /* ── bandes cinéma animées (entrent au début, sortent à la fin) ── */
+    let bar = H * .10;
+    if(T < .8) bar = H * .10 * ease(T / .8);
+    else if(T > TOTAL - .8) bar = H * .10 * ease(Math.max(0, (TOTAL - T) / .8));
+    c.fillStyle = "#04040e";
+    c.fillRect(0, 0, W, bar); c.fillRect(0, H - bar, W, bar);
+
+    /* ── sous-titres : fondu doux, cachés pendant les cuts ── */
     let line = "";
     sc.subs.forEach(([at, txt])=>{ if(t >= at) line = txt; });
-    if(subEl.textContent !== line) subEl.textContent = line;
-    /* bandes cinéma + vignette */
-    c.fillStyle = "#04040e";
-    c.fillRect(0, 0, W, H*.085); c.fillRect(0, H*.915, W, H*.085);
+    if(line !== curLine){ curLine = line; subEl.textContent = line; }
+    subEl.classList.toggle("show", !!line && blackA < .35);
+
     if(T > 3.5) skipBt.hidden = false;
     raf = requestAnimationFrame(frame);
   }
@@ -3125,6 +3208,7 @@ const Cinematic = (()=>{
     if(raf) cancelAnimationFrame(raf);
     clearTimeout(guard);
     skipBt.hidden = true;
+    subEl.classList.remove("show");
     const cb = doneCb; doneCb = null;
     if(cb) cb();
   }
@@ -3134,14 +3218,21 @@ const Cinematic = (()=>{
     if(matchMedia("(prefers-reduced-motion: reduce)").matches){ done(); return; }
     doneCb = done; ended = false; t0 = performance.now();
     Object.keys(fired).forEach(k=>delete fired[k]);
+    W = innerWidth; H = innerHeight;
     stars = Array.from({length:60}, ()=>[Math.random(), Math.random()*.5, Math.random()*1.6+.6, Math.random()*7]);
     cityFar = buildCity(0, .12, .3); cityNear = buildCity(0, .08, .22);
     mist = [];
+    if(!grainTile) grainTile = makeGrain();
+    rain = Array.from({length:90}, ()=>({
+      x: Math.random()*W*1.2, y: Math.random()*H,
+      l: 10 + Math.random()*14, v: 9 + Math.random()*7,
+      a: Math.random(), on: Math.random() }));
+    curLine = "";
     blips = Array.from({length:8}, (_,i)=>{
       const a2 = i/8*Math.PI*2 + .4, r2 = .3 + (i%3)*.22;
       return [Math.cos(a2)*r2, Math.sin(a2)*r2];
     });
-    subEl.textContent = "";
+    subEl.textContent = ""; subEl.classList.remove("show");
     skipBt.hidden = true;
     skipBt.onclick = ()=>{ AudioFX.back(); end(); };
     show("cine-screen");
