@@ -39,6 +39,7 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `CONFIG.joueur` | le prénom affiché dans l'intro |
 | `CONFIG.messageVictoire` | le texte de fin |
 | `CONFIG.codeTriche` | le mot secret qui débloque un flash (défaut : ULYSSE) |
+| `CONFIG.codeReset` | le code secret de remise à zéro tapé dans le scanner (défaut : 0000) |
 | `CONFIG.credits` | le texte de l'écran Crédits (menu ☰) |
 | `SONG` (dans AudioFX) | la musique de fond : 4 pistes de 16 pas (basse, arpège, kick, charley) — remplace les fréquences pour changer le thème |
 | `CONFIG.messagesInvader` | les 7 messages de l'invader entre les défis — c'est là que se joue l'histoire |
@@ -51,6 +52,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `SHAPES.portrait` + `PALETTES.portrait` | le portrait pixel de ton père (LV_08, peint au pochoir) — grille de lettres, une lettre = une couleur ; un visage 12×12 d'exemple montre le format. `LAYER_NAMES` (dans LV_08) nomme chaque couche de couleur |
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
+
+## Nouveautés (v21) — reprendre / recommencer + fin du cache bloqué
+
+- **Écran-titre intelligent** : si aucune partie n'existe, un seul bouton « ▶ Commencer l'aventure » (qui lance la cinématique). Si une partie est en cours, deux boutons : « ▶ Reprendre ma partie » (droit au HUB) et « ✦ Nouvelle partie (voir l'intro) » qui, après **double confirmation**, efface tout et rejoue la cinématique depuis zéro.
+- **Code secret de remise à zéro** : tape `CONFIG.codeReset` (défaut **`0000`**) dans la saisie manuelle du scanner. Première saisie = avertissement, deuxième saisie = tout est effacé et le jeu redémarre au début (cinématique comprise). Se change dans `CONFIG.codeReset`.
+- **Fin du « je ne vois pas les nouveautés »** : le service worker passe en **réseau-d'abord pour le jeu** (`index.html`). Dès qu'il y a du réseau, on obtient TOUJOURS la dernière version (cinématique, La Cavale, Le Pochoir…) ; le cache ne sert plus qu'en secours hors-ligne. ⚠ Après une mise à jour, il peut falloir **recharger une fois de plus** (ou fermer/rouvrir l'appli) le temps que l'ancien service worker cède la place au nouveau.
 
 ## Nouveautés (v20) — cinématique d'intro
 

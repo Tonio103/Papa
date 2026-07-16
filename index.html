@@ -1021,6 +1021,7 @@ button:disabled{ color:#7683ad;
     <div id="hi-line" class="pix" style="font-size:10px; color:var(--gris); text-align:center; min-height:14px;"></div>
     <div class="btn-row">
       <button id="btn-start">▶ Appuyer pour démarrer</button>
+      <button id="btn-newgame" class="b3" hidden>✦ Nouvelle partie (voir l'intro)</button>
     </div>
     <div class="pix" style="font-size:8px; color:#3c3c66; text-align:center; margin-top:14px;">© 2026 INVADER CORP — LES VANS</div>
   </div>
@@ -1192,6 +1193,11 @@ const CONFIG = {
   // Chaque saisie débloque la PROCHAINE pièce non flashée — le
   // secours si un QR est perdu, arraché ou illisible au soleil.
   codeTriche: "ULYSSE",                 // À PERSONNALISER
+
+  // Code secret de remise à zéro : tapé dans la saisie manuelle du
+  // scanner, il efface toute la progression (avec double confirmation)
+  // et relance le jeu depuis le début — cinématique comprise.
+  codeReset: "0000",                    // À PERSONNALISER
 
   credits: "Conçu, codé et mosaïqué\nà la main, rien que pour toi.\n\n— A.",   // À PERSONNALISER
 
@@ -2232,9 +2238,28 @@ const Scanner = (()=>{
 /* Un code arrive (QR ou clavier) → on décide.
    codeInterceptor : un mini-jeu peut capter les codes (ex : coop LV_07). */
 let codeInterceptor = null;
+let resetArmedScan = false, resetArmTimer = null;
 function handleCode(raw){
   const code = String(raw).trim().toUpperCase().replace(/[^A-Z0-9_]/g,"");
   if(codeInterceptor && codeInterceptor(code)){ restartScanSoon(); return; }
+  /* code secret de remise à zéro → double confirmation puis reload */
+  if(CONFIG.codeReset && code === CONFIG.codeReset.toUpperCase()){
+    if(resetArmedScan){
+      clearTimeout(resetArmTimer);
+      Store.reset();
+      AudioFX.boom();
+      Scanner.msg("PARTIE EFFACÉE — REDÉMARRAGE…");
+      setTimeout(()=>location.reload(), 700);
+      return;
+    }
+    resetArmedScan = true;
+    AudioFX.err();
+    Scanner.msg("⚠ TOUT EFFACER ? RETAPE LE CODE", true);
+    clearTimeout(resetArmTimer);
+    resetArmTimer = setTimeout(()=>{ resetArmedScan = false; }, 6000);
+    restartScanSoon();
+    return;
+  }
   /* code secret → débloque la prochaine pièce verrouillée */
   if(code === CONFIG.codeTriche.toUpperCase()){
     const next = CONFIG.stations.find(s=>!S.flashed[s.code]);
@@ -3158,18 +3183,70 @@ function buildCheat(){
 }
 
 /* branchements */
-$("#btn-start").addEventListener("click", ()=>{
+/* une partie est-elle déjà commencée ? */
+function hasProgress(){
+  return !!(S.won || S.points > 0 || Object.keys(S.flashed||{}).length > 0);
+}
+function enterGame(){
   AudioFX.init(); AudioFX.powerOn();
   setTimeout(()=>AudioFX.startMusic(), 1000);
   keepAwake();
   if(bootScene) bootScene();          // libère la scène d'accueil
-  const goHub = ()=>{ renderHub(); show("hub-screen"); };
-  /* première fois : la cinématique raconte la nuit de l'invasion */
-  if(!S.cineSeen){
+}
+function goHub(){ renderHub(); show("hub-screen"); }
+/* efface tout en mémoire ET sur disque, puis relance une partie neuve */
+function wipeState(){
+  Store.reset();
+  S = { points:0, flashed:{}, done:{}, won:false,
+        msgSeen:0, start:null, end:null, stars:{}, succes:{}, cineSeen:false };
+  persist();
+}
+
+$("#btn-start").addEventListener("click", ()=>{
+  enterGame();
+  if(hasProgress()){
+    goHub();                          // « Reprendre » : droit au but, pas d'intro
+  }else{
+    /* première partie : la cinématique raconte la nuit de l'invasion */
     S.cineSeen = true; persist();
     Cinematic.play(goHub);
-  }else goHub();
+  }
 });
+
+/* « Nouvelle partie » : double confirmation puis intro depuis zéro */
+let newgameArmed = false, newgameTimer = null;
+$("#btn-newgame").addEventListener("click", e=>{
+  const btn = e.currentTarget;
+  AudioFX.init();
+  if(!newgameArmed){
+    newgameArmed = true;
+    btn.textContent = "⚠ Effacer ma partie ?";
+    AudioFX.err();
+    clearTimeout(newgameTimer);
+    newgameTimer = setTimeout(()=>{
+      newgameArmed = false; btn.textContent = "✦ Nouvelle partie (voir l'intro)";
+    }, 4000);
+    return;
+  }
+  clearTimeout(newgameTimer); newgameArmed = false;
+  wipeState();
+  S.cineSeen = true; persist();
+  enterGame();
+  Cinematic.play(goHub);
+});
+
+/* libellés de l'écran-titre selon qu'une partie existe ou non */
+function setupBootButtons(){
+  const start = $("#btn-start"), ng = $("#btn-newgame");
+  if(hasProgress()){
+    start.textContent = "▶ Reprendre ma partie";
+    ng.hidden = false;
+  }else{
+    start.textContent = "▶ Commencer l'aventure";
+    ng.hidden = true;
+  }
+}
+setupBootButtons();
 { const hi = Store.hiGet(); const ts = totalStars(); const bits = [];
   if(hi) bits.push("HI-SCORE  " + hi);
   if(ts > 0) bits.push("RANG  " + RANKS[rankIndex(ts)].nom);
