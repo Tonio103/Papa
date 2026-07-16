@@ -429,14 +429,63 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 @keyframes slideD{ from{ transform:translateY(-16px); } }
 
 /* ── Final & victoire ─────────────────────────────────────── */
-#final-inputs{ display:flex; justify-content:center; gap:5px; margin:20px 0; flex-wrap:wrap; }
-#final-inputs input{
-  width:38px; height:54px; text-align:center; font-family:var(--f-pix); font-size:18px;
-  background:#0d0d22; color:var(--jaune); border:2px solid var(--line);
-  box-shadow:inset 0 0 10px rgba(0,0,0,.8);
-}
-#final-inputs input:focus{ outline:none; border-color:var(--jaune);
-  box-shadow:inset 0 0 10px rgba(0,0,0,.8), 0 0 12px rgba(255,210,63,.4); }
+#final-inner{ justify-content:flex-start; align-items:center; }
+/* le cadenas, dessiné en CSS, s'ouvre à la victoire */
+#lock-badge{ margin:8px auto 4px; width:96px; height:104px; position:relative; }
+#lock-anse{ position:absolute; left:50%; top:2px; width:52px; height:46px;
+  transform:translateX(-50%);
+  border:9px solid #cfcfe6; border-bottom:0; border-radius:26px 26px 0 0;
+  transition:transform .45s cubic-bezier(.3,1.5,.4,1), left .45s ease; }
+#lock-body{ position:absolute; left:50%; bottom:0; width:88px; height:66px;
+  transform:translateX(-50%); border-radius:14px;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d 55%,#e5a92a);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.6), inset 0 -5px 0 rgba(0,0,0,.22),
+    0 8px 20px rgba(0,0,0,.5), 0 0 22px rgba(255,206,77,.35); }
+#lock-body::after{ content:""; position:absolute; left:50%; top:20px; transform:translateX(-50%);
+  width:14px; height:14px; border-radius:50%; background:#8a5a10;
+  box-shadow:0 12px 0 -3px #8a5a10; }
+#lock-badge.open #lock-anse{ transform:translateX(-30%) rotate(24deg); left:38%; }
+#lock-badge.open #lock-body{ animation:hudBump .5s; }
+/* titre propre (or), sans le glitch cyan/magenta du reste du jeu */
+#final-screen h1{ margin-top:6px; color:#ffe08a; letter-spacing:2px;
+  text-shadow:0 0 12px rgba(255,206,77,.55), 0 2px 3px rgba(0,0,0,.6); }
+
+/* les 8 pastilles du code : afficheur à molette */
+#final-cells{ display:flex; justify-content:center; gap:6px; margin:14px 0 4px; flex-wrap:wrap; }
+.fcell{ width:34px; height:50px; border-radius:9px;
+  background:linear-gradient(180deg,#0a0a1c,#12122b);
+  border:2px solid var(--line); position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--f-pix); font-size:17px; color:#33335c;
+  box-shadow:inset 0 3px 10px rgba(0,0,0,.7); transition:color .15s, border-color .15s; }
+.fcell::before{ content:""; position:absolute; left:0; right:0; top:50%; height:1px;
+  background:rgba(255,255,255,.06); }         /* ligne de molette */
+.fcell.filled{ color:var(--jaune); border-color:#5a5a2a;
+  text-shadow:0 0 10px rgba(255,210,63,.8); }
+.fcell.active{ border-color:var(--cyan);
+  box-shadow:inset 0 3px 10px rgba(0,0,0,.7), 0 0 12px rgba(43,228,208,.5); }
+.fcell.ok{ color:var(--jaune); border-color:var(--jaune);
+  text-shadow:0 0 12px rgba(255,210,63,.95);
+  box-shadow:inset 0 0 12px rgba(255,210,63,.2), 0 0 16px rgba(255,210,63,.5);
+  animation:lockPulse .3s; }
+#final-cells.wrong{ animation:shakeBox .35s; }
+
+/* clavier numérique arcade */
+#keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+  width:100%; max-width:300px; margin:16px auto 0; }
+#keypad button{ font-family:var(--f-pix); font-size:20px; padding:16px 0;
+  color:var(--blanc); border-radius:12px;
+  background:linear-gradient(180deg,#2a2a52,#1a1a3a);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.1), inset 0 -3px 0 rgba(0,0,0,.4),
+    0 5px 0 #0c0c1e, 0 7px 12px rgba(0,0,0,.45); }
+#keypad button:active{ transform:translateY(4px);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.06), 0 1px 0 #0c0c1e; }
+#keypad button.k-del{ color:var(--rouge); font-size:22px; }
+#keypad button.k-ok{ color:#03231f;
+  background:linear-gradient(180deg,#46f2df,#17b7a4); box-shadow:inset 0 2px 0 rgba(255,255,255,.4),
+    inset 0 -3px 0 rgba(0,0,0,.25), 0 5px 0 #0c7a6d, 0 7px 12px rgba(0,0,0,.45); }
+#keypad button.k-ok:disabled{ color:#6f6f95; background:linear-gradient(180deg,#3a3a5c,#2c2c48);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.06), 0 5px 0 #191930; opacity:.85; }
 #fx{ position:fixed; inset:0; z-index:5; pointer-events:none; }
 #victory-screen .screen-inner{ position:relative; z-index:6; justify-content:center; text-align:center; }
 #victory-screen h1{
@@ -491,14 +540,6 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   background:linear-gradient(180deg,#ff5b5b,#d92626);
   box-shadow:0 3px 0 #7a0d0d; color:#fff; }
 
-/* ── Code final : verrouillage & refus ────────────────────── */
-#final-inputs.wrong{ animation:shakeBox .35s; }
-#final-inputs input.ok{
-  border-color:var(--jaune); color:var(--jaune);
-  text-shadow:0 0 10px rgba(255,210,63,.9);
-  box-shadow:inset 0 0 10px rgba(255,210,63,.15), 0 0 14px rgba(255,210,63,.45);
-  animation:lockPulse .3s;
-}
 
 /* ── Archive des transmissions (menu) ─────────────────────── */
 .msg-arch{ border-left:3px solid var(--magenta); padding:8px 0 8px 14px; margin-top:14px; }
@@ -898,13 +939,10 @@ button:disabled{ color:#7683ad;
   box-shadow:0 16px 36px rgba(0,0,0,.55); }
 #cam-frame{ border-color:#4db8ff; border-radius:12px;
   box-shadow:0 0 0 1000px rgba(6,8,24,.55), 0 0 26px rgba(77,184,255,.65); }
-#manual input, #final-inputs input{ background:rgba(255,255,255,.06); color:var(--ink);
+#manual input{ background:rgba(255,255,255,.06); color:var(--ink);
   border:2px solid rgba(255,255,255,.14); border-radius:14px; box-shadow:inset 0 2px 8px rgba(0,0,0,.4); }
-#manual input:focus, #final-inputs input:focus{ border-color:var(--blue);
+#manual input:focus{ border-color:var(--blue);
   box-shadow:inset 0 2px 8px rgba(0,0,0,.4), 0 0 0 4px rgba(77,184,255,.25); }
-#final-inputs input{ color:#ffce4d; }
-#final-inputs input.ok{ border-color:#ffce4d; color:#ffce4d;
-  background:rgba(255,206,77,.1); box-shadow:0 0 16px rgba(255,206,77,.45); }
 
 /* ── Flash de capture (cinématique) ───────────────────────── */
 #flash-name{ color:#7fd0ff; text-shadow:0 0 14px rgba(77,184,255,.6); font-weight:800; }
@@ -1139,13 +1177,14 @@ button:disabled{ color:#7683ad;
 
 <!-- ═══ ÉCRAN 6 : CODE FINAL ═══ -->
 <section id="final-screen" class="screen">
-  <div class="screen-inner">
+  <div class="screen-inner" id="final-inner">
+    <div id="lock-badge"><div id="lock-anse"></div><div id="lock-body"></div></div>
     <h1 style="font-size:15px;">LE CODE FINAL</h1>
-    <p class="sub">Entre les 8 chiffres dans l'ordre des pièces.</p>
-    <div id="final-inputs"></div>
-    <div id="final-msg" class="sub" style="min-height:26px;"></div>
+    <p class="sub">Compose les 8 chiffres révélés par les défis.</p>
+    <div id="final-cells"></div>
+    <div id="final-msg" class="sub" style="min-height:24px;"></div>
+    <div id="keypad"></div>
     <div class="btn-row">
-      <button id="btn-final-ok">Déverrouiller</button>
       <button id="btn-final-back" class="b3">← Retour</button>
     </div>
   </div>
@@ -2689,52 +2728,87 @@ function creditsHTML(){
 /* ═══════════════════════════════════════════════════════════
    12. FINAL + VICTOIRE
    ─────────────────────────────────────────────────────────── */
-function buildFinalInputs(){
-  const w = $("#final-inputs"); w.innerHTML="";
-  w.classList.remove("wrong");
-  $("#btn-final-ok").disabled = false;
+let finalEntry = [], finalLocked = false;
+function renderFinalCells(){
+  const w = $("#final-cells"); w.innerHTML = "";
   for(let i=0;i<CODE_FINAL.length;i++){
-    const inp = document.createElement("input");
-    inp.type="tel"; inp.maxLength=1; inp.inputMode="numeric";
-    inp.addEventListener("input", ()=>{
-      inp.value = inp.value.replace(/\D/g,"");
-      if(inp.value && inp.nextElementSibling) inp.nextElementSibling.focus();
-    });
-    w.appendChild(inp);
+    const d = document.createElement("div");
+    d.className = "fcell" + (finalEntry[i] != null ? " filled" : "")
+      + (!finalLocked && i === finalEntry.length ? " active" : "");
+    d.textContent = finalEntry[i] != null ? finalEntry[i] : "";
+    w.appendChild(d);
   }
+  const ok = $("#kp-ok");
+  if(ok) ok.disabled = finalLocked || finalEntry.length !== CODE_FINAL.length;
+}
+function buildKeypad(){
+  const kp = $("#keypad");
+  if(kp.dataset.built) return;
+  kp.dataset.built = "1";
+  ["1","2","3","4","5","6","7","8","9","del","0","ok"].forEach(key=>{
+    const b = document.createElement("button");
+    if(key === "del"){ b.className = "k-del"; b.textContent = "⌫";
+      b.setAttribute("aria-label","Effacer"); b.addEventListener("click", delDigit); }
+    else if(key === "ok"){ b.className = "k-ok"; b.id = "kp-ok"; b.textContent = "✓";
+      b.setAttribute("aria-label","Déverrouiller"); b.addEventListener("click", checkFinal); }
+    else { b.textContent = key; b.addEventListener("click", ()=>addDigit(key)); }
+    kp.appendChild(b);
+  });
+}
+function addDigit(d){
+  if(finalLocked || finalEntry.length >= CODE_FINAL.length) return;
+  finalEntry.push(d); AudioFX.tick();
+  $("#final-msg").textContent = "";
+  renderFinalCells();
+  if(finalEntry.length === CODE_FINAL.length) AudioFX.select();
+}
+function delDigit(){
+  if(finalLocked || !finalEntry.length) return;
+  finalEntry.pop(); AudioFX.back();
+  $("#final-msg").textContent = "";
+  renderFinalCells();
+}
+function buildFinalInputs(){
+  finalEntry = []; finalLocked = false;
+  $("#final-cells").classList.remove("wrong");
+  $("#lock-badge").classList.remove("open");
+  $("#final-msg").textContent = "";
+  buildKeypad();
+  renderFinalCells();
 }
 function checkFinal(){
-  const wrap = $("#final-inputs");
-  const inputs = [...wrap.querySelectorAll("input")];
-  const val = inputs.map(i=>i.value).join("");
+  if(finalLocked || finalEntry.length !== CODE_FINAL.length) return;
+  const val = finalEntry.join("");
+  const cells = [...$("#final-cells").children];
   if(val === CODE_FINAL){
-    /* scène de déverrouillage : chaque chiffre se verrouille
-       en or avec son clonk, puis la porte s'ouvre */
-    $("#btn-final-ok").disabled = true;
-    inputs.forEach(i=>i.readOnly = true);
+    /* déverrouillage : chaque chiffre claque en or, le cadenas s'ouvre */
+    finalLocked = true;
+    const ok = $("#kp-ok"); if(ok) ok.disabled = true;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    inputs.forEach((inp, k)=>{
+    cells.forEach((cell, k)=>{
       setTimeout(()=>{
-        inp.classList.add("ok");
+        cell.classList.remove("active"); cell.classList.add("ok");
         AudioFX.lock();
         try{ navigator.vibrate && navigator.vibrate(30); }catch(e){}
-      }, reduced ? 0 : 180*k);
+      }, reduced ? 0 : 150*k);
     });
     setTimeout(()=>{
+      $("#lock-badge").classList.add("open");
       $("#final-msg").textContent = "DÉVERROUILLÉ";
       $("#final-msg").style.color = "var(--jaune)";
       AudioFX.ok();
-    }, reduced ? 0 : 180*inputs.length + 100);
+    }, reduced ? 0 : 150*cells.length + 100);
     setTimeout(()=>{
       S.won = true; persist();
       victory();
-    }, reduced ? 300 : 180*inputs.length + 1100);
+    }, reduced ? 400 : 150*cells.length + 1200);
   }else{
     AudioFX.err();
-    wrap.classList.remove("wrong"); void wrap.offsetWidth;
-    wrap.classList.add("wrong");
+    const w = $("#final-cells");
+    w.classList.remove("wrong"); void w.offsetWidth; w.classList.add("wrong");
     $("#final-msg").textContent = "ACCÈS REFUSÉ";
     $("#final-msg").style.color = "var(--rouge)";
+    setTimeout(()=>{ if(!finalLocked){ finalEntry = []; renderFinalCells(); } }, 850);
   }
 }
 let victoryOrbit = null;
@@ -3377,11 +3451,16 @@ $("#btn-hint").addEventListener("click", ()=>{
 });
 $("#btn-skip").addEventListener("click", ()=>winGame(currentStation, true));
 $("#btn-final").addEventListener("click", ()=>{
-  buildFinalInputs(); $("#final-msg").textContent="";
+  buildFinalInputs();
   show("final-screen");
-  const f=$("#final-inputs input"); if(f) f.focus();
 });
-$("#btn-final-ok").addEventListener("click", checkFinal);
+/* clavier physique (ordinateur) : chiffres, effacer, entrée */
+window.addEventListener("keydown", e=>{
+  if(!$("#final-screen").classList.contains("active")) return;
+  if(/^[0-9]$/.test(e.key)){ addDigit(e.key); e.preventDefault(); }
+  else if(e.key === "Backspace"){ delDigit(); e.preventDefault(); }
+  else if(e.key === "Enter"){ checkFinal(); e.preventDefault(); }
+});
 $("#btn-final-back").addEventListener("click", ()=>{ AudioFX.back(); show("hub-screen"); });
 /* ── menu 3D ── */
 $("#btn-menu").addEventListener("click", ()=>{ show("menu-screen"); Menu3D.start(); });
