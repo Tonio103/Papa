@@ -53,6 +53,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v23) — La Cavale : glissade + échelle repensée
+
+- **Glissade dans le sprint** : de nouvelles **poutres à hauteur de tête** (rayées jaune/noir, télégraphiées « ▼ GLISSE ») qu'on ne peut PAS sauter — il faut **glisser dessous**. Tape en **haut** de l'écran = saut, tape en **bas** ou **glisse vers le bas** = glissade (au clavier : ↓ ou S). Glisser sous une poutre au ras rapporte « GLISSÉ ! +1 » et des bombes au sol.
+- **Échelle plus longue et plus fun** : la partie échelle dure maintenant plus longtemps que la course (42 barreaux). On peut **se déplacer à gauche/droite** (glissé ↔ ou flèches) entre les rails pour **esquiver les débris qui tombent** (télégraphiés par un ▼ rouge en haut) et **récupérer des bombes** placées sur un rail. Le projecteur de l'hélico (fige-toi !) reste, mais on peut esquiver latéralement pendant qu'on est figé.
+- La course de rue est un peu plus courte, pour que le gros du défi se joue en hauteur.
+
 ## Nouveautés (v22) — cinématique de cinéma + écrans à encoche
 
 - **Cinématique nettement enrichie** : bandes noires de cinéma qui entrent/sortent, léger **travelling/zoom « Ken Burns »** sur chaque plan, **fondus au noir** entre les plans (vrais « cuts »), **pluie fine** sur les scènes de nuit, **vignette** et **grain de pellicule** argentique, sous-titres en fondu doux. Tout reste dessiné au canvas, sans image externe.
