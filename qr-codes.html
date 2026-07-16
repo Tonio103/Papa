@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR codes — L'Invasion des Vans</title>
+<!--
+  Planche imprimable des 10 QR codes du jeu.
+  ⚠ Ouvrir CETTE page avec du réseau (la bibliothèque QR vient d'un CDN),
+  puis Ctrl+P / Imprimer. Niveau de correction H : le QR reste lisible
+  même un peu abîmé, plastifié ou au soleil.
+  Les codes générés doivent correspondre EXACTEMENT à CONFIG.stations
+  du jeu (LV_01 … LV_08) + les deux balises coop LV_07A / LV_07B.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  body{ font-family:monospace; margin:0; padding:20px; background:#fff; color:#111; }
+  h1{ font-size:18px; }
+  .toolbar{ margin-bottom:16px; }
+  .toolbar button{ font-size:16px; padding:10px 16px; cursor:pointer; }
+  .note{ font-size:13px; color:#555; max-width:640px; }
+  #sheet{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10mm; max-width:180mm; }
+  .card{
+    border:2px dashed #999; padding:8mm; text-align:center;
+    break-inside:avoid; page-break-inside:avoid;
+  }
+  .card .qr{ display:flex; justify-content:center; }
+  .card .qr img, .card .qr canvas{ width:42mm !important; height:42mm !important; }
+  .code{ font-size:22px; font-weight:bold; letter-spacing:2px; margin-top:4mm; }
+  .nom{ font-size:14px; color:#333; }
+  .pts{ font-size:12px; color:#777; }
+  .coop{ background:#fdf3f7; }
+  .spot{ background:#f0fbfa; }
+  @media print{
+    .toolbar, .note, h1{ display:none; }
+    body{ padding:0; }
+    #sheet{ max-width:none; }
+  }
+</style>
+</head>
+<body>
+<h1>L'INVASION DES VANS — planche de QR codes</h1>
+<div class="toolbar"><button onclick="print()">🖨 Imprimer</button></div>
+<p class="note">
+  Découpe le long des pointillés. Colle chaque QR au dos ou à côté de sa mosaïque.
+  Le code est imprimé en clair sous le QR : c'est le secours si la caméra ne
+  coopère pas (saisie manuelle dans le jeu). Les deux balises roses LV_07A et
+  LV_07B sont les points A et B du défi coop — à poser LOIN l'une de l'autre.
+  Les trois balises bleutées LV_03A/B/C sont les mini-balises du Spotting : à
+  cacher aux endroits exacts de tes trois photos macro.
+  Plastifie ou couvre d'adhésif transparent : correction niveau H, ça tiendra.
+</p>
+<div id="sheet"></div>
+<script>
+const CARDS = [
+  { code:"LV_01",  nom:"La Palette",   pts:"10 PTS" },
+  { code:"LV_02",  nom:"Le Binaire",   pts:"20 PTS" },
+  { code:"LV_03",  nom:"Le Spotting",  pts:"30 PTS" },
+  { code:"LV_03A", nom:"Mini-balise spotting — 1", pts:"", spot:true },
+  { code:"LV_03B", nom:"Mini-balise spotting — 2", pts:"", spot:true },
+  { code:"LV_03C", nom:"Mini-balise spotting — 3", pts:"", spot:true },
+  { code:"LV_04",  nom:"Rubikcubisme", pts:"40 PTS" },
+  { code:"LV_05",  nom:"Le Simon",     pts:"50 PTS" },
+  { code:"LV_06",  nom:"L'Arcade",     pts:"70 PTS" },
+  { code:"LV_07",  nom:"La Coop",      pts:"90 PTS" },
+  { code:"LV_07A", nom:"Balise coop — point A", pts:"", coop:true },
+  { code:"LV_07B", nom:"Balise coop — point B", pts:"", coop:true },
+  { code:"LV_08",  nom:"Le Portrait",  pts:"100 PTS" },
+];
+const sheet = document.getElementById("sheet");
+CARDS.forEach(c=>{
+  const d = document.createElement("div");
+  d.className = "card" + (c.coop ? " coop" : "") + (c.spot ? " spot" : "");
+  d.innerHTML = `<div class="qr"></div>
+    <div class="code">${c.code}</div>
+    <div class="nom">${c.nom}</div>
+    <div class="pts">${c.pts}</div>`;
+  sheet.appendChild(d);
+  new QRCode(d.querySelector(".qr"), {
+    text: c.code, width: 320, height: 320,
+    correctLevel: QRCode.CorrectLevel.H,
+  });
+});
+</script>
+</body>
+</html>
