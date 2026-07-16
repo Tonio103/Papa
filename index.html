@@ -352,6 +352,14 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   #cam-frame{ animation:framePulse 1.7s ease-in-out infinite; }
   @keyframes framePulse{ 50%{ border-color:rgba(43,228,208,.35);
     box-shadow:0 0 0 1000px rgba(0,0,0,.4), 0 0 6px rgba(43,228,208,.2); } }
+  /* ligne de balayage : le scanner "cherche" visiblement */
+  #cam-wrap::after{
+    content:""; position:absolute; left:0; right:0; top:0; height:30%;
+    background:linear-gradient(180deg, transparent,
+      rgba(43,228,208,.14) 80%, rgba(43,228,208,.5));
+    animation:scanline 2.4s linear infinite; pointer-events:none;
+  }
+  @keyframes scanline{ from{ transform:translateY(-100%); } to{ transform:translateY(340%); } }
 }
 #manual{ display:flex; gap:8px; margin-top:14px; }
 #manual input{
@@ -425,6 +433,10 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 /* ── Intro / boot ─────────────────────────────────────────── */
 #boot-screen{ overflow:hidden; }
 #boot3d{ position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+#boot-ribbon{ text-align:center; font-size:9px; color:#3a2a06; margin:12px auto 0;
+  width:max-content; padding:6px 16px; letter-spacing:2px;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d); border-radius:99px;
+  box-shadow:0 3px 0 #b8791a, 0 6px 14px rgba(0,0,0,.4), 0 0 18px rgba(255,206,77,.35); }
 #boot-ui{ position:relative; z-index:2; }
 #boot-screen::before{
   content:""; position:absolute; inset:0; z-index:1; pointer-events:none;
@@ -993,6 +1005,7 @@ button:disabled{ color:#7683ad;
   <canvas id="boot3d"></canvas>
   <div class="screen-inner" id="boot-ui">
     <h1>L'INVASION<br>DES VANS</h1>
+    <div id="boot-ribbon" class="pix">✦ ÉDITION LES VANS ✦</div>
     <div id="boot-txt" class="cursor"></div>
     <div id="attract"></div>
     <div id="hi-line" class="pix" style="font-size:10px; color:var(--gris); text-align:center; min-height:14px;"></div>
@@ -1026,6 +1039,7 @@ button:disabled{ color:#7683ad;
     </div>
 
     <div id="quest"></div>
+    <div id="quest-next" class="dim" style="font-size:17px; text-align:center; margin-top:7px; min-height:22px;"></div>
     <h2>Code final</h2>
     <div id="frags"></div>
     <p class="sub">Chaque défi réussi révèle un chiffre.</p>
@@ -2030,7 +2044,10 @@ function renderPlayerCard(){
   const t = totalStars();
   const idx = rankIndex(t);
   const rank = RANKS[idx], next = RANKS[idx+1] || null;
-  $("#pc-hello").textContent = "Agent " + CONFIG.joueur;
+  /* l'accueil suit l'heure de la chasse */
+  const hh = new Date().getHours();
+  const salut = hh < 6 ? "Chasse de nuit" : hh < 12 ? "Bonjour" : hh < 18 ? "Bonne chasse" : "Bonsoir";
+  $("#pc-hello").textContent = `${salut}, agent ${CONFIG.joueur}`;
   const rk = $("#pc-rank");
   rk.textContent = rank.nom;
   rk.style.color = rank.couleur;
@@ -2081,6 +2098,17 @@ function renderHub(){
     s.className = "qseg" + (S.done[st.code] ? " done" : S.flashed[st.code] ? " half" : "");
     q.appendChild(s);
   });
+  /* le prochain objectif, toujours affiché : personne ne se demande "et maintenant ?" */
+  const qn = $("#quest-next");
+  if(qn){
+    const pending = CONFIG.stations.find(st=>S.flashed[st.code] && !S.done[st.code]);
+    const unflashed = CONFIG.stations.find(st=>!S.flashed[st.code]);
+    qn.innerHTML = pending
+      ? `Défi en attente : <b style="color:var(--jaune)">${pending.code} — ${pending.nom}</b>`
+      : unflashed
+      ? `Prochaine pièce à trouver : <b style="color:var(--cyan)">${unflashed.code} — ${unflashed.nom}</b>`
+      : `Toutes les pièces sont à toi — <b style="color:var(--jaune)">entre le code final !</b>`;
+  }
 
   // fragments
   const fr = $("#frags"); fr.innerHTML="";
@@ -2119,9 +2147,19 @@ function renderHub(){
       card.style.cursor = "pointer";
       card.addEventListener("click", ()=>{ AudioFX.select(); startGame(st); });
     }else{
+      /* pièce non trouvée : une silhouette dans l'ombre — le teasing
+         donne plus envie qu'un simple "???" */
       card.innerHTML = `<div class="card-top locked">${st.code}</div>
-                        <div class="card-win"><span class="myst">???</span></div>
+                        <div class="card-win" style="position:relative;"></div>
                         <span class="pts">${st.points} PTS</span>`;
+      const cvL = document.createElement("canvas");
+      cvL.width = 150; cvL.height = 122;
+      cvL.style.cssText = "width:75px;height:61px;opacity:.55;filter:brightness(.5);";
+      const win = card.querySelector(".card-win");
+      win.appendChild(cvL);
+      Voxel.draw(cvL, st.sprite, "#2b2b52", .5, -.3, { cam:{ scale:11, focal:11, dist:7 } });
+      win.insertAdjacentHTML("beforeend",
+        `<span class="myst" style="position:absolute; font-size:17px;">?</span>`);
     }
     g.appendChild(card);
   });
@@ -3067,6 +3105,25 @@ let bootScene = null;
   let ufoT = -6, raf;
   const t0 = performance.now();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* la ville en contre-jour, pré-rendue une fois */
+  const sky = document.createElement("canvas");
+  sky.width = 900; sky.height = 170;
+  {
+    const g = sky.getContext("2d");
+    let x = 0;
+    while(x < 900){
+      const bw = 40 + Math.random()*60, bh = 40 + Math.random()*110;
+      g.fillStyle = "#101026";
+      g.fillRect(x, 170 - bh, bw, bh);
+      if(Math.random() < .5) g.fillRect(x + bw/2 - 2, 170 - bh - 10, 4, 10);
+      g.fillStyle = "rgba(255,216,138,.5)";
+      for(let wy = 170 - bh + 8; wy < 158; wy += 16)
+        for(let wx = x + 6; wx < x + bw - 8; wx += 14)
+          if(Math.random() < .10) g.fillRect(wx, wy, 4, 6);
+      x += bw + 4;
+    }
+  }
+  let meteor = null, nextMeteor = 2600;
   function frame(now){
     const t = (now - t0)/1000;
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -3090,6 +3147,31 @@ let bootScene = null;
       cam:{ scale: Math.min(innerWidth, innerHeight)*dpr/13, focal:13, dist:9,
             x: Math.sin(t*.18)*14*dpr, y: 40*dpr },
     });
+    /* l'escadron survole la ville : silhouette + fenêtres */
+    const c2 = cv.getContext("2d");
+    const sw2 = sky.width*dpr, sh2 = sky.height*dpr;
+    const offx = Math.sin(t*.18)*7*dpr;              // parallaxe douce avec la caméra
+    c2.globalAlpha = .92;
+    for(let x = -offx - sw2; x < cv.width; x += sw2)
+      c2.drawImage(sky, x, cv.height - sh2, sw2, sh2);
+    c2.globalAlpha = 1;
+    /* une étoile filante, de temps en temps */
+    nextMeteor -= 16.7;
+    if(!meteor && nextMeteor <= 0){
+      meteor = { x: cv.width*(.3 + Math.random()*.55), y: cv.height*(.06 + Math.random()*.1), k: 0 };
+      nextMeteor = 5000 + Math.random()*7000;
+    }
+    if(meteor){
+      meteor.k += .03;
+      const mx = meteor.x - meteor.k*130*dpr, my = meteor.y + meteor.k*80*dpr;
+      const fade = Math.sin(Math.min(1, meteor.k)*Math.PI);
+      const gr = c2.createLinearGradient(mx, my, mx + 70*dpr, my - 43*dpr);
+      gr.addColorStop(0, `rgba(255,255,255,${.95*fade})`);
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      c2.strokeStyle = gr; c2.lineWidth = 2*dpr; c2.lineCap = "round";
+      c2.beginPath(); c2.moveTo(mx, my); c2.lineTo(mx + 70*dpr, my - 43*dpr); c2.stroke();
+      if(meteor.k >= 1) meteor = null;
+    }
     if(!reduced) raf = requestAnimationFrame(frame);
   }
   frame(t0);

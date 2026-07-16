@@ -52,6 +52,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v19) — habillage général
+
+- **Écran titre** : l'escadron survole maintenant une **ville en contre-jour** (fenêtres allumées, parallaxe douce avec la caméra), des **étoiles filantes** traversent le ciel, et un badge doré « ✦ ÉDITION LES VANS ✦ » signe le jeu sous le logo.
+- **HUB** : l'accueil suit l'heure (« Bonsoir, agent Papa »), et une ligne sous la barre de quête affiche **toujours le prochain objectif** (défi en attente, prochaine pièce à trouver, ou code final). Les pièces non trouvées apparaissent en **silhouette dans l'ombre** au lieu d'un simple « ??? ».
+- **Scanner** : une **ligne de balayage** cyan parcourt l'image caméra — on voit que ça cherche.
+
 ## Nouveautés (v18) — polish « comme un vrai jeu »
 
 - **La Cavale, mise en scène** : jalons de rythme annoncés (« ÇA S'ACCÉLÈRE ! », « DERNIÈRE LIGNE DROITE ! »), voiture de patrouille qui traverse en silhouette au premier plan avec gyrophare qui teinte la scène, pigeons qui picorent et s'envolent au passage, nuages devant la lune, écharpe et traînée **dorées** à partir du combo ×5, fanion cyan qui flotte au sommet de l'échelle.
