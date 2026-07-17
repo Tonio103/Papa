@@ -53,6 +53,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v31) — l'écran de capture en carte de collection
+
+- **« FLASH RÉUSSI ! » devient une carte à collectionner** : la pièce 3D trône sur des **rayons lumineux rotatifs** teintés à sa couleur, dans une carte au bord assorti, avec un badge doré « **PIÈCE n/8** » et le nom de la pièce dans sa couleur. Ce moment revient 8 fois — c'est maintenant un petit événement à chaque fois.
+- La typo d'affiche **Bungee** s'applique aussi aux tampons de fin de défi, au « PRÊT ?/GO ! » et aux badges — cohérence d'enseigne partout.
+- **Bug réglé** : un vieil effet « letterbox » posait une bande noire qui masquait le titre de l'écran de capture — supprimé.
+
 ## Nouveautés (v30) — direction artistique + LE VRAI PORTRAIT
 
 - **Le portrait du Pochoir est maintenant le vrai** : dessiné d'après photo (14×16) — cheveux argent, lunettes rondes (dont les verres clignent à la fin), barbe poivre et sel, veste noire zippée, grand sourire. 8 couches à peindre à la bombe.

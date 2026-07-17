@@ -674,13 +674,8 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   grid-template-columns:repeat(8,1fr); grid-auto-rows:1fr; }
 .tcell{ background:#0a0a22; transform:scale(0); transition:transform .16s ease; }
 
-/* ── Letterbox cinéma sur l'écran de capture ──────────────── */
-#flash-screen::before, #flash-screen::after{
-  content:""; position:absolute; left:0; right:0; height:0; background:#000; z-index:3;
-}
-#flash-screen::before{ top:0; }  #flash-screen::after{ bottom:0; }
-#flash-screen.active::before, #flash-screen.active::after{ animation:letterbox .6s ease .2s forwards; }
-@keyframes letterbox{ to{ height:38px; } }
+/* (l'ancien letterbox de l'écran de capture a été remplacé par
+   la carte de collection à rayons — plus de bandes noires) */
 
 /* ── Entrées en cascade (hub) ─────────────────────────────── */
 @media (prefers-reduced-motion: no-preference){
@@ -1191,6 +1186,34 @@ button:disabled{ color:#7683ad;
 #boot-screen .btn-row{ margin-top:auto; padding-top:14px; gap:12px; }
 #btn-start{ font-size:21px; padding:18px 24px; }
 
+/* ═══ FLASH RÉUSSI : carte de collection à rayons ═══ */
+#flash-card{ position:relative; overflow:hidden; width:min(86vw,340px);
+  margin-top:10px; padding:16px 12px 14px; border-radius:24px;
+  background:linear-gradient(180deg, rgba(32,28,64,.92), rgba(12,12,34,.96));
+  border:2px solid color-mix(in srgb, var(--c,#3fe0d6) 62%, transparent);
+  box-shadow:0 0 30px color-mix(in srgb, var(--c,#3fe0d6) 28%, transparent),
+    0 18px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.1); }
+#flash-burst{ position:absolute; inset:-42%; pointer-events:none; opacity:.45;
+  background:repeating-conic-gradient(from 0deg,
+    color-mix(in srgb, var(--c,#3fe0d6) 26%, transparent) 0deg 13deg,
+    transparent 13deg 26deg);
+  -webkit-mask-image:radial-gradient(circle at 50% 44%, #000 0%, transparent 60%);
+  mask-image:radial-gradient(circle at 50% 44%, #000 0%, transparent 60%); }
+@media (prefers-reduced-motion: no-preference){
+  #flash-burst{ animation:burstSpin 26s linear infinite; }
+  @keyframes burstSpin{ to{ transform:rotate(360deg); } }
+}
+#flash-badge{ position:relative; display:inline-block; font-size:11px; letter-spacing:2px;
+  padding:5px 14px; border-radius:99px; color:#2a1a06; font-weight:800;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d);
+  box-shadow:0 3px 0 #b8791a, 0 0 14px rgba(255,206,77,.35); }
+#flash-card #flash-canvas{ position:relative; width:min(62vw,250px); height:min(62vw,250px); margin:6px 0 2px; }
+#flash-card #flash-name{ position:relative; font-size:22px; }
+#flash-card #flash-pts{ position:relative; min-height:30px; font-size:20px; }
+
+/* ═══ Typo d'affiche partagée : tampons, PRÊT?/GO!, badge titre ═══ */
+.stamp, .readygo, #boot-ribbon, #flash-badge{ font-family:'Bungee', var(--f-pix); font-weight:400; }
+
 /* ═══ GALERIE : les cartes comme des stickers posés à la main ═══ */
 #grid .card{ will-change:transform; }
 #grid .card:nth-child(odd){ transform:rotate(-.7deg); }
@@ -1288,14 +1311,18 @@ button:disabled{ color:#7683ad;
   </div>
 </section>
 
-<!-- ═══ ÉCRAN 4 : FLASH RÉUSSI ═══ -->
+<!-- ═══ ÉCRAN 4 : FLASH RÉUSSI — carte de collection ═══ -->
 <section id="flash-screen" class="screen">
-  <div class="screen-inner" style="justify-content:center; align-items:center; text-align:center;">
-    <h1 style="font-size:16px;">FLASH RÉUSSI !</h1>
-    <canvas id="flash-canvas" width="220" height="220"></canvas>
-    <div id="flash-name"></div>
-    <div id="flash-pts"></div>
-    <div id="flash-hint" class="dim" style="font-size:18px; margin-top:4px;" hidden>👆 fais-la tourner au doigt</div>
+  <div class="screen-inner" style="justify-content:flex-start; align-items:center; text-align:center;">
+    <h1 style="font-size:16px; margin-top:6px;">FLASH RÉUSSI !</h1>
+    <div id="flash-card">
+      <div id="flash-burst"></div>
+      <div id="flash-badge" class="pix">PIÈCE 1/8</div>
+      <canvas id="flash-canvas" width="220" height="220"></canvas>
+      <div id="flash-name"></div>
+      <div id="flash-pts"></div>
+    </div>
+    <div id="flash-hint" class="dim" style="font-size:17px; margin-top:8px;" hidden>👆 fais-la tourner au doigt</div>
     <div class="btn-row" style="width:100%;">
       <button id="btn-challenge" class="b2">⚡ Lancer le défi</button>
     </div>
@@ -2575,7 +2602,15 @@ let currentStation = null, flashSpin = null;
 function flashSeq(st){
   currentStation = st;
   show("flash-screen");
+  /* la carte prend la couleur de la pièce, le badge son numéro */
+  const card = $("#flash-card");
+  if(card) card.style.setProperty("--c", st.couleur);
+  const idx = CONFIG.stations.findIndex(s=>s.code === st.code) + 1;
+  const badge = $("#flash-badge");
+  if(badge) badge.textContent = `PIÈCE ${idx}/${CONFIG.stations.length}`;
   $("#flash-name").textContent = `${st.code} — ${st.nom}`;
+  $("#flash-name").style.color = st.couleur;
+  $("#flash-name").style.textShadow = `0 0 14px ${st.couleur}66`;
   $("#flash-pts").textContent = "";
   const fcv = $("#flash-canvas");
   fcv.width = 520; fcv.height = 520;                 // rendu 3D net
