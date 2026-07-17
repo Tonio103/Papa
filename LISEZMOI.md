@@ -40,8 +40,7 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `CONFIG.messageVictoire` | le texte de fin |
 | `CONFIG.codeTriche` | le mot secret qui débloque un flash (défaut : ULYSSE) |
 | `CONFIG.codeReset` | le code secret de remise à zéro tapé dans le scanner (défaut : 0000) |
-| `CONFIG.map.positions` | où sont les pièces sur la mini-carte (réglable en glissant les marqueurs en `?triche=1`) |
-| `CONFIG.map.bounds` | le cadre GPS de la carte pour le point « TOI » |
+| `CONFIG.map.spots` | coordonnées GPS réelles des pièces pour le radar chaud/froid (réglables sur place en `?triche=1`) |
 | `CONFIG.credits` | le texte de l'écran Crédits (menu ☰) |
 | `SONG` (dans AudioFX) | la musique de fond : 4 pistes de 16 pas (basse, arpège, kick, charley) — remplace les fréquences pour changer le thème |
 | `CONFIG.messagesInvader` | les 7 messages de l'invader entre les défis — c'est là que se joue l'histoire |
@@ -55,12 +54,10 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
-## Nouveautés (v33) — la mini-carte des Vans
+## Nouveautés (v34) — le RADAR CHAUD-FROID (remplace la mini-carte)
 
-- Nouveau bouton **« 🗺 La carte de l'invasion »** sur le HUB : un **plan stylisé des Vans** dessiné dans le style du jeu — la vieille ville en halo pointillé, la grande traversée et les routes (Villefort, Joyeuse, Naves, Chambonas), la **place Ollier** et ses platanes, l'église, et **le Chassezac** en ruban cyan animé. Boussole comprise.
-- **Les 8 zones** : « ? » doré pulsant = zone à fouiller ; pièce **en couleur** = flashée ; **✓** = défi réussi. Toucher un marqueur affiche son nom (ou « Zone à fouiller… »).
-- **📍 Ma position** : un point « TOI » suit le GPS (cadre à affiner dans `CONFIG.map.bounds`).
-- **Placer les pièces (à faire par TOI)** : en mode `?triche=1`, **glisse les marqueurs** sur la carte à l'endroit réel de chaque pièce, puis « ⎘ Copier les positions » → colle le résultat dans `CONFIG.map.positions` (ou fais-le passer à Claude). Les positions glissées sont aussi retenues localement sur le téléphone qui a servi au réglage.
+- La carte dessinée a été remplacée par un **radar chaud/froid au GPS**, bien plus utile pour une chasse : bouton « 📡 Radar chaud-froid » sur le HUB. Le radar vise **la pièce non flashée la plus proche** et affiche la température : **GLACIAL → FROID → TIÈDE → CHAUD → BRÛLANT → C'EST LÀ ! FOUILLE !**, avec la distance approximative et des **bips façon compteur Geiger qui accélèrent** en approchant (+ petites vibrations). Aucune carte, aucun réseau : GPS pur, fiable hors-ligne.
+- **À FAIRE PAR TOI (réglage des spots)** : ouvre le jeu en `?triche=1` → Radar → active-le → va PHYSIQUEMENT à l'endroit d'une pièce → choisis son numéro dans les pastilles → « 📌 Enregistrer la pièce ici ». Répète pour les 8. Puis « ⎘ Copier les spots » et colle le résultat dans `CONFIG.map.spots` (ou envoie-le à Claude). Sans spots réglés, le radar l'indique honnêtement.
 
 ## Nouveautés (v32) — la planche de balises redessinée
 
