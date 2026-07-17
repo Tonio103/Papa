@@ -53,6 +53,14 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v30) — direction artistique + LE VRAI PORTRAIT
+
+- **Le portrait du Pochoir est maintenant le vrai** : dessiné d'après photo (14×16) — cheveux argent, lunettes rondes (dont les verres clignent à la fin), barbe poivre et sel, veste noire zippée, grand sourire. 8 couches à peindre à la bombe.
+- **Écran titre recomposé** : le bouton JOUER est **toujours visible** (plus jamais coupé par la barre Safari), le texte console est compact et lisible, la table des valeurs qui encombrait la scène 3D a été retirée.
+- **Direction artistique « affiche »** : police display **Bungee** (enseigne/street-art) sur tous les grands titres, dégradé **coucher synthwave** (or→corail→magenta→violet) assorti à l'horizon du sol, fini les ombres cyan/magenta qui salissaient les titres.
+- **Boutons refondus** : pilules au dégradé coucher-de-soleil pour l'action principale, cyan pour la secondaire, verre dépoli pour le reste — une vraie hiérarchie visuelle cohérente avec le titre.
+- **Galerie** : les cartes sont légèrement inclinées comme des **stickers posés à la main** sur un mur.
+
 ## Nouveautés (v29) — LE DÉFI ULTIME : se flasher soi-même
 
 - Après le code final et l'ouverture du cadenas, le jeu annonce qu'il manque **UNE pièce au tableau : l'invader lui-même**. La **caméra frontale** s'ouvre et son visage apparaît **pixelisé en mosaïque vivante** (il devient littéralement une pièce d'invader), avec viseur doré et ligne de balayage. Bouton « ⌖ Me flasher » → compte à rebours **3-2-1** → flash blanc, « **INVADER IDENTIFIÉ ✓** », confettis → victoire.

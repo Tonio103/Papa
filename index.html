@@ -35,7 +35,7 @@
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800;900&family=Bungee&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <style>
 /* ── Jetons de design ─────────────────────────────────────── */
@@ -916,37 +916,39 @@ canvas{ image-rendering:auto !important; }
 /* ── Typo moderne ─────────────────────────────────────────── */
 h1,h2,.pix{ font-family:var(--f-pix); font-weight:800; line-height:1.15; letter-spacing:.2px; }
 h1{
-  font-size:clamp(30px,10vw,46px); text-align:center; letter-spacing:.5px;
-  background:linear-gradient(180deg,#a6ecff 0%,#4db8ff 58%,#8f9cff 100%);
+  font-family:'Bungee', var(--f-pix); font-weight:400;
+  font-size:clamp(24px,8.4vw,38px); text-align:center; letter-spacing:1px;
+  line-height:1.22; text-shadow:none;
+  background:linear-gradient(180deg,#ffe27a 0%,#ffb45c 40%,#ff5da2 78%,#c86bff 105%);
   -webkit-background-clip:text; background-clip:text;
-  color:#8fd6ff; -webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 16px rgba(77,184,255,.55)) drop-shadow(0 4px 6px rgba(0,0,0,.45));
+  color:#ffb45c; -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 0 rgba(24,8,42,.95)) drop-shadow(0 0 20px rgba(255,93,162,.4));
 }
 h2{ font-size:19px; color:var(--ink); margin:22px 0 10px; font-weight:800;
-  text-shadow:0 0 14px rgba(120,150,255,.3); }
+  letter-spacing:.6px; text-shadow:0 0 14px rgba(255,150,120,.22); }
 h2::before, h2::after{ height:3px; border-radius:3px; }
-h2::before{ background:linear-gradient(90deg, transparent, rgba(120,150,255,.45)) !important; }
-h2::after{ background:linear-gradient(270deg, transparent, rgba(120,150,255,.45)) !important; }
+h2::before{ background:linear-gradient(90deg, transparent, rgba(255,120,150,.4)) !important; }
+h2::after{ background:linear-gradient(270deg, transparent, rgba(255,120,150,.4)) !important; }
 .sub{ color:var(--ink-soft); font-weight:700; font-size:18px; }
 .dim{ color:#7d89b8; font-weight:600; }
 
-/* ── Boutons glossy néon ──────────────────────────────────── */
+/* ── Boutons : coucher synthwave (assortis au titre) ──────── */
 button{
   font-family:var(--f-pix); font-weight:800; font-size:19px;
-  color:#06122e; text-transform:none; letter-spacing:.3px;
-  border:0; border-radius:20px; padding:16px 22px;
-  background:linear-gradient(180deg,#7ad3ff 0%,#4db8ff 52%,#2f92f0 100%);
+  color:#3a1024; text-transform:none; letter-spacing:.3px;
+  border:0; border-radius:999px; padding:16px 24px;
+  background:linear-gradient(180deg,#ffd27a 0%,#ff9760 40%,#ff5da2 100%);
   box-shadow:
-    inset 0 3px 0 rgba(255,255,255,.6), inset 0 -5px 0 rgba(0,0,0,.18),
-    0 7px 0 #1f5fc0, 0 12px 24px rgba(20,40,120,.5), 0 0 24px rgba(77,184,255,.4);
+    inset 0 3px 0 rgba(255,255,255,.6), inset 0 -5px 0 rgba(0,0,0,.16),
+    0 7px 0 #a92d67, 0 12px 24px rgba(120,20,80,.45), 0 0 26px rgba(255,120,140,.35);
 }
 button:active{ transform:translateY(5px);
-  box-shadow:inset 0 3px 0 rgba(255,255,255,.45), 0 2px 0 #1f5fc0, 0 5px 12px rgba(20,40,120,.4); }
-button.b2{ color:#2a0a1e;
-  background:linear-gradient(180deg,#ff9dd4,#ff5db4 52%,#f23f97);
-  box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -5px 0 rgba(0,0,0,.18),
-    0 7px 0 #c92f7f, 0 12px 24px rgba(120,20,80,.5), 0 0 24px rgba(255,93,180,.4); }
-button.b2:active{ box-shadow:inset 0 3px 0 rgba(255,255,255,.45), 0 2px 0 #c92f7f, 0 5px 12px rgba(120,20,80,.4); }
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.45), 0 2px 0 #a92d67, 0 5px 12px rgba(120,20,80,.4); }
+button.b2{ color:#03231f;
+  background:linear-gradient(180deg,#8ef4e6,#3fe0d6 52%,#1cb9ac);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -5px 0 rgba(0,0,0,.16),
+    0 7px 0 #0c7a6d, 0 12px 24px rgba(10,80,70,.5), 0 0 24px rgba(63,224,214,.4); }
+button.b2:active{ box-shadow:inset 0 3px 0 rgba(255,255,255,.45), 0 2px 0 #0c7a6d, 0 5px 12px rgba(10,80,70,.4); }
 button.b3{ color:#eaf0ff;
   background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
   backdrop-filter:blur(6px);
@@ -1172,6 +1174,29 @@ button:disabled{ color:#7683ad;
 #game-box > canvas{ max-width:none !important; }
 #hint-txt{ margin-top:6px; min-height:0; }
 #hint-bar{ margin-top:8px; }
+
+/* ═══ ÉCRAN TITRE : composition (le bouton JOUER toujours visible,
+   texte console compact, scène 3D dégagée) ═══ */
+#boot-screen .screen-inner{
+  justify-content:flex-start; gap:12px;
+  padding-bottom:calc(18px + var(--sab));
+}
+#boot-screen h1{ margin-top:max(3.5vh, 12px); }
+#boot-txt{
+  min-height:84px; font-size:16px; line-height:1.55; max-width:300px;
+  margin:0 auto; opacity:.92;
+}
+#attract{ display:none; }        /* la table des valeurs encombrait la scène */
+#hi-line{ margin-top:0; }
+#boot-screen .btn-row{ margin-top:auto; padding-top:14px; gap:12px; }
+#btn-start{ font-size:21px; padding:18px 24px; }
+
+/* ═══ GALERIE : les cartes comme des stickers posés à la main ═══ */
+#grid .card{ will-change:transform; }
+#grid .card:nth-child(odd){ transform:rotate(-.7deg); }
+#grid .card:nth-child(even){ transform:rotate(.55deg); }
+#grid .card:nth-child(4n){ transform:rotate(-.35deg); }
+#grid .card:active{ transform:scale(.97); }
 </style>
 </head>
 <body>
@@ -1727,21 +1752,36 @@ const SHAPES = {
    portrait de LV_08 : dessine sur papier quadrillé, puis
    recopie ici lettre par lettre.                             */
 const PALETTES = {
-  portrait: { H:"#5b3a1e", S:"#e8b98a", E:"#0B0B1E", M:"#c0392b", L:"#EDEDF7" },
+  /* le portrait de Papa : cheveux argent, lunettes rondes, barbe
+     poivre et sel, veste noire zippée, grand sourire */
+  portrait: {
+    H:"#b9bcc6",   // cheveux gris argent
+    S:"#eab98e",   // peau
+    E:"#20222e",   // monture des lunettes
+    G:"#cfdcee",   // verres (c'est eux qui clignent à la fin)
+    B:"#8f867f",   // barbe poivre et sel
+    M:"#b3574d",   // sourire
+    J:"#23242f",   // la veste noire
+    Z:"#7f838f",   // le zip
+  },
 };
-SHAPES.portrait = [            // ← placeholder 12×12, À REMPLACER par le vrai portrait
-  "..HHHHHHHH..",
-  ".HHHHHHHHHH.",
-  "HHHSSSSSSHHH",
-  "HHSSSSSSSSHH",
-  ".HSSSSSSSSH.",
-  ".SSEESSEESS.",
-  ".SSEESSEESS.",
-  ".SSSSSSSSSS.",
-  ".SSSMMMMSSS.",
-  "..SSMLLMSS..",
-  "..SSSMMSSS..",
-  "...SSSSSS...",
+SHAPES.portrait = [            // 14×16 — dessiné d'après photo
+  "...HHHHHHHH...",
+  "..HHHHHHHHHH..",
+  ".HHHHHHHHHHHH.",
+  ".HHSSSSSSSSHH.",
+  ".HSSSSSSSSSSH.",
+  ".SEGGESSEGGES.",
+  ".SSSSSSSSSSSS.",
+  ".SSSSSSSSSSSS.",
+  ".SBSSSSSSSSBS.",
+  ".SBBSMMMMSBBS.",
+  "..BBBMMMMBBB..",
+  "..BBBBBBBBBB..",
+  "...BBBBBBBB...",
+  ".JJJJJJJJJJJJ.",
+  "JJJJJJZZJJJJJJ",
+  "JJJJJJZZJJJJJJ",
 ];
 /* ── Nuancier : éclaircir (pct>0) / assombrir (pct<0) un hex ── */
 function shade(hex, pct){
@@ -5388,7 +5428,8 @@ MiniGames["LV_08"] = function(box, api){
   const SX = ox - SM, SY = oy - SM, SW = CS*cols + SM*2, SH = CS*rows + SM*2;
 
   /* ── couches : une par couleur, grandes zones d'abord ── */
-  const LAYER_NAMES = { H:"les cheveux", S:"la peau", E:"les yeux", M:"la bouche", L:"le sourire" };
+  const LAYER_NAMES = { H:"les cheveux", S:"la peau", E:"les lunettes", G:"les verres",
+    B:"la barbe", M:"le sourire", L:"les dents", J:"la veste", Z:"le zip" };
   const byLetter = {};
   shape.forEach((row, y)=>[...row].forEach((ch, x)=>{
     if(ch === "." || ch === " ") return;
@@ -5449,7 +5490,7 @@ MiniGames["LV_08"] = function(box, api){
   let mist = [], drips = [];
   let over = false, raf = null;
   let sigT = 0, sigHiss = false;                       // la pièce prend vie
-  const eyeCells = byLetter["E"] || [];
+  const eyeCells = byLetter["G"] || byLetter["E"] || [];   // les verres clignent
   const skinCol = (pal && pal.S) || null;
 
   function startLayer(){
