@@ -1214,6 +1214,13 @@ button:disabled{ color:#7683ad;
 /* ═══ Typo d'affiche partagée : tampons, PRÊT?/GO!, badge titre ═══ */
 .stamp, .readygo, #boot-ribbon, #flash-badge{ font-family:'Bungee', var(--f-pix); font-weight:400; }
 
+/* ═══ MINI-CARTE DES VANS ═══ */
+#map-wrap{ margin-top:10px; border-radius:20px; overflow:hidden;
+  border:1.5px solid rgba(255,216,138,.28);
+  box-shadow:0 0 26px rgba(255,180,110,.12), 0 16px 36px rgba(0,0,0,.5); }
+#map-cv{ display:block; width:100%; touch-action:none; cursor:pointer; }
+#map-legend{ text-align:center; font-size:15px; margin-top:8px; }
+
 /* ═══ GALERIE : les cartes comme des stickers posés à la main ═══ */
 #grid .card{ will-change:transform; }
 #grid .card:nth-child(odd){ transform:rotate(-.7deg); }
@@ -1286,6 +1293,7 @@ button:disabled{ color:#7683ad;
     <div id="grid"></div>
     <div class="btn-row">
       <button id="btn-scan">⌖ Flasher une pièce</button>
+      <button id="btn-map" class="b3">🗺 La carte de l'invasion</button>
       <button id="btn-final" class="b2">🔒 Entrer le code final</button>
     </div>
   </div>
@@ -1403,6 +1411,22 @@ button:disabled{ color:#7683ad;
   </div>
 </section>
 
+<!-- ═══ ÉCRAN 9 : LA CARTE DE L'INVASION ═══ -->
+<section id="map-screen" class="screen">
+  <div class="screen-inner">
+    <h2 style="text-align:center;">Les Vans — carte de l'invasion</h2>
+    <div id="map-wrap">
+      <canvas id="map-cv"></canvas>
+    </div>
+    <div id="map-legend" class="dim">? = zone à fouiller · pièce en couleur = déjà flashée</div>
+    <div class="btn-row">
+      <button id="btn-map-loc" class="b3">📍 Ma position</button>
+      <button id="btn-map-copy" class="b3" hidden>⎘ Copier les positions</button>
+      <button id="btn-map-back" class="b3">← Retour</button>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ ÉCRAN 8 : TRANSMISSION DE L'INVADER ═══ -->
 <section id="msg-screen" class="screen">
   <div class="screen-inner" style="justify-content:center;">
@@ -1456,6 +1480,19 @@ const CONFIG = {
   // scanner, il efface toute la progression (avec double confirmation)
   // et relance le jeu depuis le début — cinématique comprise.
   codeReset: "0000",                    // À PERSONNALISER
+
+  // Mini-carte des Vans. positions = où sont posées les pièces,
+  // en fractions de la carte (x 0→1 gauche→droite, y 0→1 haut→bas).
+  // À PERSONNALISER : en mode ?triche=1, GLISSE les marqueurs sur la
+  // carte puis bouton « Copier les positions » → colle le résultat ici.
+  // bounds = cadre GPS approximatif de la carte (pour le point « TOI »).
+  map: {
+    positions: {
+      LV_01:[.36,.47], LV_02:[.57,.40], LV_03:[.48,.55], LV_04:[.30,.62],
+      LV_05:[.66,.52], LV_06:[.25,.35], LV_07:[.72,.68], LV_08:[.50,.30],
+    },
+    bounds: { latMin:44.398, latMax:44.410, lonMin:4.125, lonMax:4.140 }, // À AFFINER
+  },
 
   credits: "Conçu, codé et mosaïqué\nà la main, rien que pour toi.\n\n— A.",   // À PERSONNALISER
 
@@ -3312,6 +3349,281 @@ function fireworks(){
 }
 
 /* ═══════════════════════════════════════════════════════════
+   11ter. MINI-CARTE DES VANS — plan stylisé du village avec les
+   8 zones. « ? » = zone à fouiller ; pièce colorée = flashée ;
+   ✓ = défi réussi. En ?triche=1 : GLISSER les marqueurs pour les
+   placer, puis « Copier les positions » → coller dans CONFIG.map.
+   « 📍 Ma position » : point TOI via GPS (cadre CONFIG.map.bounds).
+   ─────────────────────────────────────────────────────────── */
+const MiniMap = (()=>{
+  /* géométrie schématique des Vans (fractions de carte, y vers le bas) */
+  const ROADS = [
+    [[.06,.56],[.22,.53],[.38,.51],[.52,.49],[.68,.47],[.90,.44]],  // grande traversée
+    [[.44,.50],[.34,.38],[.24,.26],[.12,.12]],                      // vers Villefort
+    [[.60,.47],[.70,.34],[.80,.22],[.92,.10]],                      // vers Joyeuse
+    [[.40,.53],[.30,.68],[.20,.80],[.10,.92]],                      // vers Naves
+    [[.50,.49],[.50,.34],[.48,.20]],                                // vers Chambonas
+    [[.34,.42],[.44,.36],[.58,.37],[.66,.45],[.64,.58],[.52,.64],[.40,.62],[.33,.53],[.34,.42]], // ceinture
+    [[.42,.44],[.50,.56]], [[.55,.42],[.47,.40]], [[.46,.60],[.58,.56]], // ruelles
+  ];
+  const RIVER = [[.04,.97],[.20,.93],[.38,.90],[.55,.90],[.70,.83],[.84,.72],[.97,.58]];
+  const EDGE_LABELS = [
+    [.16,.10,"VERS VILLEFORT"], [.82,.08,"VERS JOYEUSE"],
+    [.15,.955,"VERS NAVES"], [.60,.945,"LE CHASSEZAC"],
+  ];
+  const STORE_KEY = "invasionLesVans:mapPos";
+  let cv, c, raf = null, positions = null, dragging = null;
+  let sel = null, selUntil = 0, watchId = null, me = null, meErr = "";
+  let bound = false;
+  const sprites = {};
+
+  function loadPositions(){
+    try{ const raw = localStorage.getItem(STORE_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+    return JSON.parse(JSON.stringify(CONFIG.map.positions));
+  }
+  function savePositions(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(positions)); }catch(e){}
+  }
+  function spriteOf(st){
+    if(!sprites[st.code]) sprites[st.code] = Voxel.sprite(st.sprite, st.couleur, .5, -.3, 64, 64);
+    return sprites[st.code];
+  }
+  const path = (pts, W, H)=>{ c.beginPath(); pts.forEach((p,i)=>i ? c.lineTo(p[0]*W, p[1]*H) : c.moveTo(p[0]*W, p[1]*H)); };
+
+  function draw(now){
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const cssW = cv.clientWidth || 340, cssH = Math.round(cssW * 1.12);
+    if(cv.width !== cssW*dpr){ cv.width = cssW*dpr; cv.height = cssH*dpr; cv.style.height = cssH + "px"; }
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = cssW, H = cssH;
+
+    /* fond nuit + halo central */
+    const bg = c.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#141232"); bg.addColorStop(1, "#1c1640");
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    const glow = c.createRadialGradient(W*.48, H*.5, 10, W*.48, H*.5, W*.5);
+    glow.addColorStop(0, "rgba(255,190,120,.10)"); glow.addColorStop(1, "rgba(255,190,120,0)");
+    c.fillStyle = glow; c.fillRect(0, 0, W, H);
+
+    /* la vieille ville : tache chaude + pourtour pointillé */
+    c.save();
+    c.translate(W*.485, H*.50); c.rotate(.15);
+    c.fillStyle = "rgba(255,180,110,.07)";
+    c.beginPath(); c.ellipse(0, 0, W*.19, H*.15, 0, 0, 7); c.fill();
+    c.setLineDash([5,5]); c.strokeStyle = "rgba(255,216,138,.30)"; c.lineWidth = 1.5;
+    c.stroke(); c.setLineDash([]);
+    c.restore();
+
+    /* le Chassezac : ruban cyan qui scintille */
+    c.save();
+    c.lineCap = "round"; c.lineJoin = "round";
+    c.strokeStyle = "rgba(43,228,208,.16)"; c.lineWidth = 13;
+    path(RIVER, W, H); c.stroke();
+    c.strokeStyle = "rgba(43,228,208,.65)"; c.lineWidth = 5;
+    c.setLineDash([16, 10]); c.lineDashOffset = -(now/90) % 26;
+    path(RIVER, W, H); c.stroke(); c.setLineDash([]);
+    c.restore();
+
+    /* les rues : sombres dessous, éclairées dessus */
+    c.lineCap = "round"; c.lineJoin = "round";
+    ROADS.forEach((r, i)=>{
+      const petite = r.length <= 2 || i > 4;
+      c.strokeStyle = "rgba(10,10,28,.8)"; c.lineWidth = petite ? 6 : 9;
+      path(r, W, H); c.stroke();
+      c.strokeStyle = petite ? "rgba(255,216,138,.32)" : "rgba(255,216,138,.5)";
+      c.lineWidth = petite ? 1.6 : 2.4;
+      path(r, W, H); c.stroke();
+    });
+
+    /* place Ollier : dalle + platanes */
+    c.fillStyle = "rgba(80,120,90,.32)";
+    c.beginPath(); if(c.roundRect) c.roundRect(W*.42, H*.485, W*.13, H*.085, 7); else c.rect(W*.42, H*.485, W*.13, H*.085);
+    c.fill();
+    [[.445,.505],[.475,.545],[.505,.500],[.535,.540],[.525,.505]].forEach(([x,y])=>{
+      c.fillStyle = "#39e08a";
+      c.beginPath(); c.arc(x*W, y*H, 3.2, 0, 7); c.fill();
+      c.fillStyle = "rgba(57,224,138,.25)";
+      c.beginPath(); c.arc(x*W, y*H, 6.5, 0, 7); c.fill();
+    });
+    /* l'église : croix dorée */
+    c.strokeStyle = "#ffce4d"; c.lineWidth = 2.6; c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(W*.565, H*.385); c.lineTo(W*.565, H*.425);
+    c.moveTo(W*.552, H*.398); c.lineTo(W*.578, H*.398);
+    c.stroke();
+
+    /* étiquettes */
+    c.font = "800 10px 'Baloo 2', sans-serif"; c.textAlign = "center";
+    c.lineWidth = 3; c.strokeStyle = "rgba(12,12,30,.85)";
+    const label = (x, y, t, col)=>{ c.strokeText(t, x*W, y*H); c.fillStyle = col || "#9c9cc4"; c.fillText(t, x*W, y*H); };
+    label(.485, .60, "PLACE OLLIER", "#8fd8b0");
+    label(.565, .37, "ÉGLISE", "#ffce4d");
+    EDGE_LABELS.forEach(([x, y, t])=>label(x, y, t, t === "LE CHASSEZAC" ? "#2BE4D0" : "#8a8ab5"));
+
+    /* boussole */
+    c.save(); c.translate(W - 26, 28);
+    c.strokeStyle = "rgba(255,216,138,.5)"; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(0, 0, 13, 0, 7); c.stroke();
+    c.fillStyle = "#ff5da2";
+    c.beginPath(); c.moveTo(0, -10); c.lineTo(4, 4); c.lineTo(0, 1); c.lineTo(-4, 4); c.closePath(); c.fill();
+    c.fillStyle = "#ffce4d"; c.font = "800 9px 'Baloo 2', sans-serif";
+    c.fillText("N", 0, -17);
+    c.restore();
+
+    /* les 8 marqueurs */
+    CONFIG.stations.forEach((st, i)=>{
+      const p = positions[st.code]; if(!p) return;
+      const x = p[0]*W, y = p[1]*H;
+      const done = S.done[st.code], flashed = S.flashed[st.code];
+      const pulse = 1 + Math.sin(now/420 + i)*.14;
+      if(done || flashed){
+        c.save();
+        if(!done) c.globalAlpha = .95;
+        const img = spriteOf(st), s2 = 30;
+        c.shadowColor = st.couleur; c.shadowBlur = 12;
+        c.drawImage(img, x - s2/2, y - s2/2, s2, s2);
+        c.restore();
+        if(done){
+          c.fillStyle = "#39e08a"; c.font = "900 12px 'Baloo 2', sans-serif";
+          c.strokeStyle = "rgba(12,12,30,.9)"; c.lineWidth = 3;
+          c.strokeText("✓", x + 12, y - 8); c.fillText("✓", x + 12, y - 8);
+        }
+      }else{
+        c.fillStyle = `rgba(255,216,138,${.12*pulse})`;
+        c.beginPath(); c.arc(x, y, 15*pulse, 0, 7); c.fill();
+        c.fillStyle = "#242048";
+        c.beginPath(); c.arc(x, y, 10, 0, 7); c.fill();
+        c.strokeStyle = "rgba(255,216,138,.75)"; c.lineWidth = 1.6; c.stroke();
+        c.fillStyle = "#ffce4d"; c.font = "400 12px 'Bungee', 'Baloo 2', sans-serif";
+        c.textAlign = "center"; c.fillText("?", x, y + 4);
+      }
+    });
+
+    /* le point TOI (GPS) */
+    if(me){
+      if(me.x >= -.02 && me.x <= 1.02 && me.y >= -.02 && me.y <= 1.02){
+        const x = me.x*W, y = me.y*H;
+        const k = 1 + Math.sin(now/300)*.25;
+        c.fillStyle = "rgba(255,150,96,.18)";
+        c.beginPath(); c.arc(x, y, 17*k, 0, 7); c.fill();
+        c.fillStyle = "#ff9760";
+        c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill();
+        c.strokeStyle = "#fff"; c.lineWidth = 2; c.stroke();
+        c.font = "800 10px 'Baloo 2', sans-serif";
+        c.strokeStyle = "rgba(12,12,30,.9)"; c.lineWidth = 3;
+        c.strokeText("TOI", x, y - 12); c.fillStyle = "#ff9760"; c.fillText("TOI", x, y - 12);
+      }
+    }else if(meErr && performance.now() < meErr.until){
+      c.fillStyle = "#ff8484"; c.font = "800 11px 'Baloo 2', sans-serif"; c.textAlign = "center";
+      c.fillText(meErr.txt, W/2, H - 10);
+    }
+
+    /* infobulle du marqueur touché */
+    if(sel && now < selUntil){
+      const st = CONFIG.stations.find(s=>s.code === sel);
+      const p = positions[sel];
+      const known = S.flashed[sel];
+      const txt = known ? `${st.code} — ${st.nom}` : "Zone à fouiller…";
+      c.font = "800 12px 'Baloo 2', sans-serif";
+      const tw = c.measureText(txt).width + 18;
+      let bx = Math.max(6, Math.min(W - tw - 6, p[0]*W - tw/2));
+      const by = Math.max(8, p[1]*H - 42);
+      c.fillStyle = "rgba(14,14,36,.94)";
+      c.beginPath(); if(c.roundRect) c.roundRect(bx, by, tw, 24, 9); else c.rect(bx, by, tw, 24);
+      c.fill();
+      c.strokeStyle = known ? st.couleur : "rgba(255,216,138,.6)"; c.lineWidth = 1.4; c.stroke();
+      c.fillStyle = known ? st.couleur : "#ffce4d"; c.textAlign = "center";
+      c.fillText(txt, bx + tw/2, by + 16);
+    }
+    c.textAlign = "left";
+  }
+  function loop(now){
+    if(!$("#map-screen").classList.contains("active")){ raf = null; return; }
+    draw(now);
+    raf = requestAnimationFrame(loop);
+  }
+
+  /* ── interactions : toucher (infobulle) / glisser (triche) ── */
+  const local = e=>{
+    const r = cv.getBoundingClientRect();
+    return [ (e.clientX - r.left)/r.width, (e.clientY - r.top)/r.height ];
+  };
+  function nearest(fx, fy){
+    let best = null, bd = 1e9;
+    CONFIG.stations.forEach(st=>{
+      const p = positions[st.code]; if(!p) return;
+      const d = Math.hypot(p[0] - fx, p[1] - fy);
+      if(d < bd){ bd = d; best = st.code; }
+    });
+    return bd < .07 ? best : null;
+  }
+  function onDown(e){
+    e.preventDefault();
+    const [fx, fy] = local(e);
+    const hit = nearest(fx, fy);
+    if(hit && TRICHE){ dragging = hit; }
+    else if(hit){ sel = hit; selUntil = performance.now() + 2400; AudioFX.tick(); }
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const [fx, fy] = local(e);
+    positions[dragging] = [Math.max(.03, Math.min(.97, fx)), Math.max(.03, Math.min(.97, fy))];
+  }
+  function onUp(){ if(dragging){ savePositions(); AudioFX.tick(); } dragging = null; }
+
+  function start(){
+    cv = $("#map-cv"); c = cv.getContext("2d");
+    positions = loadPositions();
+    $("#btn-map-copy").hidden = !TRICHE;
+    if(!bound){
+      bound = true;
+      cv.addEventListener("pointerdown", onDown);
+      cv.addEventListener("pointermove", onMove);
+      cv.addEventListener("pointerup", onUp);
+      cv.addEventListener("pointercancel", onUp);
+      $("#btn-map-copy").addEventListener("click", ()=>{
+        const out = {};
+        CONFIG.stations.forEach(st=>{ const p = positions[st.code];
+          out[st.code] = [ +p[0].toFixed(3), +p[1].toFixed(3) ]; });
+        const json = JSON.stringify(out);
+        AudioFX.select();
+        if(navigator.clipboard && navigator.clipboard.writeText)
+          navigator.clipboard.writeText(json).catch(()=>prompt("Positions :", json));
+        else prompt("Positions :", json);
+      });
+      $("#btn-map-loc").addEventListener("click", ()=>{
+        if(watchId != null){                       // couper le suivi
+          try{ navigator.geolocation.clearWatch(watchId); }catch(e){}
+          watchId = null; me = null;
+          $("#btn-map-loc").textContent = "📍 Ma position";
+          AudioFX.back(); return;
+        }
+        if(!navigator.geolocation){ meErr = { txt:"GPS indisponible", until:performance.now()+2500 }; return; }
+        AudioFX.select();
+        $("#btn-map-loc").textContent = "📍 Suivi actif — couper";
+        watchId = navigator.geolocation.watchPosition(p=>{
+          const b = CONFIG.map.bounds;
+          me = {
+            x:(p.coords.longitude - b.lonMin)/(b.lonMax - b.lonMin),
+            y:1 - (p.coords.latitude - b.latMin)/(b.latMax - b.latMin),
+          };
+        }, ()=>{ meErr = { txt:"Position refusée ou indisponible", until:performance.now()+3000 };
+          watchId = null; $("#btn-map-loc").textContent = "📍 Ma position";
+        }, { enableHighAccuracy:true, maximumAge:4000, timeout:12000 });
+      });
+    }
+    draw(performance.now());                       // première image tout de suite
+    if(!matchMedia("(prefers-reduced-motion: reduce)").matches && !raf)
+      raf = requestAnimationFrame(loop);
+  }
+  function stop(){
+    if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} watchId = null; me = null;
+      $("#btn-map-loc").textContent = "📍 Ma position"; }
+  }
+  return { start, stop };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    12bis. CINÉMATIQUE D'INTRO — ~75 s en 6 plans, tout dessiné
    (la nuit, l'artiste, la pose, l'aube, le radar, la mission).
    Skippable après 3,5 s. Jouée au premier démarrage, puis
@@ -3837,6 +4149,8 @@ $("#btn-sound").addEventListener("click", e=>{
   e.target.textContent = ["♪","FX","✕"][AudioFX.cycle()];
 });
 $("#btn-scan").addEventListener("click", ()=>{ show("scan-screen"); Scanner.start(); });
+$("#btn-map").addEventListener("click", ()=>{ AudioFX.select(); show("map-screen"); MiniMap.start(); });
+$("#btn-map-back").addEventListener("click", ()=>{ AudioFX.back(); MiniMap.stop(); renderHub(); show("hub-screen"); });
 $("#btn-scan-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
 $("#btn-manual").addEventListener("click", ()=>{
   const v=$("#manual-in").value; $("#manual-in").value="";
