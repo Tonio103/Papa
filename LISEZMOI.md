@@ -53,6 +53,16 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v29) — LE DÉFI ULTIME : se flasher soi-même
+
+- Après le code final et l'ouverture du cadenas, le jeu annonce qu'il manque **UNE pièce au tableau : l'invader lui-même**. La **caméra frontale** s'ouvre et son visage apparaît **pixelisé en mosaïque vivante** (il devient littéralement une pièce d'invader), avec viseur doré et ligne de balayage. Bouton « ⌖ Me flasher » → compte à rebours **3-2-1** → flash blanc, « **INVADER IDENTIFIÉ ✓** », confettis → victoire.
+- **Incassable le jour J** : si la caméra refuse (permission, mode avion), un message l'indique aussitôt et un bouton de secours (« C'est bien moi — parole d'invader ») apparaît — il s'affiche de toute façon après 7 secondes. Aucune reconnaissance faciale, aucun réseau : ça marche à tous les coups.
+
+## Nouveautés (v28) — transmissions refaites + mini-jeux plein écran
+
+- **Les messages de l'invader** ne sont plus un simple texte : ils arrivent dans une **émission pirate** — carte sombre bordée de magenta avec scanlines de vieux tube, **● REC** qui clignote, numéro de **SIGNAL**, barres d'onde animées, et le **visage de l'invader** qui tourne en 3D avec des à-coups de glitch au-dessus du texte tapé.
+- **Mini-jeux en PLEIN ÉCRAN** : l'écran de défi occupe désormais tout le téléphone (marges minimales, boîte étirée). La Cavale et le Pochoir calculent leur toile sur la taille réelle de l'écran — sur iPhone 13 la course fait presque toute la hauteur, et la découpe du pochoir est nettement plus grande.
+
 ## Nouveautés (v27) — arrière-plans enrichis
 
 - **Sol synthwave** de retour et sublimé : une **grille en perspective** qui défile en bas de tous les écrans, avec un **horizon lumineux** (halo rose/violet) et des lignes **teintées du magenta (horizon) au cyan (près de toi)**, rendues en **lumière additive** pour un glow premium. Ça donne enfin un vrai « lieu » et de la profondeur à la scène.
