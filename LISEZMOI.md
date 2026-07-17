@@ -22,7 +22,7 @@ Le plus simple : **Netlify Drop** (https://app.netlify.com/drop) → glisse le d
 
 ## Imprimer les QR
 
-Ouvre `qr-codes.html` (avec réseau), bouton Imprimer. 13 cartes : les 8 stations, les 2 balises coop LV_07A/LV_07B (loin l'une de l'autre), et les 3 mini-balises spotting LV_03A/B/C (à cacher aux endroits de tes photos). Le code en clair sous chaque QR est le plan B (saisie manuelle). Plastifie ou couvre d'adhésif transparent.
+Ouvre `qr-codes.html` (réseau conseillé pour les polices ; les QR eux-mêmes se génèrent sans réseau), bouton Imprimer. 13 cartes aux couleurs du jeu : les 8 pièces avec leur invader pixel, les 2 balises coop LV_07A/LV_07B (loin l'une de l'autre), et les 3 mini-balises spotting LV_03A/B/C (à cacher aux endroits de tes photos). Le code en clair sous chaque QR est le plan B (saisie manuelle). Plastifie ou couvre d'adhésif transparent.
 
 ## Le code secret (dans le jeu)
 
@@ -52,6 +52,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `SHAPES.portrait` + `PALETTES.portrait` | le portrait pixel de ton père (LV_08, peint au pochoir) — grille de lettres, une lettre = une couleur ; un visage 12×12 d'exemple montre le format. `LAYER_NAMES` (dans LV_08) nomme chaque couche de couleur |
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
+
+## Nouveautés (v32) — la planche de balises redessinée
+
+- **`qr-codes.html` refaite aux couleurs du jeu** : 13 cartes imprimables avec l'**invader pixel** de chaque pièce dans sa couleur, bandeau titre en typo d'affiche, badge de points, **QR au cadre coloré**, code en toutes lettres, guides de découpe en pointillés, liseré assorti. Les balises Coop (🤝) et Spotting (🔍) ont leurs cartes dédiées avec les consignes de pose imprimées dessus.
+- **Plus aucun CDN pour les QR** : la bibliothèque de génération est **embarquée dans la page** (MIT) — la planche fonctionne même sans réseau, et les QR ont une zone de silence de 4 modules pour un scan fiable.
+- **Validé** : les 13 QR générés ont été décodés avec jsQR (la bibliothèque exacte du scanner du jeu) — 13/13 corrects.
 
 ## Nouveautés (v31) — l'écran de capture en carte de collection
 
