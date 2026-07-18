@@ -54,6 +54,13 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v39) — barre d'onglets façon appli (navigation claire)
+
+- Fini les gros boutons empilés au milieu du repaire : la navigation passe par une **barre d'onglets fixée en bas**, avec icône + libellé, comme dans l'appli Flash Invaders.
+- **5 onglets** : 🏠 **Repaire** (galerie, rang, quête) · ⌖ **Flash** (scanner caméra) · 📡 **Radar** (chaud-froid) · 🔑 **Code** (le code final) · ☰ **Menu** (réglages, aide, sauvegarde).
+- L'onglet actif est **surligné en cyan** avec un petit trait lumineux. La barre **disparaît** pendant l'intro, les défis, le flash et la victoire (plein écran).
+- Le tutoriel Squiddy pointe désormais directement sur les onglets.
+
 ## Nouveautés (v38) — économie de batterie (chasse toute une journée)
 
 - **Le GPS haute précision est coupé dès qu'on quitte le radar** (retour au hub, ouverture d'un défi…) — avant, il pouvait continuer à tourner en fond.
