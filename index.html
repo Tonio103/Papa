@@ -1412,6 +1412,8 @@ button:disabled{ color:#7683ad;
   --spray-orange:#ff7a29; --spray-purple:#9d5cff; --spray-green:#37e37e;
   --f-graff:'Bangers','Bungee',cursive;
   --f-tag:'Permanent Marker',cursive;
+  /* coulures de peinture (masque SVG réutilisable, teinté par carte) */
+  --dripmask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 26'%3E%3Cg fill='%23000'%3E%3Crect width='150' height='5'/%3E%3Crect x='19.5' width='5' height='14' rx='2.5'/%3E%3Ccircle cx='22' cy='15' r='3'/%3E%3Crect x='67.5' width='5' height='8' rx='2.5'/%3E%3Ccircle cx='70' cy='9' r='2.6'/%3E%3Crect x='115.5' width='5' height='19' rx='2.5'/%3E%3Ccircle cx='118' cy='20' r='3.4'/%3E%3C/g%3E%3C/svg%3E");
   /* grain de béton réutilisable (SVG inline, marche hors-ligne) */
   --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
@@ -1479,7 +1481,20 @@ h2::after{ background:linear-gradient(270deg,transparent,var(--spray-cyan)) !imp
 }
 #player-card{ border-color:var(--spray-cyan) !important; transform:rotate(-.5deg); }
 #quest-card{ border-color:var(--spray-pink) !important; transform:rotate(.4deg); }
+#player-card, #quest-card{ position:relative; overflow:visible !important; }
 #player-card::before{ display:none !important; }
+
+/* coulures de peinture qui dégoulinent du bas de chaque carte */
+.drips{
+  position:absolute; top:100%; left:12px; right:12px; height:20px; margin-top:-3px;
+  pointer-events:none; z-index:2;
+  background:var(--dripcol,var(--paint));
+  -webkit-mask:var(--dripmask) repeat-x top / 150px 20px;
+  mask:var(--dripmask) repeat-x top / 150px 20px;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.45)) drop-shadow(0 0 5px var(--dripcol));
+}
+#player-card .drips{ --dripcol:var(--spray-cyan); }
+#quest-card .drips{ --dripcol:var(--spray-pink); }
 
 /* étiquette « scotch » en haut des cartes */
 #player-card::after, #quest-card::after{
@@ -1596,6 +1611,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
         <div id="pc-xp"><i></i></div>
         <div id="pc-next"></div>
       </div>
+      <span class="drips" aria-hidden="true"></span>
     </div>
 
     <!-- Carte de quête : progression des 8 défis + objectif courant -->
@@ -1603,6 +1619,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
       <div id="quest-top"><span id="quest-title">◈ LA CHASSE</span><span id="quest-count">0/8</span></div>
       <div id="quest"></div>
       <div id="quest-next"></div>
+      <span class="drips" aria-hidden="true"></span>
     </div>
 
     <h2>Code final</h2>
