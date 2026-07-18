@@ -1472,19 +1472,19 @@ button:disabled{ color:#7683ad;
    ─────────────────────────────────────────────────────────── */
 const CONFIG = {
   joueur: "Papa",                       // À PERSONNALISER
-  messageVictoire: "Joyeux anniversaire !\nTon cadeau t'attend dans la boîte.", // À PERSONNALISER
+  messageVictoire: "L'invader, c'était moi.\nDepuis le début.\n\nJ'ai semé les Vans d'étoiles rien que pour toi.\nJoyeux anniversaire, Papa. 🛸\n\nTon cadeau t'attend dans la boîte.", // À PERSONNALISER
 
   // Messages de l'invader : le n-ième s'affiche après le n-ième défi
   // réussi. À partir du 4e, l'application se met à "glitcher".
   // À PERSONNALISER — c'est là que se joue toute l'histoire.
   messagesInvader: [
-    "Tiens.\nQuelqu'un a trouvé ma première pièce.\nBienvenue dans la partie.",
-    "Deux. Pas mal.\nMais c'étaient les faciles.",
-    "Trois. Tu commences à regarder la ville comme moi.\nLes murs parlent, non ?",
-    "ERREUR SYST—\n…non. C'est moi.\nJe suis entré dans ton application.\nJe te regarde chercher.",
-    "Tu te demandes qui je suis.\nTu brûles. Vraiment.",
-    "Plus que deux.\nJ'ai gardé le meilleur pour la fin.",
-    "La dernière pièce te connaît depuis toujours.\nVa la voir.",
+    "Tiens, tiens.\nQuelqu'un a trouvé ma première pièce.\nToi qui kiffes les invaders depuis toujours…\nbienvenue dans TA chasse.",
+    "Deux. Tu chauffes.\nUne question te brûle les lèvres :\nqui a bien pu poser tout ça ?\n(prends ton temps. genre… 30 secondes.)",
+    "Trois pièces.\nJe t'avais gardé une blague bien pourrie ici…\nmais tu me connais trop pour ça. 😏",
+    "ERREUR SYST—\n…non. C'est moi.\nJe me suis glissé dans l'appli.\nTu te souviens de Cologne ? De l'ESA ?\nLa tête en l'air, tous les deux, à chasser les étoiles.",
+    "Tu brûles vraiment.\nL'invader n'est pas un inconnu.\nC'est quelqu'un qui a tout hérité de toi —\ntes blagues pourries comprises.",
+    "Plus que deux.\nJ'ai gardé le plus grand invader pour la fin.\nTu le connais mieux que personne.",
+    "La dernière pièce te regarde depuis toujours.\nElle a tes lunettes rondes. Ton sourire.\nVa la voir, Papa.",
   ],
 
   // Code secret : à taper dans la saisie manuelle du scanner.
@@ -1585,21 +1585,53 @@ const AudioFX = (()=>{
     ctx = new (window.AudioContext||window.webkitAudioContext)();
     /* chaîne de mixage : gain → passe-bas (adoucit les carrés)
        → compresseur (colle le tout, évite que ça agresse) */
-    master = ctx.createGain(); master.gain.value = .5;
+    master = ctx.createGain(); master.gain.value = .46;
+    /* passe-bas plus doux (moins de « fizz » de carré) + léger creux
+       dans les aigus agressifs → son plus rond, moins « bip » */
     const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass"; lp.frequency.value = 6200; lp.Q.value = .5;
+    lp.type = "lowpass"; lp.frequency.value = 5200; lp.Q.value = .4;
+    const hs = ctx.createBiquadFilter();
+    hs.type = "highshelf"; hs.frequency.value = 3200; hs.gain.value = -5;
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -18; comp.knee.value = 22; comp.ratio.value = 6;
-    master.connect(lp); lp.connect(comp); comp.connect(ctx.destination);
+    comp.threshold.value = -20; comp.knee.value = 26; comp.ratio.value = 5;
+    master.connect(lp); lp.connect(hs); hs.connect(comp); comp.connect(ctx.destination);
+    /* ── REVERB : impulsion synthétique → les bips deviennent un son
+       ample et spatial (le plus gros gain de qualité) ── */
+    function makeImpulse(dur, decay){
+      const n = Math.floor(ctx.sampleRate*dur), buf = ctx.createBuffer(2, n, ctx.sampleRate);
+      for(let ch=0; ch<2; ch++){ const d = buf.getChannelData(ch);
+        for(let i=0;i<n;i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/n, decay); }
+      return buf;
+    }
+    const conv = ctx.createConvolver(); conv.buffer = makeImpulse(2.0, 2.6);
+    const revLP = ctx.createBiquadFilter(); revLP.type = "lowpass"; revLP.frequency.value = 3400;
+    const revSend = ctx.createGain(); revSend.gain.value = .17;
+    hs.connect(revSend); revSend.connect(conv); conv.connect(revLP); revLP.connect(comp);
     /* écho discret : de l'espace, un son plus "gros" */
-    const dly = ctx.createDelay(.5); dly.delayTime.value = .17;
-    const fb  = ctx.createGain(); fb.gain.value = .22;
-    const wet = ctx.createGain(); wet.gain.value = .13;
+    const dly = ctx.createDelay(.5); dly.delayTime.value = .19;
+    const fb  = ctx.createGain(); fb.gain.value = .24;
+    const wet = ctx.createGain(); wet.gain.value = .12;
     lp.connect(dly); dly.connect(fb); fb.connect(dly);
     dly.connect(wet); wet.connect(comp);
     /* bus musique : volume propre, passe par le même filtre */
     musicGain = ctx.createGain(); musicGain.gain.value = .5;
     musicGain.connect(lp);
+  }
+  /* nappe d'accord douce (attaque lente, release long) : donne du
+     corps à la musique sous la mélodie */
+  function pad(freqs, d, at){
+    if(!musicOn || !ctx) return;
+    freqs.forEach((f, i)=>{
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = i === 0 ? "triangle" : "sine";
+      o.frequency.value = f * (1 + (i-1)*0.0016);      // léger désaccord → chaleur
+      g.gain.setValueAtTime(.0001, at);
+      g.gain.linearRampToValueAtTime(.028, at + .34);   // attaque lente
+      g.gain.setValueAtTime(.028, at + Math.max(.4, d - .45));
+      g.gain.exponentialRampToValueAtTime(.0001, at + d);
+      o.connect(g); g.connect(musicGain);
+      o.start(at); o.stop(at + d + .05);
+    });
   }
   /* une note : attaque 8ms anti-clic, déclin exponentiel,
      glissando optionnel (f → f2) — c'est LE truc qui fait chiptune */
@@ -1639,42 +1671,49 @@ const AudioFX = (()=>{
   /* ── musique : séquenceur 16 pas calé sur l'horloge audio
        (planification en avance de 250 ms : zéro jitter) ──── */
   const SONGS = {
-    /* thème de chasse : Am – C – F – G, léger */
+    /* thème de chasse : Am – C – F – G, léger. pad = 1 accord / 4 pas */
     chasse: {
-      bpm: 112,
+      bpm: 110,
       bass:[110,  0,110,110, 131,  0,131,131,  87,  0, 87, 87,  98,  0, 98, 98],
       arp: [440,659,523,659, 523,784,659,784, 523,698,880,698, 494,587,784,587],
       kick:[  1,  0,  0,  0,   1,  0,  0,  0,   1,  0,  0,  0,   1,  0,  1,  0],
       hat: [  0,  1,  0,  1,   0,  1,  0,  1,   0,  1,  0,  1,   0,  1,  0,  1],
+      pad: [[220,262,330],[262,330,392],[175,220,262],[196,247,294]],   // Am C F G
     },
-    /* thème glitch (acte II) : Am – F – Dm – E, plus sombre,
-       kick syncopé, charleys serrés — l'invader est dans l'app */
+    /* thème glitch (acte II) : Am – F – Dm – E, plus sombre */
     glitch: {
-      bpm: 118,
+      bpm: 116,
       bass:[110,  0,110, 55, 87,  0, 87, 87,  73,  0, 73, 73,  82, 82,  0,165],
       arp: [440,  0,523,659, 440,  0,523,698, 440,  0,587,698, 415,  0,494,659],
       kick:[  1,  0,  0,  1,   1,  0,  0,  0,   1,  0,  0,  1,   1,  0,  1,  0],
       hat: [  1,  1,  0,  1,   1,  1,  0,  1,   1,  1,  0,  1,   1,  1,  1,  1],
+      pad: [[220,262,330],[175,220,262],[147,175,220],[165,208,247]],   // Am F Dm E
     },
-    /* thème de victoire : C – G – Am – F (I–V–vi–IV), majeur,
-       lumineux et fêtard — tourne en boucle sur l'écran de fin */
+    /* thème de victoire : C – G – Am – F (I–V–vi–IV), majeur, fêtard */
     victoire: {
-      bpm: 128,
+      bpm: 126,
       bass:[ 65,  0, 65, 98,  98,  0, 98, 98, 110,  0,110,110,  87,  0, 87, 98],
       arp: [523,659,784,659, 587,784,988,784, 659,880,1046,880, 698,880,1046,880],
       kick:[  1,  0,  0,  0,   1,  0,  0,  0,   1,  0,  0,  0,   1,  0,  1,  0],
       hat: [  0,  1,  0,  1,   0,  1,  0,  1,   0,  1,  0,  1,   0,  1,  1,  1],
+      pad: [[262,330,392],[196,247,294],[220,262,330],[175,220,262]],   // C G Am F
     },
   };
   let songName = "chasse";
   function playStep(s, t){
     const S2 = SONGS[songName];
+    const spb = 60/S2.bpm/2;
+    /* nappe d'accord au début de chaque quart de motif */
+    if(s % 4 === 0 && S2.pad){ pad(S2.pad[(s/4) % S2.pad.length], spb*4, t); }
     const b = S2.bass[s];
-    if(b) note({f:b, d:.22, type:"triangle", v:.2, at:t, music:true});
+    if(b) note({f:b, d:.24, type:"triangle", v:.22, at:t, music:true});
+    if(b) note({f:b, d:.24, type:"sine", v:.10, at:t, music:true});   // sub-basse ronde
     const a = S2.arp[s];
-    if(a) note({f:a, d:.12, type:"square", v:.05, at:t, music:true});
-    if(S2.kick[s]) note({f:120, f2:44, d:.14, type:"sine", v:.28, at:t, music:true});
-    if(S2.hat[s])  noise({d:.03, v:.03, from:8500, to:6000, at:t, music:true});
+    /* arpège adouci : triangle + une pointe de carré, plus discret */
+    if(a){ note({f:a, d:.14, type:"triangle", v:.07, at:t, music:true});
+           note({f:a, d:.10, type:"square",   v:.022, at:t, music:true}); }
+    if(S2.kick[s]) note({f:130, f2:44, d:.16, type:"sine", v:.30, at:t, music:true});
+    if(S2.hat[s])  noise({d:.028, v:.022, from:8000, to:6000, at:t, music:true});
   }
   function schedLoop(){
     if(!ctx) return;
@@ -1687,14 +1726,15 @@ const AudioFX = (()=>{
   return {
     init,
     /* Simon : carré doux + octave sinus par-dessus = son rond */
-    tone(f){ note({f, d:.34, v:.26}); note({f:f*2, d:.34, type:"sine", v:.1}); },
-    /* petit clic discret (machine à écrire, curseur) */
-    tick(){ note({f:2100, d:.025, type:"triangle", v:.09}); },
+    tone(f){ note({f, d:.34, type:"triangle", v:.24}); note({f:f*2, d:.34, type:"sine", v:.09}); },
+    /* petit clic feutré (machine à écrire, curseur) — sinus doux,
+       moins piquant que l'ancien triangle aigu */
+    tick(){ note({f:1500, d:.03, type:"sine", v:.06}); },
     /* pièce ramassée façon Mario : si → mi, octave sinus */
     ok(){
-      note({f:988,  d:.09, v:.28});
-      note({f:1319, d:.30, v:.28, when:.08});
-      note({f:2637, d:.30, type:"sine", v:.10, when:.08});
+      note({f:988,  d:.10, type:"triangle", v:.26});
+      note({f:1319, d:.30, type:"triangle", v:.24, when:.08});
+      note({f:2637, d:.30, type:"sine", v:.08, when:.08});
       buzz(40);
     },
     /* erreur : double buzz descendant, pas trop méchant */
@@ -5905,7 +5945,7 @@ MiniGames["LV_08"] = function(box, api){
     sigT = performance.now() + (reduced ? 250 : 1500);
     setTimeout(()=>{
       AudioFX.fanfare(); Juice.confetti(box, 34);
-      txt.textContent = "L'invader… c'était moi. 😏\nJoyeux anniversaire.";
+      txt.textContent = "Le plus beau des invaders des Vans…\nc'est toi, Papa. 🛸";
       const btn = document.createElement("button");
       btn.className = "b2";
       btn.textContent = "Récupérer le dernier fragment";
