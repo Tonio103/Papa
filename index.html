@@ -2461,6 +2461,7 @@ function showNow(id){
   $("#"+id).classList.add("active");
   if(wasMenu && id !== "menu-screen" && typeof Menu3D !== "undefined") Menu3D.stop();
   if(id!=="scan-screen") Scanner.stop();
+  if(id!=="map-screen" && typeof Radar !== "undefined") Radar.stop();   // coupe le GPS hors radar
   if(id==="hub-screen"){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
@@ -3644,6 +3645,7 @@ const Radar = (()=>{
   ];
   let cv, c, raf = null, watchId = null, fix = null, accM = null;
   let selCode = null, lastBeep = 0, gpsErr = false, bound = false, stopped = false;
+  let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
 
   const loadSpots = ()=>{ let s = {};
     try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
@@ -3828,7 +3830,21 @@ const Radar = (()=>{
     if(!raf) raf = requestAnimationFrame(loopFrame);
   }
   function stop(){ stopped = true; stopWatch(); }
-  return { start, stop };
+  /* écran éteint / appli en arrière-plan : on coupe le GPS haute
+     précision (gros consommateur) et on gèle la boucle. Au retour,
+     resume() relance le radar exactement dans l'état précédent. */
+  function pause(){
+    if(stopped && watchId == null) return;   // déjà à l'arrêt
+    wasWatching = watchId != null;
+    stopWatch(); stopped = true;
+  }
+  function resume(){
+    if(!$("#map-screen").classList.contains("active")) return;
+    stopped = false;
+    if(!raf) raf = requestAnimationFrame(loopFrame);
+    if(wasWatching){ wasWatching = false; startWatch(); }
+  }
+  return { start, stop, pause, resume };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -4426,7 +4442,17 @@ async function keepAwake(){
   try{ if("wakeLock" in navigator) await navigator.wakeLock.request("screen"); }catch(e){}
 }
 document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState === "visible"){ keepAwake(); AudioFX.resume(); }
+  if(document.visibilityState === "visible"){
+    keepAwake(); AudioFX.resume();
+    /* on revient dans l'appli : relance ce qui tournait sur l'écran courant */
+    if(typeof Radar !== "undefined" && $("#map-screen").classList.contains("active")) Radar.resume();
+    if($("#scan-screen").classList.contains("active")) Scanner.start();
+  }else{
+    /* écran verrouillé / appli en arrière-plan : on coupe tout ce qui
+       vide la batterie (GPS haute précision, flux caméra). */
+    if(typeof Radar !== "undefined") Radar.pause();
+    Scanner.stop();
+  }
 });
 /* pas de menu "enregistrer l'image" en plein combat */
 document.addEventListener("contextmenu", e=>{

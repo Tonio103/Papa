@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v38) — économie de batterie (chasse toute une journée)
+
+- **Le GPS haute précision est coupé dès qu'on quitte le radar** (retour au hub, ouverture d'un défi…) — avant, il pouvait continuer à tourner en fond.
+- **Écran verrouillé / appli en arrière-plan** : le GPS **et** le flux caméra sont **automatiquement coupés**, puis **relancés au retour dans l'appli** exactement dans l'état où on les avait laissés. C'est le plus gros gain d'autonomie pour une chasse qui dure des heures.
+
 ## Nouveautés (v37) — le tableau de bord repensé (vrai look de jeu vidéo)
 
 - **Fiche agent héroïque** : nom d'agent, **rang actuel ▸ rang suivant** (RECRUE ▸ ÉCLAIREUR…), **jauge d'XP** propre (sans texte qui se chevauche), **pastille de rang** (R2, R3…) sur le badge, et « Encore X ★ pour [rang suivant] » (ou « ✦ Rang maximum atteint »).
