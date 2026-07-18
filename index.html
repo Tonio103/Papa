@@ -35,7 +35,7 @@
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800;900&family=Bungee&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800;900&family=Bungee&family=Bangers&family=Permanent+Marker&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <style>
 /* ── Jetons de design ─────────────────────────────────────── */
@@ -1391,12 +1391,153 @@ button:disabled{ color:#7683ad;
 #grid .card:nth-child(even){ transform:rotate(.55deg); }
 #grid .card:nth-child(4n){ transform:rotate(-.35deg); }
 #grid .card:active{ transform:scale(.97); }
+
+/* ═══════════════════════════════════════════════════════════════
+   ✦✦ SKIN « STREET ART » ✦✦  — direction graffiti / mur de béton
+   ─────────────────────────────────────────────────────────────
+   Univers du récit : l'invader-artiste tague Les Vans. Mur béton
+   grainé, taches de bombe, cadres découpés au pochoir, typo tag.
+   Dernier bloc de la feuille de style → gagne la cascade.
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --paint:#f3eee2;                 /* blanc cassé « peinture » */
+  --spray-cyan:#2ce8d2; --spray-pink:#ff2f86; --spray-yellow:#ffd23f;
+  --spray-orange:#ff7a29; --spray-purple:#9d5cff; --spray-green:#37e37e;
+  --f-graff:'Bangers','Bungee',cursive;
+  --f-tag:'Permanent Marker',cursive;
+  /* grain de béton réutilisable (SVG inline, marche hors-ligne) */
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Le MUR : béton sombre + auréoles de bombe ────────────────── */
+body{
+  background:
+    radial-gradient(38% 30% at 12% 9%,  rgba(255,47,134,.16), transparent 60%),
+    radial-gradient(40% 32% at 88% 7%,  rgba(44,232,210,.13), transparent 60%),
+    radial-gradient(48% 38% at 82% 93%, rgba(157,92,255,.15), transparent 62%),
+    radial-gradient(40% 30% at 15% 90%, rgba(255,122,41,.12), transparent 60%),
+    linear-gradient(180deg,#1b1720 0%,#171319 48%,#100d14 100%) !important;
+  background-attachment:fixed !important;
+}
+/* grain de béton par-dessus le mur (immobile) */
+body::before{
+  inset:0 !important;
+  background:var(--grain) repeat !important;
+  background-size:150px 150px !important;
+  mix-blend-mode:soft-light !important;
+  opacity:.55 !important; animation:none !important;
+}
+/* la grille synthwave « borne d'arcade » n'a pas sa place sur un mur */
+#gridfloor{ display:none !important; }
+#stars{ opacity:.5 !important; }
+
+/* fine pellicule de grain SUR tout (unifie comme une affiche collée) */
+#grain-top{
+  position:fixed; inset:0; z-index:900; pointer-events:none;
+  background:var(--grain) repeat; background-size:170px 170px;
+  mix-blend-mode:overlay; opacity:.06;
+}
+
+/* ── TYPO TAG ─────────────────────────────────────────────────── */
+h1{
+  font-family:var(--f-graff) !important; font-weight:400 !important;
+  letter-spacing:2px !important;
+  color:var(--paint) !important; -webkit-text-fill-color:var(--paint) !important;
+  background:none !important; filter:none !important;
+  transform:rotate(-1.6deg);
+  text-shadow:
+    -2px -2px 0 #0a0710, 2px -2px 0 #0a0710, -2px 2px 0 #0a0710, 2px 2px 0 #0a0710,
+    5px 7px 0 var(--spray-pink),
+    0 0 26px rgba(255,47,134,.45) !important;
+}
+h2{
+  font-family:var(--f-tag) !important; font-weight:400 !important;
+  color:var(--spray-yellow) !important; letter-spacing:.5px !important;
+  transform:rotate(-.8deg);
+  text-shadow:-1.5px -1.5px 0 #0a0710,1.5px -1.5px 0 #0a0710,
+    -1.5px 1.5px 0 #0a0710,1.5px 1.5px 0 #0a0710, 0 4px 8px rgba(0,0,0,.5) !important; }
+h2::before{ background:linear-gradient(90deg,transparent,var(--spray-pink)) !important; }
+h2::after{ background:linear-gradient(270deg,transparent,var(--spray-cyan)) !important; }
+
+/* ── CARTES = affiches/pochoirs collés au mur ─────────────────── */
+#player-card, #quest-card{
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(35,30,42,.97), rgba(21,18,26,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  border:2.5px solid var(--paint) !important; border-radius:12px !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), 0 18px 30px rgba(0,0,0,.5) !important;
+}
+#player-card{ border-color:var(--spray-cyan) !important; transform:rotate(-.5deg); }
+#quest-card{ border-color:var(--spray-pink) !important; transform:rotate(.4deg); }
+#player-card::before{ display:none !important; }
+
+/* étiquette « scotch » en haut des cartes */
+#player-card::after, #quest-card::after{
+  content:""; position:absolute; top:-9px; left:22px; width:52px; height:16px;
+  background:rgba(243,238,226,.34); border:1px dashed rgba(255,255,255,.35);
+  transform:rotate(-4deg); border-radius:2px; pointer-events:none;
+  box-shadow:0 2px 5px rgba(0,0,0,.3);
+}
+#quest-card::after{ left:auto; right:26px; transform:rotate(5deg); }
+
+/* pastilles de quête : carreaux de pochoir */
+.qseg{ border-radius:8px !important; }
+
+/* ── BOUTONS = stickers découpés (contour + ombre franche) ────── */
+button{
+  border:2.5px solid #0a0710 !important; border-radius:13px !important;
+  letter-spacing:.4px !important;
+  box-shadow:0 5px 0 #0a0710, 0 10px 16px rgba(0,0,0,.5) !important;
+}
+button:active{ transform:translateY(5px) !important;
+  box-shadow:0 1px 0 #0a0710, 0 4px 10px rgba(0,0,0,.45) !important; }
+button.b3{ border-color:rgba(255,255,255,.55) !important;
+  box-shadow:0 5px 0 rgba(0,0,0,.55), 0 10px 16px rgba(0,0,0,.45) !important; }
+#btn-start{ font-size:22px !important; letter-spacing:.6px !important; transform:rotate(-1deg); }
+
+/* ── HUD : plaques de métal taguées ───────────────────────────── */
+#hud{ background:rgba(20,17,26,.72) !important; border-radius:0 0 16px 16px !important;
+  border-bottom:2.5px solid rgba(255,255,255,.14) !important; }
+#hud .hud-item{ border-radius:11px !important; background:rgba(0,0,0,.32) !important;
+  border:2px solid rgba(255,255,255,.14) !important; }
+#hud button{ border-radius:11px !important; border:2px solid #0a0710 !important; }
+
+/* ── BARRE D'ONGLETS : bande de béton, onglet actif « sprayé » ── */
+#tabbar{
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(26,22,31,.93), rgba(14,11,18,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  border-top:2.5px solid rgba(255,255,255,.14) !important;
+}
+.tab .tlab{ font-family:var(--f-tag) !important; font-weight:400 !important;
+  font-size:10px !important; letter-spacing:.3px !important; }
+.tab.sel{ background:transparent !important; color:var(--spray-cyan) !important; }
+.tab.sel::after{                         /* tache de bombe derrière l'onglet actif */
+  content:""; position:absolute; inset:2px 6px; z-index:-1; border-radius:12px;
+  background:radial-gradient(circle at 50% 45%, rgba(44,232,210,.30), transparent 72%);
+  filter:blur(1px);
+}
+.tab.sel::before{ background:var(--spray-cyan) !important;
+  box-shadow:0 0 12px var(--spray-cyan) !important; }
+
+/* ── Signatures / transmissions à la main ─────────────────────── */
+#msg-sign, #victory-txt, .pop-text{ font-family:var(--f-tag) !important; }
+
+/* les canvases restent nets (pixel-art assumé sur le mur) */
+#hub-alien, #pc-alien, .card canvas, #flash-canvas{ image-rendering:pixelated !important; }
 </style>
 </head>
 <body>
 <div id="sky-deco"></div>
 <canvas id="stars"></canvas>
 <canvas id="gridfloor"></canvas>
+<div id="grain-top"></div>
+
 <div id="frame"><i></i><i></i><i></i><i></i></div>
 <div id="crt-on"></div>
 <div id="transition"></div>
