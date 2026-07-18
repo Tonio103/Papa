@@ -1513,21 +1513,21 @@ const CONFIG = {
   // Le code final = les 8 fragments dans l'ordre (ici : 1998 = début
   // de l'invasion + 2026. À PERSONNALISER, par ex. avec une date à lui).
   stations: [
-    { code:"LV_01", nom:"La Palette",    points:10,  fragment:"1", sprite:"squid",  couleur:"#2BE4D0",
+    { code:"LV_01", nom:"La Palette",    points:10,  fragment:"2", sprite:"squid",  couleur:"#2BE4D0",
       indice:"Compare ligne par ligne avec le modèle. Commence par les coins." },
-    { code:"LV_02", nom:"Le Binaire",    points:20,  fragment:"9", sprite:"crab",   couleur:"#FFD23F",
+    { code:"LV_02", nom:"Le Binaire",    points:20,  fragment:"7", sprite:"crab",   couleur:"#FFD23F",
       indice:"Noir = 0, allumé = 1. Chaque ligne se lit de gauche à droite." },
-    { code:"LV_03", nom:"Le Spotting",   points:30,  fragment:"9", sprite:"octo",   couleur:"#FF2E88",
+    { code:"LV_03", nom:"Le Spotting",   points:30,  fragment:"0", sprite:"octo",   couleur:"#FF2E88",
       indice:"Lève les yeux : le détail est au-dessus de la hauteur des yeux." },
-    { code:"LV_04", nom:"Rubikcubisme",  points:40,  fragment:"8", sprite:"squid",  couleur:"#FF3F3F",
+    { code:"LV_04", nom:"Rubikcubisme",  points:40,  fragment:"7", sprite:"squid",  couleur:"#FF3F3F",
       indice:"Résous d'abord la ligne du haut, elle ne bougera plus." },
-    { code:"LV_05", nom:"Le Simon",      points:50,  fragment:"2", sprite:"crab",   couleur:"#2BE4D0",
+    { code:"LV_05", nom:"Le Simon",      points:50,  fragment:"1", sprite:"crab",   couleur:"#2BE4D0",
       indice:"Jouez à deux : un qui chante les couleurs à voix haute, un qui appuie." },
-    { code:"LV_06", nom:"La Cavale",     points:70,  fragment:"0", sprite:"octo",   couleur:"#FFD23F",
+    { code:"LV_06", nom:"La Cavale",     points:70,  fragment:"9", sprite:"octo",   couleur:"#FFD23F",
       indice:"Appuie pour sauter, RESTE APPUYÉ pour sauter plus haut. Sur l'échelle : grimpe en tapant, mais fige-toi quand le projecteur arrive." },
-    { code:"LV_07", nom:"La Coop",       points:90,  fragment:"2", sprite:"crab",   couleur:"#FF2E88",
+    { code:"LV_07", nom:"La Coop",       points:90,  fragment:"7", sprite:"crab",   couleur:"#FF2E88",
       indice:"Séparez-vous. Vous avez 60 secondes entre les deux scans." },
-    { code:"LV_08", nom:"Le Pochoir",    points:100, fragment:"6", sprite:"heart",  couleur:"#FFD23F",
+    { code:"LV_08", nom:"Le Pochoir",    points:100, fragment:"5", sprite:"heart",  couleur:"#FFD23F",
       indice:"Balaie toute la découpe avec la bombe, couche après couche… et regarde bien qui se dessine." },
   ],
 
@@ -1829,36 +1829,41 @@ const SHAPES = {
    portrait de LV_08 : dessine sur papier quadrillé, puis
    recopie ici lettre par lettre.                             */
 const PALETTES = {
-  /* le portrait de Papa : cheveux argent, lunettes rondes, barbe
-     poivre et sel, veste noire zippée, grand sourire */
+  /* le portrait de Papa : cheveux argentés, lunettes RONDES,
+     barbe très légère, grand sourire, veste noire zippée.
+     Dessiné d'après photo (15×19). */
   portrait: {
-    H:"#b9bcc6",   // cheveux gris argent
-    S:"#eab98e",   // peau
-    E:"#20222e",   // monture des lunettes
-    G:"#cfdcee",   // verres (c'est eux qui clignent à la fin)
-    B:"#8f867f",   // barbe poivre et sel
-    M:"#b3574d",   // sourire
-    J:"#23242f",   // la veste noire
-    Z:"#7f838f",   // le zip
+    H:"#c9ccd6",   // cheveux gris argent
+    S:"#e8b78e",   // peau
+    E:"#1c1e2a",   // monture des lunettes rondes
+    G:"#cfdcec",   // verres (c'est eux qui clignent à la fin)
+    B:"#9a9088",   // barbe légère / poivre et sel
+    M:"#b0564c",   // sourire
+    T:"#f1ede4",   // dents
+    J:"#22232e",   // la veste noire
+    C:"#565a68",   // col / zip
   },
 };
-SHAPES.portrait = [            // 14×16 — dessiné d'après photo
-  "...HHHHHHHH...",
-  "..HHHHHHHHHH..",
-  ".HHHHHHHHHHHH.",
-  ".HHSSSSSSSSHH.",
-  ".HSSSSSSSSSSH.",
-  ".SEGGESSEGGES.",
-  ".SSSSSSSSSSSS.",
-  ".SSSSSSSSSSSS.",
-  ".SBSSSSSSSSBS.",
-  ".SBBSMMMMSBBS.",
-  "..BBBMMMMBBB..",
-  "..BBBBBBBBBB..",
-  "...BBBBBBBB...",
-  ".JJJJJJJJJJJJ.",
-  "JJJJJJZZJJJJJJ",
-  "JJJJJJZZJJJJJJ",
+SHAPES.portrait = [            // 15×19 — dessiné d'après photo
+  "....HHHHHHH....",
+  "..HHHHHHHHHHH..",
+  ".HHHHHHHHHHHHH.",
+  ".HHHSSSSSSSHHH.",
+  ".HHSSSSSSSSSHH.",
+  ".SSSSSSSSSSSSS.",
+  ".SEEESSSSSEEES.",
+  ".EGGGESESEGGGE.",
+  ".SEEESSSSSEEES.",
+  ".SSSSSSSSSSSSS.",
+  ".SSSSSSSSSSSSS.",
+  ".SSSSMTTTMSSSS.",
+  ".SSSSSMMMSSSSS.",
+  "..SBBSSSSSBBS..",
+  "...SBBSSSBBS...",
+  "....SSSSSSS....",
+  "...JJCCCCCJJ...",
+  ".JJJJJJCJJJJJJ.",
+  "JJJJJJJCJJJJJJJ",
 ];
 /* ── Nuancier : éclaircir (pct>0) / assombrir (pct<0) un hex ── */
 function shade(hex, pct){
@@ -2843,6 +2848,7 @@ const Menu3D = (()=>{
     { id:"succes",  label:"SUCCÈS",        tint:"#FFD23F" },
     { id:"msgs",    label:"TRANSMISSIONS", tint:"#FF2E88" },
     { id:"cine",    label:"REVOIR L'INTRO", tint:"#4db8ff" },
+    { id:"save",    label:"SAUVEGARDE",    tint:"#39e08a" },
     { id:"credits", label:"CRÉDITS",       tint:"#EDEDF7" },
     { id:"reset",   label:"RECOMMENCER",   tint:"#FF3F3F" },
   ];
@@ -2929,6 +2935,7 @@ const Menu3D = (()=>{
       case "succes": panel(succesHTML()); break;
       case "msgs":   panel(msgsHTML()); break;
       case "cine":   stop(); Cinematic.play(()=>{ renderHub(); show("hub-screen"); }); break;
+      case "save":   panel(saveHTML()); wireSavePanel(); break;
       case "credits":panel(creditsHTML()); break;
       case "reset":
         if(resetArmed){ Store.reset(); location.reload(); return; }
@@ -3023,6 +3030,62 @@ function msgsHTML(){
 function creditsHTML(){
   return `<h2 style="justify-content:center;">CRÉDITS</h2>
     <p style="text-align:center; font-size:24px; white-space:pre-line; padding:16px 0;">${CONFIG.credits}</p>`;
+}
+/* ── Sauvegarde : exporter / restaurer la progression ──────── */
+function saveCode(){
+  try{ return "INV1." + btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }
+  catch(e){ return "INV1." + btoa(JSON.stringify(S)); }
+}
+function saveHTML(){
+  const n = Object.keys(S.flashed||{}).length, d = Object.keys(S.done||{}).length;
+  return `<h2 style="justify-content:center;">SAUVEGARDE</h2>
+    <p class="sub" style="text-align:left;">Ta partie est déjà gardée automatiquement sur ce téléphone.
+    Ici tu peux en faire une <b>copie de secours</b> (à s'envoyer par SMS/mail) et la
+    <b>restaurer</b> sur un autre téléphone.</p>
+    <p class="dim" style="font-size:16px;">État : ${n} pièce${n>1?"s":""} flashée${n>1?"s":""} · ${d} défi${d>1?"s":""} réussi${d>1?"s":""} · ${S.points||0} pts</p>
+    <div style="font-weight:800; margin-top:12px;">Code de secours</div>
+    <textarea id="save-out" readonly style="width:100%; height:70px; margin-top:6px; border-radius:12px;
+      background:rgba(255,255,255,.06); color:var(--ink); border:2px solid rgba(255,255,255,.14);
+      padding:10px; font-size:13px; resize:none;">${saveCode()}</textarea>
+    <div class="btn-row" style="flex-direction:row; gap:10px; padding-top:8px;">
+      <button id="save-copy" class="b2">⎘ Copier</button>
+    </div>
+    <div style="font-weight:800; margin-top:16px;">Restaurer une partie</div>
+    <textarea id="save-in" placeholder="Colle ici un code de secours…" style="width:100%; height:60px; margin-top:6px;
+      border-radius:12px; background:rgba(255,255,255,.06); color:var(--ink);
+      border:2px solid rgba(255,255,255,.14); padding:10px; font-size:13px; resize:none;"></textarea>
+    <div id="save-msg" class="sub" style="min-height:22px;"></div>
+    <div class="btn-row" style="flex-direction:row; gap:10px; padding-top:4px;">
+      <button id="save-load" class="b3">↺ Restaurer</button>
+    </div>`;
+}
+function wireSavePanel(){
+  const copy = $("#save-copy"), load = $("#save-load");
+  if(copy) copy.addEventListener("click", ()=>{
+    const t = $("#save-out"); t.select();
+    const txt = t.value;
+    AudioFX.select();
+    if(navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(txt).then(()=>{ copy.textContent = "✓ Copié !"; })
+        .catch(()=>{ try{ document.execCommand("copy"); copy.textContent = "✓ Copié !"; }catch(e){} });
+    else{ try{ document.execCommand("copy"); copy.textContent = "✓ Copié !"; }catch(e){} }
+  });
+  if(load) load.addEventListener("click", ()=>{
+    const raw = ($("#save-in").value || "").trim();
+    const msg = $("#save-msg");
+    if(!raw){ return; }
+    let obj = null;
+    try{
+      const b64 = raw.startsWith("INV1.") ? raw.slice(5) : raw;
+      obj = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    }catch(e){ try{ obj = JSON.parse(atob(raw.replace(/^INV1\./,""))); }catch(e2){ obj = null; } }
+    if(!obj || typeof obj !== "object" || !("flashed" in obj)){
+      AudioFX.err(); msg.textContent = "Code invalide."; msg.style.color = "var(--rouge)"; return;
+    }
+    AudioFX.ok(); msg.textContent = "Partie restaurée ! Rechargement…"; msg.style.color = "var(--jaune)";
+    S = obj; persist();
+    setTimeout(()=>location.reload(), 800);
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -5726,7 +5789,7 @@ MiniGames["LV_08"] = function(box, api){
   const SX = ox - SM, SY = oy - SM, SW = CS*cols + SM*2, SH = CS*rows + SM*2;
 
   /* ── couches : une par couleur, grandes zones d'abord ── */
-  const LAYER_NAMES = { H:"les cheveux", S:"la peau", E:"les lunettes", G:"les verres",
+  const LAYER_NAMES = { H:"les cheveux", S:"la peau", E:"les lunettes", G:"les verres", T:"les dents", C:"le col",
     B:"la barbe", M:"le sourire", L:"les dents", J:"la veste", Z:"le zip" };
   const byLetter = {};
   shape.forEach((row, y)=>[...row].forEach((ch, x)=>{
@@ -5762,7 +5825,7 @@ MiniGames["LV_08"] = function(box, api){
     /* traces de vie du mur : vieux tags à peine lisibles */
     g.save(); g.globalAlpha = .10; g.fillStyle = "#2BE4D0";
     g.font = "italic bold 26px 'Baloo 2', sans-serif";
-    g.translate(52, H - 26); g.rotate(-.06); g.fillText("1998", 0, 0); g.restore();
+    g.translate(52, H - 26); g.rotate(-.06); g.fillText("1975", 0, 0); g.restore();
     g.save(); g.globalAlpha = .07; g.fillStyle = "#FF2E88";
     g.font = "italic bold 20px 'Baloo 2', sans-serif";
     g.translate(252, 40); g.rotate(.05); g.fillText("LV ▦", 0, 0); g.restore();

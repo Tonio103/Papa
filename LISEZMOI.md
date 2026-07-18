@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v35) — personnalisation : code final, portrait, sauvegarde
+
+- **Code final = la date de naissance de Papa (27/07/1975)** → les 8 fragments donnent `27071975`.
+- **Portrait refait** (15×19, d'après photo) : cheveux argentés, **lunettes rondes nettes**, barbe très légère, grand sourire avec dents, veste noire zippée — nettement plus ressemblant. Le vieux tag du mur du Pochoir affiche désormais **1975**.
+- **Sauvegarde / restauration** (menu ☰ → SAUVEGARDE) : la partie est déjà gardée automatiquement, mais on peut copier un **code de secours** (à s'envoyer par SMS/mail) et **restaurer** la partie sur un autre téléphone. Testé : export → restauration → état correct.
+
 ## Nouveautés (v34) — le RADAR CHAUD-FROID (remplace la mini-carte)
 
 - La carte dessinée a été remplacée par un **radar chaud/froid au GPS**, bien plus utile pour une chasse : bouton « 📡 Radar chaud-froid » sur le HUB. Le radar vise **la pièce non flashée la plus proche** et affiche la température : **GLACIAL → FROID → TIÈDE → CHAUD → BRÛLANT → C'EST LÀ ! FOUILLE !**, avec la distance approximative et des **bips façon compteur Geiger qui accélèrent** en approchant (+ petites vibrations). Aucune carte, aucun réseau : GPS pur, fiable hors-ligne.
