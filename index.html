@@ -54,7 +54,9 @@
   --f-term:    'VT323', monospace;
 }
 *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-html,body{ height:100%; }
+/* désactive le double-tap qui zoome sur iPhone (Safari ignore user-scalable) */
+html,body{ height:100%; touch-action:manipulation; -ms-touch-action:manipulation; }
+button,.tab,.card,.qseg{ touch-action:manipulation; }
 body{
   background:
     radial-gradient(1200px 760px at 50% -12%, #1d1d48 0%, #191940 42%, var(--bg) 66%, #06061a 100%),
