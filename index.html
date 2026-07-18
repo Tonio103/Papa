@@ -1236,6 +1236,74 @@ button:disabled{ color:#7683ad;
 #tuto-dots i.on{ background:var(--cyan); box-shadow:0 0 8px rgba(63,224,214,.6); }
 #tuto-next{ font-size:16px; padding:12px 20px; white-space:nowrap; }
 
+/* ═══ HUB : carte héros + quête (refonte HUD de jeu) ═══ */
+#player-card{
+  display:flex !important; align-items:center; gap:13px; margin-top:14px; padding:13px 15px;
+  background:linear-gradient(180deg, rgba(40,44,86,.92), rgba(18,20,44,.94)) !important;
+  border:1.5px solid rgba(120,150,255,.28) !important; border-radius:20px !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 10px 26px rgba(0,0,0,.45), 0 0 24px rgba(120,150,255,.08) !important;
+  position:relative; overflow:hidden;
+}
+#player-card::before{ content:""; position:absolute; left:0; right:0; top:0; height:3px;
+  background:linear-gradient(90deg, var(--cyan), #8f9cff, var(--magenta)); opacity:.85; }
+#pc-badge{
+  width:66px !important; height:66px !important; flex:0 0 auto; border-radius:16px; position:relative;
+  background:radial-gradient(circle at 50% 34%, rgba(120,150,255,.32), rgba(8,10,28,.6) 72%) !important;
+  border:1.5px solid rgba(255,255,255,.16) !important;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.5), 0 0 16px rgba(120,150,255,.15) !important;
+  display:flex; align-items:center; justify-content:center; overflow:visible;
+}
+#pc-alien{ width:56px; height:46px; }
+#pc-tier{ position:absolute; right:-6px; bottom:-6px; min-width:22px; height:22px; padding:0 5px;
+  display:flex; align-items:center; justify-content:center; font-size:11px; color:#2a1a06;
+  border-radius:11px; background:linear-gradient(180deg,#ffe08a,#ffce4d);
+  box-shadow:0 2px 0 #b8791a, 0 0 10px rgba(255,206,77,.5); border:1.5px solid #14142e; }
+#pc-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+#pc-hello{ font-size:16px; font-weight:800; color:var(--ink); letter-spacing:.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#pc-rankrow{ display:flex; align-items:center; gap:7px; font-size:13px; }
+#pc-rank{ color:var(--jaune); text-shadow:0 0 10px rgba(255,206,77,.45); }
+#pc-arrow{ color:#5b6699; font-size:10px; }
+#pc-rank-next{ color:#6b76a3; }
+#pc-xp{ position:relative; height:14px; border-radius:8px !important; margin-top:1px;
+  background:rgba(0,0,0,.42) !important; border:1px solid rgba(255,255,255,.12) !important;
+  box-shadow:inset 0 1px 4px rgba(0,0,0,.7); overflow:hidden; }
+#pc-xp > i{ display:block; height:100%; width:0%; border-radius:7px; position:relative;
+  background:linear-gradient(90deg,#39e08a,#8bffc0) !important;
+  box-shadow:0 0 12px rgba(57,224,138,.6) !important; transition:width .7s cubic-bezier(.2,1,.3,1); }
+#pc-xp > i::after{ content:""; position:absolute; inset:0; border-radius:7px;
+  background:linear-gradient(180deg, rgba(255,255,255,.35), transparent 60%); }
+#pc-next{ font-size:13px; color:var(--ink-soft); }
+#pc-next b{ color:#8bffc0; }
+#pc-next.max{ color:var(--jaune); }
+
+#quest-card{ margin-top:12px; padding:12px 14px 13px; border-radius:18px;
+  background:linear-gradient(180deg, rgba(30,32,64,.85), rgba(16,18,40,.9));
+  border:1.5px solid rgba(120,150,255,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 8px 22px rgba(0,0,0,.4); }
+#quest-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
+#quest-title{ font-family:var(--f-pix); font-size:12px; letter-spacing:1px; color:var(--ink-soft); }
+#quest-count{ font-family:var(--f-pix); font-size:13px; color:var(--jaune); text-shadow:0 0 10px rgba(255,206,77,.4); }
+#quest{ display:flex !important; gap:6px !important; margin:0 !important; }
+.qseg{ flex:1 !important; aspect-ratio:1; max-width:42px; height:auto !important; border-radius:11px !important;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--f-pix); font-size:12px; color:#4a5480;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.2)) !important;
+  border:1.5px solid rgba(255,255,255,.1) !important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.4) !important; transition:all .3s; }
+.qseg.half{ color:#eaf6ff; border-color:var(--cyan) !important;
+  background:linear-gradient(180deg, rgba(63,224,214,.22), rgba(63,224,214,.06)) !important;
+  box-shadow:0 0 12px rgba(63,224,214,.4), inset 0 1px 0 rgba(255,255,255,.15) !important; }
+.qseg.done{ color:#3a2a06; border-color:#ffce4d !important;
+  background:linear-gradient(180deg,#ffe08a,#ffce4d) !important;
+  box-shadow:0 0 14px rgba(255,206,77,.5), inset 0 1px 0 rgba(255,255,255,.5) !important; }
+#quest-next{ margin-top:11px !important; font-size:15px; color:var(--ink-soft);
+  display:flex; align-items:center; gap:8px; line-height:1.3; text-align:left !important;
+  padding:9px 11px; border-radius:12px;
+  background:rgba(63,224,214,.08); border:1px solid rgba(63,224,214,.18); }
+#quest-next .qn-ico{ flex:0 0 auto; font-size:18px; }
+#quest-next b{ color:var(--ink); }
+
 /* ═══ FLASH RÉUSSI : carte de collection à rayons ═══ */
 #flash-card{ position:relative; overflow:hidden; width:min(86vw,340px);
   margin-top:10px; padding:16px 12px 14px; border-radius:24px;
@@ -1333,19 +1401,28 @@ button:disabled{ color:#7683ad;
       <button id="btn-sound" class="b3" aria-label="Son">♪</button>
     </div>
 
-    <!-- Tableau de bord joueur : rang, badge, étoiles, XP -->
+    <!-- Carte héros : badge de rang, XP, progression de rang -->
     <div id="player-card">
-      <div id="pc-badge"><canvas id="pc-alien" width="132" height="108"></canvas></div>
+      <div id="pc-badge"><canvas id="pc-alien" width="132" height="108"></canvas><span id="pc-tier" class="pix"></span></div>
       <div id="pc-info">
-        <div id="pc-hello" class="dim"></div>
-        <div id="pc-rank" class="pix"></div>
-        <div id="pc-xp"><i></i><span id="pc-xp-label" class="pix"></span></div>
-        <div id="pc-next" class="dim"></div>
+        <div id="pc-hello"></div>
+        <div id="pc-rankrow">
+          <span id="pc-rank" class="pix"></span>
+          <span id="pc-arrow">▸</span>
+          <span id="pc-rank-next" class="pix"></span>
+        </div>
+        <div id="pc-xp"><i></i></div>
+        <div id="pc-next"></div>
       </div>
     </div>
 
-    <div id="quest"></div>
-    <div id="quest-next" class="dim" style="font-size:17px; text-align:center; margin-top:7px; min-height:22px;"></div>
+    <!-- Carte de quête : progression des 8 défis + objectif courant -->
+    <div id="quest-card">
+      <div id="quest-top"><span id="quest-title">◈ LA CHASSE</span><span id="quest-count">0/8</span></div>
+      <div id="quest"></div>
+      <div id="quest-next"></div>
+    </div>
+
     <h2>Code final</h2>
     <div id="frags"></div>
     <p class="sub">Chaque défi réussi révèle un chiffre.</p>
@@ -2534,19 +2611,23 @@ function renderPlayerCard(){
   /* l'accueil suit l'heure de la chasse */
   const hh = new Date().getHours();
   const salut = hh < 6 ? "Chasse de nuit" : hh < 12 ? "Bonjour" : hh < 18 ? "Bonne chasse" : "Bonsoir";
-  $("#pc-hello").textContent = `${salut}, agent ${CONFIG.joueur}`;
+  $("#pc-hello").textContent = `Agent ${CONFIG.joueur}`;
   const rk = $("#pc-rank");
   rk.textContent = rank.nom;
   rk.style.color = rank.couleur;
   rk.style.textShadow = "0 0 10px " + hexA(rank.couleur, .5);
+  /* rang suivant affiché à côté (flèche) + palier sur le badge */
+  const rn = $("#pc-rank-next"), ar = $("#pc-arrow"), tier = $("#pc-tier");
+  if(rn && ar){ if(next){ rn.textContent = next.nom; rn.style.display = ""; ar.style.display = ""; }
+                else{ rn.style.display = "none"; ar.style.display = "none"; } }
+  if(tier) tier.textContent = "R" + (idx + 1);
   /* barre d'XP : progression vers le rang suivant */
   const cap = next ? next.min : 24;
   const pct = next ? Math.round((t - rank.min) / (cap - rank.min) * 100) : 100;
   $("#pc-xp").firstElementChild.style.width = pct + "%";
-  $("#pc-xp-label").textContent = "★ " + t + " / 24";
-  $("#pc-next").innerHTML = next
-    ? `Prochain rang : <b>${next.nom}</b> · ${cap - t} ★`
-    : `Rang maximum atteint ✦`;
+  const pn = $("#pc-next");
+  if(next){ pn.classList.remove("max"); pn.innerHTML = `Encore <b>${cap - t} ★</b> pour ${next.nom}`; }
+  else{ pn.classList.add("max"); pn.innerHTML = `✦ Rang maximum atteint — ${t}/24 ★`; }
   /* badge voxel : une vraie pièce 3D qui tourne, teintée au rang */
   lastRankDraw = idx;
   Spin3D.add($("#pc-alien"), rank.sprite, rank.couleur,
@@ -2580,21 +2661,24 @@ function renderHub(){
 
   /* barre de quête : segment vide → à moitié (flashé) → or (défi ok) */
   const q = $("#quest"); q.innerHTML = "";
-  CONFIG.stations.forEach(st=>{
+  CONFIG.stations.forEach((st, i)=>{
     const s = document.createElement("div");
     s.className = "qseg" + (S.done[st.code] ? " done" : S.flashed[st.code] ? " half" : "");
+    s.textContent = S.done[st.code] ? "✓" : (i + 1);
     q.appendChild(s);
   });
+  const nDone = CONFIG.stations.filter(st=>S.done[st.code]).length;
+  const qc = $("#quest-count"); if(qc) qc.textContent = nDone + "/8";
   /* le prochain objectif, toujours affiché : personne ne se demande "et maintenant ?" */
   const qn = $("#quest-next");
   if(qn){
     const pending = CONFIG.stations.find(st=>S.flashed[st.code] && !S.done[st.code]);
     const unflashed = CONFIG.stations.find(st=>!S.flashed[st.code]);
     qn.innerHTML = pending
-      ? `Défi en attente : <b style="color:var(--jaune)">${pending.code} — ${pending.nom}</b>`
+      ? `<span class="qn-ico">⚡</span><span>Défi en attente&nbsp;: <b>${pending.code} — ${pending.nom}</b></span>`
       : unflashed
-      ? `Prochaine pièce à trouver : <b style="color:var(--cyan)">${unflashed.code} — ${unflashed.nom}</b>`
-      : `Toutes les pièces sont à toi — <b style="color:var(--jaune)">entre le code final !</b>`;
+      ? `<span class="qn-ico">🎯</span><span>À trouver&nbsp;: <b>${unflashed.code} — ${unflashed.nom}</b></span>`
+      : `<span class="qn-ico">🔒</span><span>Toutes les pièces sont à toi — <b>entre le code final !</b></span>`;
   }
 
   // fragments
@@ -2641,12 +2725,15 @@ function renderHub(){
                         <span class="pts">${st.points} PTS</span>`;
       const cvL = document.createElement("canvas");
       cvL.width = 150; cvL.height = 122;
-      cvL.style.cssText = "width:75px;height:61px;opacity:.55;filter:brightness(.5);";
+      cvL.style.cssText = "width:78px;height:64px;opacity:.85;filter:brightness(.8) saturate(.7);";
       const win = card.querySelector(".card-win");
       win.appendChild(cvL);
-      Voxel.draw(cvL, st.sprite, "#2b2b52", .5, -.3, { cam:{ scale:11, focal:11, dist:7 } });
+      /* silhouette teintée à la couleur de la pièce, assombrie — on
+         devine l'invader sans le dévoiler */
+      Voxel.draw(cvL, st.sprite, hexA(st.couleur, 1), .5, -.3, { cam:{ scale:11, focal:11, dist:7 } });
+      cvL.style.filter = "brightness(.5) saturate(.85)";
       win.insertAdjacentHTML("beforeend",
-        `<span class="myst" style="position:absolute; font-size:17px;">?</span>`);
+        `<span class="myst" style="position:absolute; font-size:18px; opacity:.9;">?</span>`);
     }
     g.appendChild(card);
   });

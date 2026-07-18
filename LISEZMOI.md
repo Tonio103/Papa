@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v37) — le tableau de bord repensé (vrai look de jeu vidéo)
+
+- **Fiche agent héroïque** : nom d'agent, **rang actuel ▸ rang suivant** (RECRUE ▸ ÉCLAIREUR…), **jauge d'XP** propre (sans texte qui se chevauche), **pastille de rang** (R2, R3…) sur le badge, et « Encore X ★ pour [rang suivant] » (ou « ✦ Rang maximum atteint »).
+- **Bandeau de quête lisible** : titre « ◈ LA CHASSE » + compteur **X/8**, une rangée de **8 pastilles numérotées** (✓ quand le défi est réussi, le numéro sinon ; états cyan « en cours » / or « terminé »), et une **bannière d'objectif** claire (⚡ prochain défi / 🎯 en cours / 🔒 terminé).
+- **Galerie plus vivante** : les silhouettes des pièces non débloquées sont teintées à leur couleur, plus lisibles.
+
 ## Nouveautés (v36) — tutoriel façon vrai jeu vidéo
 
 - **Visite guidée du HUB au premier lancement** (après la cinématique) : un guide mascotte, **Squiddy**, présente le jeu en 8 étapes avec des **coach marks** — un projecteur cyan éclaire l'élément expliqué (fiche agent, ligne d'objectif, code final, galerie, bouton Flasher, Radar, Code final) pendant que le reste s'assombrit, une main pointe la cible, bulle de dialogue + points de progression + « Suivant ▶ ».
