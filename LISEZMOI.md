@@ -54,6 +54,17 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v40) — direction artistique STREET ART (refonte graphiste)
+
+Le jeu prend l'univers de son histoire : l'invader-artiste qui tague Les Vans.
+
+- **Mur de béton** : fond sombre grainé (texture générée, marche hors-ligne) avec des **auréoles de bombe** colorées dans les coins, à la place de la grille synthwave.
+- **Typo tag** : le titre passe en **graffiti** (Bangers) avec ombre de spray décalée ; les intertitres et titres de défis en **marqueur** (Permanent Marker).
+- **Cartes = affiches collées** : contour découpé au pochoir (cyan / rose), léger travers, ombre franche, petit bout de **scotch** en haut.
+- **Boutons = stickers** : contour noir + ombre nette, façon autocollant sprayé.
+- **Barre d'onglets** : bande de béton, onglet actif avec une **tache de bombe** derrière.
+- **Pellicule de grain** sur tout l'écran pour unifier le rendu « affiche ».
+
 ## Nouveautés (v39) — barre d'onglets façon appli (navigation claire)
 
 - Fini les gros boutons empilés au milieu du repaire : la navigation passe par une **barre d'onglets fixée en bas**, avec icône + libellé, comme dans l'appli Flash Invaders.
