@@ -1186,6 +1186,56 @@ button:disabled{ color:#7683ad;
 #boot-screen .btn-row{ margin-top:auto; padding-top:14px; gap:12px; }
 #btn-start{ font-size:21px; padding:18px 24px; }
 
+/* ═══ TUTORIEL — coach marks façon vrai jeu ═══ */
+#tuto{ position:fixed; inset:0; z-index:970; }
+#tuto[hidden]{ display:none; }
+/* le projecteur : sa gigantesque ombre porte assombrit tout SAUF
+   le trou, dont le contour brille — le classique du coach mark */
+#tuto-ring{ position:absolute; left:50%; top:50%; width:0; height:0; border-radius:18px;
+  box-shadow:0 0 0 9999px rgba(6,8,20,.82); border:2px solid var(--cyan);
+  pointer-events:none;
+  transition:left .4s cubic-bezier(.2,1,.3,1), top .4s cubic-bezier(.2,1,.3,1),
+    width .4s cubic-bezier(.2,1,.3,1), height .4s cubic-bezier(.2,1,.3,1); }
+@media (prefers-reduced-motion: no-preference){
+  #tuto-ring{ animation:tutoGlow 1.6s ease-in-out infinite; }
+  @keyframes tutoGlow{ 50%{ box-shadow:0 0 0 9999px rgba(6,8,20,.82),
+    0 0 26px rgba(63,224,214,.7), inset 0 0 18px rgba(63,224,214,.35); } }
+}
+#tuto-hand{ position:absolute; z-index:2; font-size:30px; pointer-events:none;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.6)); transition:left .4s, top .4s; opacity:0; }
+@media (prefers-reduced-motion: no-preference){
+  #tuto-hand.on{ opacity:1; animation:handBob 1.1s ease-in-out infinite; }
+  @keyframes handBob{ 50%{ transform:translateY(-8px); } }
+}
+#tuto-hand.on{ opacity:1; }
+#tuto-box{ position:absolute; left:50%; transform:translateX(-50%);
+  width:min(92vw,430px); z-index:3;
+  background:linear-gradient(180deg, rgba(30,32,64,.98), rgba(14,16,38,.98));
+  border:2px solid rgba(120,150,255,.35); border-radius:20px; padding:14px 16px 16px;
+  box-shadow:0 -6px 40px rgba(0,0,0,.5), 0 0 30px rgba(63,224,214,.12);
+  transition:top .4s cubic-bezier(.2,1,.3,1), bottom .4s; }
+#tuto-box.bottom{ bottom:calc(18px + var(--sab)); top:auto; }
+#tuto-box.top{ top:calc(18px + var(--sat)); bottom:auto; }
+#tuto-box.center{ top:50%; bottom:auto; transform:translate(-50%,-50%); }
+#tuto-head{ display:flex; align-items:center; gap:11px; }
+#tuto-face-wrap{ width:52px; height:44px; flex:0 0 auto; border-radius:11px;
+  background:radial-gradient(circle at 50% 35%, rgba(63,224,214,.18), rgba(8,10,28,.6) 70%);
+  border:1px solid rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; }
+#tuto-face{ width:48px; height:38px; }
+#tuto-name{ font-size:13px; color:var(--cyan); letter-spacing:1px; }
+#tuto-role{ font-size:13px; }
+#tuto-skip{ margin-left:auto; font-family:var(--f-pix); font-size:10px; color:#9aa;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  border-radius:99px; padding:8px 12px; box-shadow:none; }
+#tuto-skip:active{ transform:translateY(2px); box-shadow:none; }
+#tuto-text{ font-size:19px; line-height:1.4; color:var(--ink); margin:12px 2px 0;
+  min-height:56px; white-space:pre-line; }
+#tuto-foot{ display:flex; align-items:center; gap:12px; margin-top:12px; }
+#tuto-dots{ display:flex; gap:6px; flex:1; }
+#tuto-dots i{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.18); }
+#tuto-dots i.on{ background:var(--cyan); box-shadow:0 0 8px rgba(63,224,214,.6); }
+#tuto-next{ font-size:16px; padding:12px 20px; white-space:nowrap; }
+
 /* ═══ FLASH RÉUSSI : carte de collection à rayons ═══ */
 #flash-card{ position:relative; overflow:hidden; width:min(86vw,340px);
   margin-top:10px; padding:16px 12px 14px; border-radius:24px;
@@ -1461,6 +1511,24 @@ button:disabled{ color:#7683ad;
     </div>
   </div>
 </section>
+
+<!-- ═══ TUTORIEL (coach marks) ═══ -->
+<div id="tuto" hidden>
+  <div id="tuto-ring"></div>
+  <div id="tuto-hand">👆</div>
+  <div id="tuto-box">
+    <div id="tuto-head">
+      <div id="tuto-face-wrap"><canvas id="tuto-face" width="120" height="96"></canvas></div>
+      <div><div id="tuto-name" class="pix">SQUIDDY</div><div id="tuto-role" class="dim">ton guide</div></div>
+      <button id="tuto-skip">Passer ✕</button>
+    </div>
+    <div id="tuto-text"></div>
+    <div id="tuto-foot">
+      <div id="tuto-dots"></div>
+      <button id="tuto-next" class="b2">Suivant ▶</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══ BARRE DE TRICHE (?triche=1) ═══ -->
 <div id="cheat"></div>
@@ -2971,7 +3039,8 @@ const Menu3D = (()=>{
     AudioFX.select();
     switch(it.id){
       case "play":   stop(); renderHub(); show("hub-screen"); break;
-      case "help":   panel(menuHelpHTML()); break;
+      case "help":   stop(); renderHub(); show("hub-screen");
+                     setTimeout(()=>Tuto.start(), 380); break;
       case "succes": panel(succesHTML()); break;
       case "msgs":   panel(msgsHTML()); break;
       case "cine":   stop(); Cinematic.play(()=>{ renderHub(); show("hub-screen"); }); break;
@@ -4086,6 +4155,79 @@ const Cinematic = (()=>{
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   12ter. TUTORIEL — visite guidée du HUB façon vrai jeu vidéo :
+   projecteur (coach mark) sur chaque élément, guide « Squiddy »,
+   étape par étape, passable, rejouable (menu → COMMENT JOUER).
+   ─────────────────────────────────────────────────────────── */
+const Tuto = (()=>{
+  const STEPS = [
+    { text:"Salut agent ! 👾\nMoi c'est Squiddy, ton guide.\nDeux minutes de brief et Les Vans sont à toi." },
+    { sel:"#player-card", text:"Ta fiche d'agent : ton rang grimpe à chaque défi réussi, et tes étoiles se cumulent." },
+    { sel:"#quest-next",  text:"Ici s'affiche TOUJOURS ton prochain objectif. En cas de doute, regarde cette ligne." },
+    { sel:"#frags",       text:"Le code final : chaque défi réussi révèle un de ses 8 chiffres." },
+    { sel:"#grid",        text:"Les 8 pièces de l'invasion, cachées dans la ville. À toi de les débusquer !" },
+    { sel:"#btn-scan",    text:"Tu trouves une mosaïque ? Appuie ici et flashe le QR posé juste à côté." },
+    { sel:"#btn-map",     text:"Le radar te dit si tu CHAUFFES ou refroidis — parfait quand une pièce se cache bien." },
+    { sel:"#btn-final",   text:"Les 8 chiffres réunis ouvrent le cadenas final.\nBonne chasse, agent ! 🚀" },
+  ];
+  let i = 0, running = false, faceDrawn = false, onDone = null;
+  function dots(){
+    const d = $("#tuto-dots"); d.innerHTML = "";
+    STEPS.forEach((_, k)=>{ const s = document.createElement("i"); if(k===i) s.className = "on"; d.appendChild(s); });
+  }
+  function place(){
+    const step = STEPS[i];
+    const ring = $("#tuto-ring"), hand = $("#tuto-hand"), box = $("#tuto-box");
+    $("#tuto-text").textContent = step.text;
+    $("#tuto-next").textContent = i === STEPS.length - 1 ? "C'est parti ! ▶" : "Suivant ▶";
+    dots();
+    const target = step.sel && document.querySelector(step.sel);
+    if(!target){                                   // étape d'accueil, centrée
+      ring.style.width = "0px"; ring.style.height = "0px";
+      ring.style.left = "50%"; ring.style.top = "50%";
+      hand.classList.remove("on");
+      box.className = "center";
+      return;
+    }
+    try{ target.scrollIntoView({ block:"center", inline:"center" }); }catch(e){ target.scrollIntoView(); }
+    setTimeout(()=>{
+      if(!running) return;
+      const r = target.getBoundingClientRect(), pad = 8;
+      ring.style.left  = (r.left - pad) + "px";
+      ring.style.top   = (r.top  - pad) + "px";
+      ring.style.width = (r.width  + pad*2) + "px";
+      ring.style.height= (r.height + pad*2) + "px";
+      hand.style.left = (r.left + r.width/2 - 15) + "px";
+      hand.style.top  = (r.bottom + 4) + "px";
+      hand.classList.add("on");
+      const mid = r.top + r.height/2;
+      box.className = mid < innerHeight*0.5 ? "bottom" : "top";
+    }, 240);
+  }
+  function next(){ if(i >= STEPS.length - 1){ finish(); return; } i++; AudioFX.nav(); place(); }
+  function finish(){
+    running = false;
+    $("#tuto").hidden = true;
+    S.tutoSeen = true; persist();
+    AudioFX.select();
+    const cb = onDone; onDone = null; if(cb) cb();
+  }
+  function start(done){
+    onDone = done || null; i = 0; running = true;
+    if(!faceDrawn){ try{ Voxel.draw($("#tuto-face"), "squid", "#2BE4D0", .5, -.3,
+      { cam:{ scale:11, focal:11, dist:7 } }); }catch(e){} faceDrawn = true; }
+    $("#tuto").hidden = false;
+    place();
+  }
+  /* branchements */
+  $("#tuto-next").addEventListener("click", e=>{ e.stopPropagation(); next(); });
+  $("#tuto-skip").addEventListener("click", e=>{ e.stopPropagation(); AudioFX.back(); finish(); });
+  $("#tuto").addEventListener("click", e=>{ if(!e.target.closest("#tuto-box")) next(); });
+  addEventListener("resize", ()=>{ if(running) place(); });
+  return { start, isRunning:()=>running };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    13. TRICHE (?triche=1) + branchements + démarrage
    ─────────────────────────────────────────────────────────── */
 function buildCheat(){
@@ -4128,6 +4270,11 @@ function enterGame(){
   if(bootScene) bootScene();          // libère la scène d'accueil
 }
 function goHub(){ renderHub(); show("hub-screen"); }
+/* arrive au HUB puis, la première fois, lance le tutoriel guidé */
+function goHubThenTuto(){
+  goHub();
+  setTimeout(()=>{ if(!S.tutoSeen && !S.won) Tuto.start(); }, 520);
+}
 /* efface tout en mémoire ET sur disque, puis relance une partie neuve */
 function wipeState(){
   Store.reset();
@@ -4141,9 +4288,10 @@ $("#btn-start").addEventListener("click", ()=>{
   if(hasProgress()){
     goHub();                          // « Reprendre » : droit au but, pas d'intro
   }else{
-    /* première partie : la cinématique raconte la nuit de l'invasion */
+    /* première partie : la cinématique raconte la nuit de l'invasion,
+       puis le tutoriel guide les premiers pas */
     S.cineSeen = true; persist();
-    Cinematic.play(goHub);
+    Cinematic.play(goHubThenTuto);
   }
 });
 
@@ -4166,7 +4314,7 @@ $("#btn-newgame").addEventListener("click", e=>{
   wipeState();
   S.cineSeen = true; persist();
   enterGame();
-  Cinematic.play(goHub);
+  Cinematic.play(goHubThenTuto);
 });
 
 /* libellés de l'écran-titre selon qu'une partie existe ou non */
