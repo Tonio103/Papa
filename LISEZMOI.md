@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v36) — tutoriel façon vrai jeu vidéo
+
+- **Visite guidée du HUB au premier lancement** (après la cinématique) : un guide mascotte, **Squiddy**, présente le jeu en 8 étapes avec des **coach marks** — un projecteur cyan éclaire l'élément expliqué (fiche agent, ligne d'objectif, code final, galerie, bouton Flasher, Radar, Code final) pendant que le reste s'assombrit, une main pointe la cible, bulle de dialogue + points de progression + « Suivant ▶ ».
+- **Passable** à tout moment (« Passer ✕ »), joué **une seule fois** (mémorisé), et **rejouable** via le menu ☰ → COMMENT JOUER.
+
 ## Nouveautés (v35) — personnalisation : code final, portrait, sauvegarde
 
 - **Code final = la date de naissance de Papa (27/07/1975)** → les 8 fragments donnent `27071975`.
