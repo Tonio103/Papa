@@ -1472,19 +1472,19 @@ button:disabled{ color:#7683ad;
    ─────────────────────────────────────────────────────────── */
 const CONFIG = {
   joueur: "Papa",                       // À PERSONNALISER
-  messageVictoire: "Joyeux anniversaire !\nTon cadeau t'attend dans la boîte.", // À PERSONNALISER
+  messageVictoire: "L'invader, c'était moi.\nDepuis le début.\n\nJ'ai semé les Vans d'étoiles rien que pour toi.\nJoyeux anniversaire, Papa. 🛸\n\nTon cadeau t'attend dans la boîte.", // À PERSONNALISER
 
   // Messages de l'invader : le n-ième s'affiche après le n-ième défi
   // réussi. À partir du 4e, l'application se met à "glitcher".
   // À PERSONNALISER — c'est là que se joue toute l'histoire.
   messagesInvader: [
-    "Tiens.\nQuelqu'un a trouvé ma première pièce.\nBienvenue dans la partie.",
-    "Deux. Pas mal.\nMais c'étaient les faciles.",
-    "Trois. Tu commences à regarder la ville comme moi.\nLes murs parlent, non ?",
-    "ERREUR SYST—\n…non. C'est moi.\nJe suis entré dans ton application.\nJe te regarde chercher.",
-    "Tu te demandes qui je suis.\nTu brûles. Vraiment.",
-    "Plus que deux.\nJ'ai gardé le meilleur pour la fin.",
-    "La dernière pièce te connaît depuis toujours.\nVa la voir.",
+    "Tiens, tiens.\nQuelqu'un a trouvé ma première pièce.\nToi qui kiffes les invaders depuis toujours…\nbienvenue dans TA chasse.",
+    "Deux. Tu chauffes.\nUne question te brûle les lèvres :\nqui a bien pu poser tout ça ?\n(prends ton temps. genre… 30 secondes.)",
+    "Trois pièces.\nJe t'avais gardé une blague bien pourrie ici…\nmais tu me connais trop pour ça. 😏",
+    "ERREUR SYST—\n…non. C'est moi.\nJe me suis glissé dans l'appli.\nTu te souviens de Cologne ? De l'ESA ?\nLa tête en l'air, tous les deux, à chasser les étoiles.",
+    "Tu brûles vraiment.\nL'invader n'est pas un inconnu.\nC'est quelqu'un qui a tout hérité de toi —\ntes blagues pourries comprises.",
+    "Plus que deux.\nJ'ai gardé le plus grand invader pour la fin.\nTu le connais mieux que personne.",
+    "La dernière pièce te regarde depuis toujours.\nElle a tes lunettes rondes. Ton sourire.\nVa la voir, Papa.",
   ],
 
   // Code secret : à taper dans la saisie manuelle du scanner.
@@ -5905,7 +5905,7 @@ MiniGames["LV_08"] = function(box, api){
     sigT = performance.now() + (reduced ? 250 : 1500);
     setTimeout(()=>{
       AudioFX.fanfare(); Juice.confetti(box, 34);
-      txt.textContent = "L'invader… c'était moi. 😏\nJoyeux anniversaire.";
+      txt.textContent = "Le plus beau des invaders des Vans…\nc'est toi, Papa. 🛸";
       const btn = document.createElement("button");
       btn.className = "b2";
       btn.textContent = "Récupérer le dernier fragment";
