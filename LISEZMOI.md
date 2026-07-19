@@ -54,6 +54,10 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v42) — éclaboussures de bombe sur le mur
+
+- Le mur de béton porte maintenant de **vieilles éclaboussures de spray** (cyan, rose, violet, orange) en fond, très discrètes. Les écrans un peu vides (radar, scanner, transmission) ressemblent enfin à un vrai mur tagué plutôt qu'à du béton nu. Formes générées en SVG, hors-ligne, sans impact sur les commandes.
+
 ## Nouveautés (v41) — coulures de peinture
 
 - Les deux cartes du repaire (fiche agent, quête) laissent maintenant **dégouliner de la peinture** de leur bord bas — coulures cyan et roses avec un léger halo néon, comme du spray frais. Détail signature de la direction street art.
