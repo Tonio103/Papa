@@ -1523,6 +1523,26 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   box-shadow:0 5px 0 rgba(0,0,0,.55), 0 10px 16px rgba(0,0,0,.45) !important; }
 #btn-start{ font-size:22px !important; letter-spacing:.6px !important; transform:rotate(-1deg); }
 
+/* ── Note d'anniversaire = mot manuscrit collé sur le mur ─────── */
+#victory-gift{
+  position:relative; overflow:visible; transform:rotate(-1.1deg);
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(38,32,46,.97), rgba(22,18,27,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  border:2.5px solid var(--spray-yellow) !important; border-radius:12px !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), 0 18px 30px rgba(0,0,0,.5) !important;
+}
+#victory-gift::after{                     /* scotch en haut de la note */
+  content:""; position:absolute; top:-11px; left:50%; width:74px; height:18px;
+  transform:translateX(-50%) rotate(-3deg);
+  background:rgba(243,238,226,.34); border:1px dashed rgba(255,255,255,.38);
+  border-radius:2px; box-shadow:0 2px 5px rgba(0,0,0,.3); pointer-events:none;
+}
+#victory-gift .drips{ --dripcol:var(--spray-yellow); }
+#victory-txt{ color:var(--paint) !important; }
+
 /* ── HUD : plaques de métal taguées ───────────────────────────── */
 #hud{ background:rgba(20,17,26,.72) !important; border-radius:0 0 16px 16px !important;
   border-bottom:2.5px solid rgba(255,255,255,.14) !important; }
@@ -1731,6 +1751,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     <div id="victory-gift">
       <span class="vg-ico">🎁</span>
       <p id="victory-txt"></p>
+      <span class="drips" aria-hidden="true"></span>
     </div>
     <div id="victory-rank"></div>
     <div id="victory-stats"></div>
