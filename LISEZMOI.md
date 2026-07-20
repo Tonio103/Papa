@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v44) — titres plus lisibles + typo de secours
+
+- **Petits titres d'écran** (« LE CODE FINAL », « FLASH RÉUSSI ! », « DERNIER FLASH ») : agrandis et ombre de spray réduite — à cette taille l'ombre pleine dédoublait le texte sur le sous-titre.
+- **Polices de secours soignées** : si les polices web ne sont pas encore en cache (tout premier lancement sans réseau), le jeu retombe sur des polices système proches de l'esprit (Marker Felt / Chalkboard SE sur iPhone pour le côté marqueur, Arial Black pour les titres) au lieu d'un serif cassé.
+
 ## Nouveautés (v43) — le message final en note taguée
 
 - L'écran de victoire présente désormais le message d'anniversaire comme un **mot manuscrit scotché sur le mur** : grain béton, cadre jaune au pochoir, bout de scotch, léger travers et coulures de peinture jaunes. Le texte (« L'invader, c'était moi… Joyeux anniversaire, Papa ») reste intact, juste bien mis en valeur.
