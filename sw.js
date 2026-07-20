@@ -8,7 +8,7 @@
    Pour forcer une mise à jour après modification du jeu :
    incrémente le numéro de version ci-dessous (v1 → v2).
    ═══════════════════════════════════════════════════════════ */
-const CACHE = "invasion-v52";
+const CACHE = "invasion-v53";
 const PRECACHE = [
   "./",
   "./index.html",

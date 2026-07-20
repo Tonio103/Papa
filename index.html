@@ -1410,8 +1410,10 @@ button:disabled{ color:#7683ad;
   --paint:#f3eee2;                 /* blanc cassé « peinture » */
   --spray-cyan:#2ce8d2; --spray-pink:#ff2f86; --spray-yellow:#ffd23f;
   --spray-orange:#ff7a29; --spray-purple:#9d5cff; --spray-green:#37e37e;
-  --f-graff:'Bangers','Bungee',cursive;
-  --f-tag:'Permanent Marker',cursive;
+  /* secours SANS réseau : polices système iOS proches de l'esprit
+     (Marker Felt / Chalkboard SE = marqueur ; Arial Black = affiche) */
+  --f-graff:'Bangers','Bungee','Arial Black','Impact',system-ui,sans-serif;
+  --f-tag:'Permanent Marker','Marker Felt','Chalkboard SE','Segoe Print','Comic Sans MS',cursive;
   /* coulures de peinture (masque SVG réutilisable, teinté par carte) */
   --dripmask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 26'%3E%3Cg fill='%23000'%3E%3Crect width='150' height='5'/%3E%3Crect x='19.5' width='5' height='14' rx='2.5'/%3E%3Ccircle cx='22' cy='15' r='3'/%3E%3Crect x='67.5' width='5' height='8' rx='2.5'/%3E%3Ccircle cx='70' cy='9' r='2.6'/%3E%3Crect x='115.5' width='5' height='19' rx='2.5'/%3E%3Ccircle cx='118' cy='20' r='3.4'/%3E%3C/g%3E%3C/svg%3E");
   /* éclaboussures de bombe (masques SVG, teintées par élément) */
@@ -1461,6 +1463,15 @@ h1{
     -2px -2px 0 #0a0710, 2px -2px 0 #0a0710, -2px 2px 0 #0a0710, 2px 2px 0 #0a0710,
     5px 7px 0 var(--spray-pink),
     0 0 26px rgba(255,47,134,.45) !important;
+}
+/* petits titres d'écran (Code, Flash réussi, Selfie) : l'ombre spray
+   pleine taille dédouble le texte à 15px — version réduite, plus lisible */
+#final-screen h1, #selfie-screen h1, #flash-screen h1{
+  font-size:24px !important; letter-spacing:1.5px !important; line-height:1.15 !important;
+  text-shadow:
+    -1.5px -1.5px 0 #0a0710, 1.5px -1.5px 0 #0a0710,
+    -1.5px 1.5px 0 #0a0710, 1.5px 1.5px 0 #0a0710,
+    3px 4px 0 var(--spray-pink), 0 0 18px rgba(255,47,134,.4) !important;
 }
 h2{
   font-family:var(--f-tag) !important; font-weight:400 !important;
