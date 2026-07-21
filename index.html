@@ -1593,6 +1593,52 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   -webkit-mask:var(--sm) no-repeat center/contain; mask:var(--sm) no-repeat center/contain;
   opacity:var(--so,.12); mix-blend-mode:screen; }
 
+/* ── ÉCRAN DE DÉFI : l'affiche de la station (couleur --st) ───── */
+#game-box{
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(33,28,40,.97), rgba(19,16,24,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  border:2.5px solid var(--st, var(--paint)) !important;
+  border-radius:12px !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), 0 18px 30px rgba(0,0,0,.5) !important;
+}
+#game-title{
+  font-family:var(--f-tag) !important; font-weight:400 !important;
+  color:var(--st, var(--spray-yellow)) !important;
+  transform:rotate(-.5deg); letter-spacing:.5px !important;
+  text-shadow:-1.5px -1.5px 0 #0a0710, 1.5px -1.5px 0 #0a0710,
+    -1.5px 1.5px 0 #0a0710, 1.5px 1.5px 0 #0a0710, 0 4px 8px rgba(0,0,0,.5) !important;
+}
+
+/* ── Pastille de quête fraîchement validée : elle POP ─────────── */
+@media (prefers-reduced-motion: no-preference){
+  .qseg.pop{ animation:pipPop .65s cubic-bezier(.2,1.7,.4,1); }
+  @keyframes pipPop{ 0%{ transform:scale(.2) rotate(-14deg); }
+    60%{ transform:scale(1.28) rotate(5deg); } }
+}
+
+/* ── Tampon PARFAIT (3★) : plus gros, rose spray, halo ────────── */
+.stamp.parfait{
+  font-size:21px !important; letter-spacing:1px;
+  box-shadow:0 0 34px rgba(255,47,134,.55), inset 0 0 14px rgba(255,47,134,.2);
+  animation:stampIn .45s cubic-bezier(.2,1.6,.4,1) forwards,
+            parfaitGlow 1.2s ease-in-out .5s infinite alternate !important;
+}
+@keyframes parfaitGlow{ to{ box-shadow:0 0 50px rgba(255,47,134,.85),
+  inset 0 0 20px rgba(255,47,134,.3); } }
+
+/* ── Invitation à rejouer (défi fini sans les 3★) ─────────────── */
+.replay-chip{
+  font-family:var(--f-tag); font-size:11px; color:var(--spray-cyan);
+  border:1.5px dashed rgba(44,232,210,.65); border-radius:9px;
+  padding:2px 8px; margin-top:4px; white-space:nowrap;
+}
+@media (prefers-reduced-motion: no-preference){
+  .replay-chip{ animation:replayPulse 2.4s ease-in-out infinite; }
+  @keyframes replayPulse{ 50%{ opacity:.5; } }
+}
 </style>
 </head>
 <body>
@@ -2790,6 +2836,7 @@ function bootType(){
    ─────────────────────────────────────────────────────────── */
 /* compteur de score qui roule vers sa nouvelle valeur */
 let scoreAnim = null, shownPts = null;
+let prevPips = null;                 // pastilles de quête déjà vues validées
 function rollScore(target){
   const el = $("#hud-pts");
   if(shownPts === null || matchMedia("(prefers-reduced-motion: reduce)").matches){
@@ -2915,14 +2962,17 @@ function renderHub(){
     if(now !== prev){ const w = hs.closest(".hud-star"); if(w){ w.classList.remove("bump"); void w.offsetWidth; w.classList.add("bump"); } } }
   renderPlayerCard();
 
-  /* barre de quête : segment vide → à moitié (flashé) → or (défi ok) */
+  /* barre de quête : segment vide → à moitié (flashé) → or (défi ok).
+     Une pastille qui VIENT d'être validée fait un petit bond. */
   const q = $("#quest"); q.innerHTML = "";
   CONFIG.stations.forEach((st, i)=>{
     const s = document.createElement("div");
     s.className = "qseg" + (S.done[st.code] ? " done" : S.flashed[st.code] ? " half" : "");
     s.textContent = S.done[st.code] ? "✓" : (i + 1);
+    if(prevPips && S.done[st.code] && !prevPips.has(st.code)) s.classList.add("pop");
     q.appendChild(s);
   });
+  prevPips = new Set(CONFIG.stations.filter(st=>S.done[st.code]).map(st=>st.code));
   const nDone = CONFIG.stations.filter(st=>S.done[st.code]).length;
   const qc = $("#quest-count"); if(qc) qc.textContent = nDone + "/8";
   /* le prochain objectif, toujours affiché : personne ne se demande "et maintenant ?" */
@@ -2960,9 +3010,12 @@ function renderHub(){
       const starsTxt = done
         ? "★".repeat(starsWon) + `<span style="color:#3c3c66">${"★".repeat(3-starsWon)}</span>`
         : "DÉFI EN ATTENTE";
+      /* défi fini sans les 3★ → on invite à retenter (bonus à la clé) */
+      const replay = done && starsWon < 3
+        ? `<span class="replay-chip">↻ rejouer</span>` : "";
       card.innerHTML = `<div class="card-top">${st.code}</div>
                         <div class="card-win"></div>
-                        <span class="pts">${starsTxt}</span>`;
+                        <span class="pts">${starsTxt}</span>${replay}`;
       const cv = document.createElement("canvas");
       cv.width = 150; cv.height = 122;
       cv.style.cssText = "width:75px;height:61px;";
@@ -3230,6 +3283,8 @@ function startGame(st){
   clearHints();
   show("game-screen");
   $("#game-title").textContent = `${st.code} — ${st.nom}`;
+  /* l'écran de défi prend la couleur de la station (cadre + titre) */
+  $("#game-screen").style.setProperty("--st", st.couleur);
   const box = $("#game-box"); box.innerHTML="";
 
   const api = {
@@ -3250,15 +3305,29 @@ function startGame(st){
 function winGame(st, skipped, opts={}){
   runCleanup();
   clearHints();
+  const wasDone = !!S.done[st.code];         // rejoue-t-il un défi déjà fini ?
+  const prevStars = S.stars[st.code] || 0;
   if(skipped && !S.done[st.code]){ S.points = Math.max(0, S.points - Math.floor(st.points/2)); }
   S.done[st.code] = true;
   persist();
   const box = $("#game-box");
   box.innerHTML = "";
-  /* tampon + étoiles de performance (chaque jeu envoie sa note) */
+  /* tampon + étoiles de performance (chaque jeu envoie sa note).
+     3★ = tampon PARFAIT rose qui rayonne. */
   const stars = skipped ? 0 : (opts.stars != null ? opts.stars : 2);
   const label = skipped ? "PASSÉ…" : (opts.label || "DÉFI RÉUSSI !");
-  Juice.stamp(box, label, skipped ? "var(--gris)" : "var(--jaune)");
+  Juice.stamp(box, stars === 3 ? "★ " + label + " ★" : label,
+    skipped ? "var(--gris)" : stars === 3 ? "var(--magenta)" : "var(--jaune)");
+  if(stars === 3 && box.lastElementChild){
+    box.lastElementChild.classList.add("parfait");
+    try{ navigator.vibrate && navigator.vibrate([40,30,40,30,110]); }catch(e){}
+  }
+  /* rejouer et faire MIEUX rapporte : +5 pts par étoile gagnée */
+  if(!skipped && wasDone && stars > prevStars){
+    const bonus = (stars - prevStars) * 5;
+    S.points += bonus;
+    setTimeout(()=>Juice.pop(box, "+" + bonus + " PTS", "var(--cyan)"), 900);
+  }
   const row = document.createElement("div"); row.className = "stars";
   for(let i=0;i<3;i++){
     const s = document.createElement("span");
