@@ -1629,6 +1629,22 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 @keyframes parfaitGlow{ to{ box-shadow:0 0 50px rgba(255,47,134,.85),
   inset 0 0 20px rgba(255,47,134,.3); } }
 
+/* ── Machine à sous du fragment : roule gris, claque en or ────── */
+.frag-big.rolling{ color:#8f96c2 !important; text-shadow:none !important;
+  border-color:rgba(255,255,255,.25) !important; box-shadow:none !important; }
+@media (prefers-reduced-motion: no-preference){
+  .frag-big.land{ animation:fragLand .6s cubic-bezier(.2,1.7,.4,1); }
+  @keyframes fragLand{ 0%{ transform:scale(1.55) rotate(5deg);
+    box-shadow:0 0 44px rgba(255,210,63,.95); } }
+}
+
+/* ── Le titre du boot se « spraye » (révélation pochoir) ──────── */
+@media (prefers-reduced-motion: no-preference){
+  #boot-screen h1{ animation:tagReveal .9s steps(11) .15s both; }
+  @keyframes tagReveal{ from{ clip-path:inset(0 100% 0 0); filter:blur(3px); }
+    to{ clip-path:inset(0 -8% 0 0); filter:none; } }
+}
+
 /* ── Invitation à rejouer (défi fini sans les 3★) ─────────────── */
 .replay-chip{
   font-family:var(--f-tag); font-size:11px; color:var(--spray-cyan);
@@ -3348,8 +3364,32 @@ function winGame(st, skipped, opts={}){
     persist();
   }
   if(!skipped){ AudioFX.fragment(); Juice.confetti(box); }
+  /* révélation du fragment façon machine à sous : le chiffre roule,
+     ralentit, et CLAQUE en or — on sait aussi où il se place. */
+  const pos = CONFIG.stations.findIndex(s2=>s2.code === st.code) + 1;
   box.insertAdjacentHTML("beforeend", `<p class="sub">FRAGMENT RÉCUPÉRÉ</p>
-    <div class="frag got frag-big">${st.fragment}</div>`);
+    <div class="frag got frag-big" id="frag-roll">·</div>
+    <p class="sub" style="margin-top:2px;">chiffre <b style="color:var(--jaune)">n°${pos}</b> du code final</p>`);
+  const fragEl = box.querySelector("#frag-roll");
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){
+    fragEl.textContent = st.fragment;
+  }else{
+    fragEl.classList.add("rolling");
+    let n = Math.floor(Math.random()*10), delay = 38;
+    const spin = ()=>{
+      fragEl.textContent = n % 10; n++;
+      if(n % 2 === 0) AudioFX.tick();
+      delay *= 1.16;
+      if(delay < 230) setTimeout(spin, delay);
+      else{
+        fragEl.textContent = st.fragment;
+        fragEl.classList.remove("rolling"); fragEl.classList.add("land");
+        AudioFX.lock();
+        try{ navigator.vibrate && navigator.vibrate([20,25,65]); }catch(e){}
+      }
+    };
+    setTimeout(spin, 320);
+  }
   const btn = document.createElement("button");
   btn.textContent = "→ Retour à la chasse";
   btn.addEventListener("click", ()=>maybeTransmission(()=>{ renderHub(); show("hub-screen"); }));

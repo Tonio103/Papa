@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v47) — la machine à sous du fragment + titre sprayé
+
+- **Révélation du fragment façon machine à sous** : après un défi, le chiffre **roule en gris** (avec cliquetis), ralentit, puis **claque en or** avec un rebond, une vibration et « chiffre **n°X** du code final » — on sait ce qu'on a gagné ET où il se place.
+- **Le titre de l'écran d'accueil se « spraye »** : révélation saccadée de gauche à droite, comme un coup de bombe à travers un pochoir.
+
 ## Nouveautés (v46) — graphisme, gameplay et animations
 
 - **L'écran de défi devient l'affiche de la station** : cadre pochoir et titre marqueur **à la couleur de la pièce** (jaune pour le Binaire, rose pour le Spotting…), fond béton grainé — chaque défi a son identité.
