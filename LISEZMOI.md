@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v48) — la capture de pièce fait CLIC-CLAC
+
+- **Éclair de flash photo** : scanner un QR déclenche un **éclair blanc plein écran** avec vibration — comme la vraie app Flash Invaders.
+- **La carte de capture claque** en arrivant (zoom + halo à la couleur de la pièce qui se résorbe).
+- **Confettis** à la révélation de l'invader, en plus du boom et du compteur de points.
+
 ## Nouveautés (v47) — la machine à sous du fragment + titre sprayé
 
 - **Révélation du fragment façon machine à sous** : après un défi, le chiffre **roule en gris** (avec cliquetis), ralentit, puis **claque en or** avec un rebond, une vibration et « chiffre **n°X** du code final » — on sait ce qu'on a gagné ET où il se place.
