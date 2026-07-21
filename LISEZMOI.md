@@ -54,6 +54,13 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v46) — graphisme, gameplay et animations
+
+- **L'écran de défi devient l'affiche de la station** : cadre pochoir et titre marqueur **à la couleur de la pièce** (jaune pour le Binaire, rose pour le Spotting…), fond béton grainé — chaque défi a son identité.
+- **Tampon PARFAIT** : réussir un défi avec 3★ déclenche un tampon rose **« ★ SANS FAUTE ! ★ »** plus gros, qui rayonne, avec rafale de vibrations.
+- **Rejouer rapporte** : un défi fini sans les 3★ affiche une invitation **« ↻ rejouer »** sur sa carte, et améliorer son score donne **+5 pts par étoile gagnée**.
+- **Pastilles de quête vivantes** : une pastille qui vient d'être validée fait un **bond** à l'arrivée sur le repaire.
+
 ## Nouveautés (v45) — grosse passe sur les mini-jeux
 
 - **Le Binaire (LV_02)** : les lignes se décodent désormais **dans l'ordre** (les suivantes attendent, assombries — fini la confusion), le **dépassement s'affiche en rouge** avec secousse et vibration, et une **jauge d'étoiles en direct** (★★★ → ★) montre le temps qui file. Verrouillage d'une ligne = vibration + pop.
