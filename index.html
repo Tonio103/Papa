@@ -1629,6 +1629,38 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 @keyframes parfaitGlow{ to{ box-shadow:0 0 50px rgba(255,47,134,.85),
   inset 0 0 20px rgba(255,47,134,.3); } }
 
+/* ── Toast de succès = sticker collé à la volée ───────────────── */
+#toast{
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(38,32,46,.97), rgba(22,18,27,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+  border:2.5px dashed var(--spray-yellow) !important; border-radius:13px !important;
+  box-shadow:5px 6px 0 rgba(0,0,0,.45), 0 0 26px rgba(255,210,63,.3) !important;
+  transform:translate(-50%,-170%) rotate(-1.5deg);
+}
+#toast.on{ transform:translate(-50%,0) rotate(-1.5deg); }
+#toast-txt{ font-family:var(--f-tag) !important; }
+
+/* ── Panneaux du menu (succès, transmissions…) en affiche ─────── */
+#menu-panel{
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(33,28,42,.97), rgba(19,16,25,.98)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  border:2.5px solid var(--paint) !important; border-radius:12px !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), 0 20px 36px rgba(0,0,0,.55) !important;
+}
+.suc{ border-radius:10px !important; }
+.suc.on{ border-color:var(--spray-yellow) !important; }
+
+/* ── Indice de défi : griffonné au marqueur ───────────────────── */
+#hint-txt{ font-family:var(--f-tag) !important; color:var(--spray-yellow) !important;
+  transform:rotate(-.4deg); }
+
 /* ── Éclair de flash photo à la capture d'une pièce ───────────── */
 #snap{ position:fixed; inset:0; background:#fff; opacity:0;
   pointer-events:none; z-index:930; }
@@ -3575,6 +3607,7 @@ const Menu3D = (()=>{
   function stop(){
     if(raf) cancelAnimationFrame(raf);
     raf = null;
+    if(!cv) return;                  // stop() sans start() : rien à décrocher
     cv.removeEventListener("pointerdown", onDown);
     cv.removeEventListener("pointermove", onMove);
     cv.removeEventListener("pointerup", onUp);
@@ -4931,7 +4964,10 @@ function showToast(){
   $("#toast-txt").textContent = s.nom;
   $("#toast-kicker").textContent = s.kicker || "SUCCÈS DÉBLOQUÉ";
   $("#toast").classList.add("on");
-  if(!s.silent) AudioFX.fragment();     // le level-up a déjà son propre jingle
+  if(!s.silent){
+    AudioFX.fragment();                 // le level-up a déjà son propre jingle
+    try{ navigator.vibrate && navigator.vibrate([30,40,80]); }catch(e){}
+  }
   setTimeout(()=>{
     $("#toast").classList.remove("on");
     setTimeout(()=>{ toastBusy = false; showToast(); }, 450);

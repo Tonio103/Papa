@@ -54,6 +54,13 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v49) — finitions street art partout
+
+- **Toast de succès en sticker** : bord pochoir jaune en pointillés, grain béton, léger travers, nom du succès au marqueur — et une **vibration** au déblocage.
+- **Panneaux du menu** (Succès, Transmissions, Crédits, Sauvegarde) : affiche béton avec cadre pochoir, cohérente avec le reste.
+- **Indice de défi griffonné au marqueur** (jaune, léger travers).
+- Robustesse : `Menu3D.stop()` ne plante plus s'il est appelé avant tout démarrage du menu.
+
 ## Nouveautés (v48) — la capture de pièce fait CLIC-CLAC
 
 - **Éclair de flash photo** : scanner un QR déclenche un **éclair blanc plein écran** avec vibration — comme la vraie app Flash Invaders.
