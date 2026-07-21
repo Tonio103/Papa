@@ -54,6 +54,14 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v45) — grosse passe sur les mini-jeux
+
+- **Le Binaire (LV_02)** : les lignes se décodent désormais **dans l'ordre** (les suivantes attendent, assombries — fini la confusion), le **dépassement s'affiche en rouge** avec secousse et vibration, et une **jauge d'étoiles en direct** (★★★ → ★) montre le temps qui file. Verrouillage d'une ligne = vibration + pop.
+- **Le Simon (LV_05)** : chaque pad porte un **symbole gravé** (▲ ● ■ ✦) — on peut suivre la séquence même sans bien distinguer les couleurs (daltonisme, plein soleil). Vibrations : petite tape par bonne note, triple secousse sur erreur.
+- **Rubikcubisme (LV_04)** : la **ligne jouée s'illumine** un instant (on voit enfin son coup sur le cube), et le compteur affiche en direct **les étoiles en jeu** (« COUPS : 5 · PAR : 8 · ★★★ »). Vibration par coup, rafale à la résolution.
+- **La Coop (LV_07)** : au premier scan, gros « **FONCE !** » + le statut **nomme la balise manquante** ; sous 10 s, un bip + une pulsation par seconde (au lieu de 5 bips/s).
+- Testé de bout en bout : partie complète de Simon gagnée, verrouillages du Binaire, coup de Rubik, scénario Coop A→B — zéro erreur.
+
 ## Nouveautés (v44) — titres plus lisibles + typo de secours
 
 - **Petits titres d'écran** (« LE CODE FINAL », « FLASH RÉUSSI ! », « DERNIER FLASH ») : agrandis et ombre de spray réduite — à cette taille l'ombre pleine dédoublait le texte sur le sous-titre.
