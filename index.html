@@ -1592,6 +1592,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 #wall-art .splat{ position:absolute; background:var(--sc,#fff);
   -webkit-mask:var(--sm) no-repeat center/contain; mask:var(--sm) no-repeat center/contain;
   opacity:var(--so,.12); mix-blend-mode:screen; }
+
 </style>
 </head>
 <body>
@@ -5596,10 +5597,12 @@ MiniGames["LV_05"] = function(box, api){
     if(i !== seq[idx]){
       accepting = false; errors++;
       AudioFX.err(); Juice.shake(box);
+      try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
       status.textContent = "RATÉ ! RÉÉCOUTE…";
       T(playSeq, 1100);
       return;
     }
+    try{ navigator.vibrate && navigator.vibrate(10); }catch(e){}
     idx++;
     if(idx >= seq.length){
       accepting = false;
@@ -5933,19 +5936,26 @@ MiniGames["LV_07"] = function(box, api){
   box.appendChild(goScan);
 
   function refresh(){
-    status.textContent = `A : ${got[CODES[0]] ? "✔" : "—"} · B : ${got[CODES[1]] ? "✔" : "—"}`;
+    const a = got[CODES[0]], b = got[CODES[1]];
+    if(a !== b){                             // une seule scannée : nomme la manquante
+      const miss = a ? "B" : "A";
+      status.innerHTML = `A : ${a?"✔":"—"} · B : ${b?"✔":"—"} — ` +
+        `<span style="color:var(--rouge)">balise ${miss} manquante, FONCE !</span>`;
+    }else status.textContent = `A : ${a ? "✔" : "—"} · B : ${b ? "✔" : "—"}`;
   }
+  let lastS = null;
   function tick(){
     if(!deadline) return;
     const rest = (deadline - Date.now())/1000;
     const s = Math.ceil(rest);
     if(s <= 0){
       CODES.forEach(k=>delete got[k]);
-      deadline = null; clearInterval(iv); iv = null;
+      deadline = null; clearInterval(iv); iv = null; lastS = null;
       ringIn.textContent = FENETRE; ringIn.style.color = "var(--cyan)";
       ringWrap.style.background = "#14142e";
       status.textContent = "TROP LENT ! On recommence.";
       AudioFX.err(); Juice.shake(box);
+      try{ navigator.vibrate && navigator.vibrate([90,60,90]); }catch(e){}
       refresh(); return;
     }
     const pct = rest / FENETRE * 100;
@@ -5953,13 +5963,21 @@ MiniGames["LV_07"] = function(box, api){
     ringWrap.style.background = `conic-gradient(${s<=10?"#FF3F3F":"#2BE4D0"} ${pct}%, #14142e 0)`;
     ringIn.textContent = s;
     ringIn.style.color = col;
-    if(s <= 10) AudioFX.tick();
+    if(s <= 10 && s !== lastS){              // un bip + une pulsation par seconde
+      AudioFX.tick();
+      try{ navigator.vibrate && navigator.vibrate(22); }catch(e){}
+    }
+    lastS = s;
   }
   codeInterceptor = code=>{
     if(!CODES.includes(code)) return false;
     if(got[code]){ Scanner.msg("DÉJÀ SCANNÉ !", true); return true; }
     got[code] = true; AudioFX.ok();
-    if(!deadline){ deadline = Date.now() + FENETRE*1000; iv = setInterval(tick, 200); }
+    if(!deadline){
+      deadline = Date.now() + FENETRE*1000; iv = setInterval(tick, 200);
+      Juice.pop(box, "FONCE !", "var(--rouge)");
+      try{ navigator.vibrate && navigator.vibrate(45); }catch(e){}
+    }
     show("game-screen"); refresh();
     if(CODES.every(k=>got[k])){
       const rest = Math.max(0, Math.round((deadline - Date.now())/1000));
@@ -6138,19 +6156,36 @@ MiniGames["LV_01"] = function(box, api){
 };
 
 /* ── LV_02 : LE BINAIRE 3D ──────────────────────────────────
-   Les bits sont des blocs qui se lèvent. Une ligne juste se
-   verrouille en OR, blocs dressés. 3★ < 45 s. */
+   Les bits sont des blocs qui se lèvent. Les lignes se décodent
+   DANS L'ORDRE (focus clair), le dépassement s'affiche en rouge,
+   et la jauge d'étoiles draine en direct. 3★ < 45 s. */
 MiniGames["LV_02"] = function(box, api){
   const TARGETS = [3, 9, 6];                 // À PERSONNALISER
   const VAL = [8, 4, 2, 1];
-  const t0 = Date.now();
+  let t0 = Date.now(), started = false;
 
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Lève les blocs pour atteindre chaque cible.<br>Un bloc levé vaut son chiffre.</p>`);
+    `<p class="sub">Lève les blocs pour atteindre la cible, <b>ligne par ligne</b>.<br>Un bloc levé vaut son chiffre.</p>`);
+
+  /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
+  const starRow = document.createElement("div");
+  starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;";
+  const starLab = document.createElement("span");
+  starLab.className = "pix";
+  starLab.style.cssText = "font-size:13px;color:var(--jaune);min-width:52px;text-align:right;";
+  const starBar = document.createElement("div");
+  starBar.className = "bar";
+  starBar.style.cssText = "width:min(50vw,190px);height:9px;overflow:hidden;";
+  const starFill = document.createElement("i");
+  starFill.style.cssText = "display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--jaune),#ff9760);";
+  starBar.appendChild(starFill);
+  starRow.appendChild(starLab); starRow.appendChild(starBar);
+  box.appendChild(starRow);
 
   const rows = TARGETS.map(()=>[0,0,0,0]);
   const locked = TARGETS.map(()=>false);
   const cellEls = [], labels = [];
+  let active = 0;
   const val = r => rows[r].reduce((a,b,i)=>a + (b ? VAL[i] : 0), 0);
 
   const board = document.createElement("div"); board.className = "board3d";
@@ -6164,13 +6199,18 @@ MiniGames["LV_02"] = function(box, api){
     VAL.forEach((v, b)=>{
       const cell = document.createElement("div");
       cell.className = "cube";
-      cell.style.cssText = "width:46px;height:46px;";
+      cell.style.cssText = "width:46px;height:46px;transition:opacity .3s,filter .3s;";
       cell.innerHTML = `<span class="val">${v}</span>`;
       cell.addEventListener("pointerdown", ()=>{
-        if(locked[r]) return;
+        if(locked[r] || r !== active) return;
+        const before = val(r);
         rows[r][b] ^= 1;
         cell.classList.toggle("on", !!rows[r][b]);
-        AudioFX.tick();
+        /* franchit la cible vers le haut → alerte ; sinon tic normal */
+        if(val(r) > tgt && before <= tgt){
+          AudioFX.err(); Juice.shake(board);
+          try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
+        }else AudioFX.tick();
         refresh();
       });
       grid.appendChild(cell); cells.push(cell);
@@ -6181,26 +6221,45 @@ MiniGames["LV_02"] = function(box, api){
     grid.appendChild(lab); labels.push(lab);
   });
 
+  /* seule la ligne active est éclairée — les suivantes attendent */
+  function focusRows(){
+    cellEls.forEach((cells, r)=>{
+      const dim = !locked[r] && r !== active;
+      cells.forEach(c=>{
+        c.style.opacity = dim ? ".32" : "1";
+        c.style.filter = dim ? "saturate(.4)" : "";
+        c.style.pointerEvents = (locked[r] || dim) ? "none" : "";
+      });
+      if(dim) labels[r].innerHTML = `<span class="dim">· / ${TARGETS[r]}</span>`;
+    });
+  }
+
   let done = false;
   function refresh(){
     TARGETS.forEach((tgt, r)=>{
-      if(locked[r]) return;
+      if(locked[r] || r !== active) return;
       const v = val(r);
       if(v === tgt){
         locked[r] = true;
         AudioFX.lock();
+        try{ navigator.vibrate && navigator.vibrate([25,30,45]); }catch(e){}
         cellEls[r].forEach(c=>{
           c.style.pointerEvents = "none";
           if(c.classList.contains("on")){ c.classList.remove("on"); c.classList.add("lock"); }
         });
         labels[r].innerHTML = `<span style="color:var(--jaune)">${v} ✔</span>`;
         Juice.pop(box, "LIGNE " + (r+1) + " !", "var(--jaune)", 50, 34 + r*16);
+        while(active < TARGETS.length && locked[active]) active++;
+        focusRows();
       }else{
-        labels[r].innerHTML = `<span style="color:var(--ink)">${v}</span><span class="dim"> / ${tgt}</span>`;
+        /* dépassé = rouge, sinon valeur courante / cible */
+        const col = v > tgt ? "var(--rouge)" : "var(--ink)";
+        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>`;
       }
     });
     if(locked.every(Boolean) && !done){
       done = true;
+      clearInterval(starIv);
       AudioFX.fanfare(); Juice.confetti(box, 22);
       const s = (Date.now() - t0)/1000;
       const stars = s < 45 ? 3 : s < 90 ? 2 : 1;
@@ -6208,8 +6267,22 @@ MiniGames["LV_02"] = function(box, api){
         label: stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }), 700);
     }
   }
-  refresh();
-  Juice.readyGo(box, ()=>{});
+  /* jauge : plein → vide sur la fenêtre 3★, puis fenêtre 2★ */
+  const starIv = setInterval(()=>{
+    if(!started) return;
+    const s = (Date.now() - t0)/1000;
+    const stars = s < 45 ? 3 : s < 90 ? 2 : 1;
+    starLab.textContent = "★".repeat(stars);
+    const frac = s < 45 ? 1 - s/45 : s < 90 ? 1 - (s-45)/45 : 1;
+    starFill.style.width = (frac*100).toFixed(1) + "%";
+    starFill.style.background = stars === 3
+      ? "linear-gradient(90deg,var(--jaune),#ff9760)"
+      : stars === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
+  }, 250);
+  starLab.textContent = "★★★";
+  focusRows(); refresh();
+  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); });
+  return ()=>clearInterval(starIv);
 };
 
 /* ── LV_05 : LE SIMON 3D ────────────────────────────────────
@@ -6217,8 +6290,8 @@ MiniGames["LV_02"] = function(box, api){
    et rayonnent quand ils s'allument. 3★ = 0 erreur. */
 MiniGames["LV_05"] = function(box, api){
   const PADS = [
-    { c:"#4db8ff", f:330 }, { c:"#ff5db4", f:415 },
-    { c:"#ffce4d", f:494 }, { c:"#39e08a", f:587 },
+    { c:"#4db8ff", f:330, sym:"▲" }, { c:"#ff5db4", f:415, sym:"●" },
+    { c:"#ffce4d", f:494, sym:"■" }, { c:"#39e08a", f:587, sym:"✦" },
   ];
   const TARGET_LEN = 6;                      // À PERSONNALISER
   let seq = [], idx = 0, accepting = false, errors = 0;
@@ -6247,6 +6320,10 @@ MiniGames["LV_05"] = function(box, api){
     d.className = "pad3d";
     d.style.background = `linear-gradient(180deg, ${shade(p.c,.45)} 0%, ${p.c} 48%, ${shade(p.c,-.3)} 100%)`;
     d.style.boxShadow = rest(p.c);
+    /* symbole gravé : on suit la séquence même sans distinguer les couleurs */
+    d.innerHTML = `<span style="pointer-events:none;display:flex;align-items:center;justify-content:center;
+      height:100%;font-size:34px;color:rgba(255,255,255,.55);
+      text-shadow:0 2px 3px rgba(0,0,0,.35);">${p.sym}</span>`;
     d.addEventListener("pointerdown", ()=>press(i));
     grid.appendChild(d);
     return d;
@@ -6277,10 +6354,12 @@ MiniGames["LV_05"] = function(box, api){
     if(i !== seq[idx]){
       accepting = false; errors++;
       AudioFX.err(); Juice.shake(box);
+      try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
       status.textContent = "RATÉ ! RÉÉCOUTE…";
       T(playSeq, 1100);
       return;
     }
+    try{ navigator.vibrate && navigator.vibrate(10); }catch(e){}
     idx++;
     if(idx >= seq.length){
       accepting = false;
@@ -7731,9 +7810,17 @@ MiniGames["LV_04"] = function(box, api){
     const f = FOCAL/(FOCAL + Z + DIST);
     return [cv.width/2 + X*SCALE*f, cv.height/2 + Y*SCALE*f];
   }
+  let hl = null;                             // ligne/colonne fraîchement jouée
   function cells(){
     const out = [];
-    for(let y=0;y<3;y++) for(let x=0;x<3;x++) out.push({ x, y, col:COLS[g[y][x]] });
+    const act = hl && performance.now() < hl.until ? hl : null;
+    for(let y=0;y<3;y++) for(let x=0;x<3;x++){
+      let col = COLS[g[y][x]];
+      /* la ligne jouée s'illumine un instant : on VOIT son coup */
+      if(act && ((act.kind === "row" && y === act.index) ||
+                 (act.kind === "col" && x === act.index))) col = shade(col, .5);
+      out.push({ x, y, col });
+    }
     return out;
   }
   function render(){
@@ -7768,43 +7855,51 @@ MiniGames["LV_04"] = function(box, api){
     const dx = px - down.px, dy = py - down.py;
     const TH = 30;                            // seuil généreux
     if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > TH){
-      doMove(()=>shiftRow(down.cell.y, dx > 0 ? 1 : -1));
+      doMove(()=>shiftRow(down.cell.y, dx > 0 ? 1 : -1), "row", down.cell.y);
     }else if(Math.abs(dy) > TH){
-      doMove(()=>shiftCol(down.cell.x, dy > 0 ? 1 : -1));
+      doMove(()=>shiftCol(down.cell.x, dy > 0 ? 1 : -1), "col", down.cell.x);
     }
     down = null;
   });
   cv.addEventListener("pointercancel", ()=>{ down = null; });
 
-  function doMove(fn){
+  function doMove(fn, kind, index){
     fn(); moves++;
     AudioFX.combo(Math.min(moves, 10));
+    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
     pulse = .12;                              // petit « pop » du cube
+    if(kind != null) hl = { kind, index, until: performance.now() + 260 };
     hud(); render(); check();
+    if(reduced) setTimeout(render, 300);      // efface le flash sans boucle rAF
   }
 
   /* ── flèches de secours tout autour ── */
-  const arrow = (txt, area, fn)=>{
+  const arrow = (txt, area, fn, kind, idx2)=>{
     const b = document.createElement("button");
     b.className = "b3";
     b.textContent = txt;
     b.style.cssText = `grid-area:${area}; font-size:13px; padding:0; width:34px; height:34px; border-radius:10px;`;
-    b.addEventListener("click", ()=>{ if(playing && !solved) doMove(fn); });
+    b.addEventListener("click", ()=>{ if(playing && !solved) doMove(fn, kind, idx2); });
     board.appendChild(b);
     return b;
   };
   board.appendChild(cv);
   for(let i=0;i<3;i++){
-    arrow("▲", `1/${i+2}/2/${i+3}`, ()=>shiftCol(i, -1));
-    arrow("▼", `5/${i+2}/6/${i+3}`, ()=>shiftCol(i,  1));
-    arrow("◀", `${i+2}/1/${i+3}/2`, ()=>shiftRow(i, -1));
-    arrow("▶", `${i+2}/5/${i+3}/6`, ()=>shiftRow(i,  1));
+    arrow("▲", `1/${i+2}/2/${i+3}`, ()=>shiftCol(i, -1), "col", i);
+    arrow("▼", `5/${i+2}/6/${i+3}`, ()=>shiftCol(i,  1), "col", i);
+    arrow("◀", `${i+2}/1/${i+3}/2`, ()=>shiftRow(i, -1), "row", i);
+    arrow("▶", `${i+2}/5/${i+3}/6`, ()=>shiftRow(i,  1), "row", i);
   }
 
-  function hud(){ hudLine.textContent = `COUPS : ${moves}  ·  PAR : ${PAR}`; }
+  /* prévision d'étoiles en direct : on sait ce qu'on joue */
+  function hud(){
+    const would = moves <= PAR ? "★★★" : moves <= 14 ? "★★" : "★";
+    hudLine.innerHTML = `COUPS : ${moves} · PAR : ${PAR} · <span style="color:var(--jaune)">${would}</span>`;
+  }
   function check(){
     if(JSON.stringify(g) === JSON.stringify(TARGET)){
       solved = true;
+      try{ navigator.vibrate && navigator.vibrate([50,40,50,40,130]); }catch(e){}
       AudioFX.fanfare(); Juice.confetti(box, 26);
       const stars = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
       setTimeout(()=>api.win({ stars,
