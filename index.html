@@ -1629,6 +1629,21 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 @keyframes parfaitGlow{ to{ box-shadow:0 0 50px rgba(255,47,134,.85),
   inset 0 0 20px rgba(255,47,134,.3); } }
 
+/* ── Éclair de flash photo à la capture d'une pièce ───────────── */
+#snap{ position:fixed; inset:0; background:#fff; opacity:0;
+  pointer-events:none; z-index:930; }
+#snap.go{ animation:snapFlash .5s ease-out; }
+@keyframes snapFlash{ 0%{ opacity:.95; } 100%{ opacity:0; } }
+@media (prefers-reduced-motion: reduce){ #snap.go{ animation:none; } }
+
+/* ── La carte de capture CLAQUE en arrivant ───────────────────── */
+@media (prefers-reduced-motion: no-preference){
+  #flash-screen.active #flash-card{
+    animation:cardSlam .55s cubic-bezier(.2,1.5,.4,1) both; }
+  @keyframes cardSlam{ 0%{ transform:scale(1.3) rotate(2.5deg);
+    box-shadow:0 0 70px var(--c, #fff); } }
+}
+
 /* ── Machine à sous du fragment : roule gris, claque en or ────── */
 .frag-big.rolling{ color:#8f96c2 !important; text-shadow:none !important;
   border-color:rgba(255,255,255,.25) !important; box-shadow:none !important; }
@@ -1903,6 +1918,9 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     </div>
   </div>
 </div>
+
+<!-- ═══ ÉCLAIR DE FLASH (déclenché à chaque capture) ═══ -->
+<div id="snap" aria-hidden="true"></div>
 
 <!-- ═══ BARRE D'ONGLETS (navigation façon appli) ═══ -->
 <nav id="tabbar">
@@ -3176,6 +3194,10 @@ function restartScanSoon(){
 let currentStation = null, flashSpin = null;
 function flashSeq(st){
   currentStation = st;
+  /* CLIC-CLAC : l'éclair du flash photo, comme la vraie app */
+  { const sn = $("#snap");
+    if(sn){ sn.classList.remove("go"); void sn.offsetWidth; sn.classList.add("go"); } }
+  try{ navigator.vibrate && navigator.vibrate(35); }catch(e){}
   show("flash-screen");
   /* la carte prend la couleur de la pièce, le badge son numéro */
   const card = $("#flash-card");
@@ -3200,6 +3222,8 @@ function flashSeq(st){
     flashSpin = Voxel.reveal(fcv, st.sprite, st.couleur, ()=>{
       fcv.classList.add("flash-done");   // pulse de capture
       AudioFX.boom();
+      const host = $("#flash-screen .screen-inner");
+      if(host) Juice.confetti(host, 22); // la capture se fête
       countUp($("#flash-pts"), st.points);
       $("#flash-hint").hidden = false;   // "fais-la tourner au doigt"
     }, SCENE);
