@@ -3310,6 +3310,7 @@ function renderHub(){
   /* la borne d'arcade se débloque dès la 1ère pièce flashée */
   { const ba = $("#btn-arcade");
     if(ba) ba.hidden = Object.keys(S.flashed).length === 0; }
+  if(typeof checkMetaSucces === "function") checkMetaSucces();
   Spin3D.start();                 // une seule boucle anime toutes les pièces
 }
 
@@ -5301,9 +5302,35 @@ const SUCCES = [
   { id:"combo5", ico:"⚡", nom:"Enchaînement",     desc:"Combo ×5 dans la cavale" },
   { id:"master", ico:"👑", nom:"Maître Invader",   desc:"3 étoiles sur les 8 défis" },
   { id:"tournee",ico:"🏁", nom:"La Tournée",       desc:"Boucler la tournée chrono de l'artiste" },
+  { id:"arcadeur",ico:"🕹",nom:"Roi de l'arcade",  desc:"1000 pts à un jeu de la borne" },
+  { id:"goldrush",ico:"🥇",nom:"Chasseur d'or",    desc:"3 médailles d'or (défis chrono)" },
 ];
 S.succes = S.succes || {};
 S.stars  = S.stars  || {};
+
+/* ── MÉDAILLES CHRONO : récompensent la VITESSE (complètent les
+   étoiles, qui récompensent la précision). Or ≤ 40 s, argent ≤ 75 s,
+   bronze = simplement terminé. Basé sur le meilleur temps du défi. ── */
+const MEDAL_ICO = { or:"🥇", argent:"🥈", bronze:"🥉" };
+function medalOf(code){
+  const ms = (S.log[code] || {}).bestMs;
+  if(!ms) return null;
+  return ms <= 40000 ? "or" : ms <= 75000 ? "argent" : "bronze";
+}
+function medalCounts(){
+  const n = { or:0, argent:0, bronze:0 };
+  CONFIG.stations.forEach(s=>{ const m = medalOf(s.code); if(m) n[m]++; });
+  return n;
+}
+function checkMetaSucces(){
+  if(medalCounts().or >= 3) unlockSucces("goldrush");
+  const arc = (S.arcadeHi || [])[0];
+  const hi = Math.max(arc ? arc.score : 0,
+    +localStorage.getItem("invasionLesVans:breakout") || 0,
+    +localStorage.getItem("invasionLesVans:snake") || 0,
+    +localStorage.getItem("invasionLesVans:survie") || 0);
+  if(hi >= 1000) unlockSucces("arcadeur");
+}
 const toastQueue = [];
 let toastBusy = false;
 function showToast(){
@@ -8623,13 +8650,17 @@ const Arcade = (()=>{
   let state = "menu";                        // menu | play | wave | over | initials
   let score, lives, waveIdx, player, bullets, bombs, aliens, grid,
       shields, pows, boss, freezeT, waveBanner, shake, flashT, initials,
-      ufo, ufoT, combo, comboT, popups;
+      ufo, ufoT, combo, comboT, popups, endless;
+  const survieBest = ()=>{ const v = +localStorage.getItem("invasionLesVans:survie"); return v>0?v:0; };
 
   const AW = 16, AH = 12;                     // taille d'un alien à l'écran
 
   /* ── construction d'une vague ── */
   function buildWave(){
-    const wv = WAVES[waveIdx];
+    /* survie : on boucle les 7 premières vagues (sans boss), plus dur
+       à chaque cycle. Campagne : la vague telle quelle (boss en 8). */
+    const wv = endless ? WAVES[waveIdx % 7] : WAVES[waveIdx];
+    const cyc = endless ? Math.floor(waveIdx / 7) : 0;
     bullets = []; bombs = []; pows = []; freezeT = 0;
     player.x = W/2; player.multi = 0; player.rapid = 0; player.cd = 0;
     if(wv.s === "BOSS"){
@@ -8639,13 +8670,14 @@ const Arcade = (()=>{
       boss = null;
       aliens = [];
       const cols = 6, rows = 4;
-      grid = { x:22, y:34, dir:1, speed:0.16 + waveIdx*0.05, drop:8, step:26,
-               bombCd:1.2, fire:1.4 - waveIdx*0.12 };
+      grid = { x:22, y:34, dir:1, speed:Math.min(0.9, 0.16 + waveIdx*0.05 + cyc*0.12), drop:8, step:26,
+               bombCd:1.2, fire:Math.max(0.5, 1.4 - waveIdx*0.12 - cyc*0.2) };
       for(let gy=0; gy<rows; gy++) for(let gx=0; gx<cols; gx++)
         aliens.push({ gx, gy, alive:true, sprite:wv.s, col:wv.c });
     }
     buildShields();
-    waveBanner = { t:1.6, txt: wv.s === "BOSS" ? "BOSS FINAL !" : "VAGUE " + (waveIdx+1) };
+    waveBanner = { t:1.6, txt: endless ? "SURVIE · VAGUE " + (waveIdx+1)
+      : wv.s === "BOSS" ? "BOSS FINAL !" : "VAGUE " + (waveIdx+1) };
     AudioFX.ready();
   }
   function buildShields(){
@@ -8662,7 +8694,8 @@ const Arcade = (()=>{
       shields.push(cells);
     }
   }
-  function startRun(){
+  function startRun(endlessMode){
+    endless = !!endlessMode;
     score = 0; lives = 3; waveIdx = 0;
     player = { x:W/2, w:18, h:8, multi:0, rapid:0, cd:0 };
     initials = ""; ufo = null; ufoT = 8 + Math.random()*8; combo = 0; comboT = 0; popups = [];
@@ -8783,8 +8816,8 @@ const Arcade = (()=>{
   }
   function nextWave(){
     waveIdx++;
-    if(waveIdx >= WAVES.length){ win(); return; }
-    score += 100;
+    if(!endless && waveIdx >= WAVES.length){ win(); return; }
+    score += 100;                              // bonus de fin de vague
     buildWave();
   }
   function win(){
@@ -8906,6 +8939,11 @@ const Arcade = (()=>{
     player.x = W/2;
   }
   function endRun(victory){
+    if(endless){                               // survie : record simple, sans initiales
+      if(score > survieBest()){ try{ localStorage.setItem("invasionLesVans:survie", score); }catch(e){} }
+      if(typeof checkMetaSucces === "function") checkMetaSucces();
+      state = "over"; showOver(victory); return;
+    }
     const hi = S.arcadeHi || [];
     const qualifies = hi.length < 5 || score > (hi[hi.length-1]?.score || 0);
     if(score > 0 && qualifies){ state = "initials"; initials = ""; showInitials(victory); }
@@ -8929,21 +8967,26 @@ const Arcade = (()=>{
       ◀ ▶ pour bouger · TIR pour tirer.</div>
       <div class="arc-sub" style="color:var(--spray-yellow)">★ MEILLEURS SCORES ★</div>
       ${hiHTML()}
-      <button id="arc-play" class="b2">▶ Jouer</button>
+      ${survieBest()?`<div class="arc-sub">♾ Survie : ${survieBest()} pts</div>`:""}
+      <button id="arc-play" class="b2">▶ Campagne (8 vagues)</button>
+      <button id="arc-survie" class="b3">♾ Mode survie</button>
       <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>
       <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>`;
-    $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(false); });
+    $("#arc-survie").addEventListener("click", ()=>{ AudioFX.select(); startRun(true); });
     $("#arc-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#arc-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
   }
   function showOver(victory){
     ov().classList.remove("hidden");
-    ov().innerHTML = `<h3>${victory ? "LES VANS<br>SAUVÉS !" : "GAME OVER"}</h3>
-      <div class="arc-sub">Score : <b style="color:var(--spray-yellow)">${score}</b></div>
-      ${hiHTML()}
+    const title = endless ? "SUBMERGÉ !" : (victory ? "LES VANS<br>SAUVÉS !" : "GAME OVER");
+    ov().innerHTML = `<h3>${title}</h3>
+      <div class="arc-sub">Score : <b style="color:var(--spray-yellow)">${score}</b>` +
+      (endless ? ` · vague ${waveIdx+1}<br>Record survie : ${survieBest()} pts` : "") + `</div>
+      ${endless ? "" : hiHTML()}
       <button id="arc-again" class="b2">↻ Rejouer</button>
       <button id="arc-quit" class="b3">← Repaire</button>`;
-    $("#arc-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#arc-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(endless); });
     $("#arc-quit").addEventListener("click", quit);
   }
   function showInitials(victory){
@@ -9177,8 +9220,9 @@ const Carnet = (()=>{
       const body = document.createElement("div"); body.className = "carnet-body";
       if(flashed){
         const stars = S.stars[st.code] || 0;
+        const med = medalOf(st.code);
         const starTxt = done
-          ? "★".repeat(stars) + "☆".repeat(3-stars)
+          ? "★".repeat(stars) + "☆".repeat(3-stars) + (med ? "  " + MEDAL_ICO[med] : "")
           : "défi en attente";
         body.innerHTML =
           `<div class="cn-name">${st.nom}</div>
@@ -9297,8 +9341,9 @@ const Carnet = (()=>{
       c.fillText(st.code.replace("_"," "), cx, cy+58);
       if(flashed && S.done[st.code]){
         const s = S.stars[st.code]||0;
+        const med = medalOf(st.code);
         c.font = "13px sans-serif"; c.fillStyle = "#ffd23f";
-        c.fillText("★".repeat(s)+"☆".repeat(3-s), cx, cy+76);
+        c.fillText("★".repeat(s)+"☆".repeat(3-s) + (med ? " " + MEDAL_ICO[med] : ""), cx, cy+76);
       }
     });
 
@@ -9824,11 +9869,27 @@ const Stats = (()=>{
     host.insertAdjacentHTML("beforeend", `<div class="stat-block"><h3>Salle d'arcade</h3>
       <div class="stat-kpis">
         ${kpi(arc ? arc.score + " pts" : "—", "🕹 Les Vans Defense")}
+        ${kpi((+localStorage.getItem("invasionLesVans:survie")||0) ? localStorage.getItem("invasionLesVans:survie")+" pts" : "—", "♾ Survie")}
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
         ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
       </div></div>`);
+
+    /* Bloc médailles chrono */
+    const mc = medalCounts();
+    let medRows = "";
+    CONFIG.stations.forEach(s=>{ const m = medalOf(s.code); if(!m) return;
+      const lg = S.log[s.code]||{};
+      medRows += `<div class="stat-bar-row"><span class="sb-lab" style="color:${s.couleur}">${s.nom}</span>` +
+        `<span style="margin-left:auto">${MEDAL_ICO[m]} <span class="sb-val">${fmtDur(lg.bestMs)}</span></span></div>`; });
+    host.insertAdjacentHTML("beforeend", `<div class="stat-block">
+      <h3>Médailles chrono</h3>
+      <div class="stat-kpis" style="margin-bottom:${medRows?"8px":"0"}">
+        ${kpi("🥇 "+mc.or, "Or (≤ 40 s)")}
+        ${kpi("🥈 "+mc.argent, "Argent (≤ 75 s)")}
+        ${kpi("🥉 "+mc.bronze, "Bronze")}
+      </div>${medRows || '<p class="sub" style="font-size:14px">Réussis des défis vite pour gagner des médailles !</p>'}</div>`);
 
     /* Bloc succès */
     let sucRows = "";
