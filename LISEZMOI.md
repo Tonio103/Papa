@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v52) — 2e jeu d'arcade + tableau de bord
+
+- **🧱 Casse-Tag** : un deuxième jeu dans la borne, un **casse-briques** où une bille renvoyée par une raquette-bombe détruit un mur en forme d'invader. 3 murs (crab, squid, octo), bonus **raquette large** et **multi-bille**, record sauvegardé. On bascule entre les deux jeux depuis le menu de la borne.
+- **📊 Tableau de bord** : un écran de stats complet — progression (pièces, défis, étoiles, sans-faute, complétion), **barres de tes meilleurs temps** par défi, records de la salle d'arcade (Les Vans Defense, Casse-Tag, Tournée) + temps de chasse, et la liste des succès.
+
 ## Nouveautés (v51) — LA BORNE D'ARCADE + LE CARNET DE CHASSE
 
 Deux grosses features rejouables, débloquées au repaire.
