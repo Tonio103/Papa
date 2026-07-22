@@ -1696,6 +1696,10 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 :root.reduce-fx body::before{ animation:none !important; }
 :root.reduce-fx #hub-amb, :root.reduce-fx #stars{ opacity:.25 !important; }
 
+/* ── Repaire : les 4 utilitaires en grille 2×2 (plus compact) ── */
+#hub-extras{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+#hub-extras button{ font-size:15px !important; padding:14px 6px !important; letter-spacing:0 !important; }
+
 /* ── ÉCRAN DE DÉFI : l'affiche de la station (couleur --st) ───── */
 #game-box{
   background:
@@ -1888,10 +1892,10 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     <div id="grid"></div>
     <button id="btn-chrono" class="b2" hidden style="margin-top:18px;">🏁 La Tournée de l'artiste</button>
     <button id="btn-daily" class="b3" hidden style="margin-top:12px;">🎯 Défi du jour</button>
-    <div class="btn-row" style="gap:10px; margin-top:12px;">
-      <button id="btn-carnet" class="b3">📖 Carnet de chasse</button>
-      <button id="btn-stats" class="b3">📊 Tableau de bord</button>
-      <button id="btn-arcade" class="b3" hidden>🕹 Borne d'arcade</button>
+    <div id="hub-extras" style="margin-top:12px;">
+      <button id="btn-carnet" class="b3">📖 Carnet</button>
+      <button id="btn-stats" class="b3">📊 Tableau</button>
+      <button id="btn-arcade" class="b3" hidden>🕹 Arcade</button>
       <button id="btn-options" class="b3">⚙ Réglages</button>
     </div>
   </div>

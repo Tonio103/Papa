@@ -54,6 +54,10 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v59) — repaire réorganisé
+
+- Avec toutes les nouvelles features, le bas du repaire s'allongeait. Les 4 utilitaires (**Carnet, Tableau, Arcade, Réglages**) sont maintenant en **grille 2×2** compacte, sous les deux gros boutons (Tournée, Défi du jour). Plus lisible, plus « appli », moins de défilement.
+
 ## Nouveautés (v58) — vibrations sur iPhone (secours)
 
 - **Important** : sur iPhone, Safari **ne supporte pas** l'API de vibration standard du web (`navigator.vibrate`) — c'est pour ça qu'aucune vibration ne s'est jamais déclenchée. C'est une limite d'Apple, pas du jeu (ça marche nativement sur Android).
