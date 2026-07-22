@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v58) — vibrations sur iPhone (secours)
+
+- **Important** : sur iPhone, Safari **ne supporte pas** l'API de vibration standard du web (`navigator.vibrate`) — c'est pour ça qu'aucune vibration ne s'est jamais déclenchée. C'est une limite d'Apple, pas du jeu (ça marche nativement sur Android).
+- **Secours ajouté** : sur iOS 17.4+, le jeu tente désormais un **léger retour haptique** via un interrupteur `<input switch>` caché, sur les moments clés (flash, réussite, erreur…). C'est du best-effort : selon le modèle et la version d'iOS, ça donne une petite tape ou rien. Le réglage « Vibrations » le pilote.
+
 ## Nouveautés (v57) — 4e jeu d'arcade : Pong Invader + partage du poster
 
 - **🏓 Pong Invader** : un pong contre l'IA (ta raquette en bas, l'IA en haut, premier à 7). La balle **accélère** à chaque échange, angle selon l'endroit touché ; **nombre de victoires** sauvegardé. La salle d'arcade compte désormais **4 jeux**.

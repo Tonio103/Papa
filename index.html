@@ -2317,12 +2317,39 @@ S.arcadeHi= S.arcadeHi|| [];     // table des records de la borne d'arcade
 S.opts    = S.opts    || { haptics:true, arcadeLives:3, reduceFx:false };  // réglages
 function persist(){ Store.save(S); }
 
-/* ── Vibrations : passent toutes par le réglage « haptics » ── */
+/* ── Vibrations : toutes passent par le réglage « haptics ».
+   Android : API standard navigator.vibrate.
+   iPhone : Safari NE SUPPORTE PAS cette API — on tente un secours
+   via un interrupteur <input switch> (iOS 17.4+) qui déclenche un
+   léger « toc » système. C'est best-effort : selon le modèle et la
+   version d'iOS, ça donne une petite tape ou rien du tout. ── */
 (function(){
-  if(navigator.vibrate){
-    const _v = navigator.vibrate.bind(navigator);
-    navigator.vibrate = (...a)=>{ try{ return (S.opts.haptics !== false) && _v(...a); }catch(e){ return false; } };
+  let sw = null;
+  function iosBuzz(){
+    try{
+      if(!sw){
+        const l = document.createElement("label");
+        l.setAttribute("aria-hidden", "true");
+        l.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;";
+        sw = document.createElement("input");
+        sw.type = "checkbox"; sw.tabIndex = -1;
+        sw.setAttribute("switch", "");           // attribut haptique Safari
+        l.appendChild(sw);
+        (document.body || document.documentElement).appendChild(l);
+      }
+      sw.click();                                // le toggle déclenche le retour haptique iOS
+    }catch(e){}
   }
+  const native = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
+  const buzz = (...a)=>{
+    if(S.opts.haptics === false) return false;
+    try{
+      if(native){ native(...a); return true; }  // Android & co
+      iosBuzz(); return true;                    // secours iPhone
+    }catch(e){ return false; }
+  };
+  try{ navigator.vibrate = buzz; }              // route TOUS les appels existants
+  catch(e){ window.__buzz = buzz; }              // si non assignable : secours global
   /* applique tout de suite la préférence « animations réduites » */
   if(S.opts.reduceFx) document.documentElement.classList.add("reduce-fx");
 })();
@@ -10194,7 +10221,7 @@ const Options = (()=>{
   function build(){
     const host = $("#options-body"); host.innerHTML = "";
     host.insertAdjacentHTML("beforeend",
-      toggleRow("Vibrations", "Retour haptique pendant les jeux", "haptics"));
+      toggleRow("Vibrations", "Léger retour haptique — selon le téléphone (limité sur iPhone)", "haptics"));
     host.insertAdjacentHTML("beforeend",
       toggleRow("Animations réduites", "Coupe les décors animés (batterie / confort)", "reduceFx"));
     /* difficulté de la borne : segmenté 3 / 5 vies */
