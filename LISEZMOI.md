@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v54) — médailles chrono + mode Survie
+
+- **Médailles chrono** : chaque défi rapporte une médaille selon ton **meilleur temps** — 🥇 or (≤ 40 s), 🥈 argent (≤ 75 s), 🥉 bronze (terminé). Elles complètent les étoiles (précision) par la vitesse. Visibles au **carnet**, sur le **poster** et dans un bloc dédié du **tableau de bord** (compte par métal + détail). Nouveau succès **🥇 Chasseur d'or** (3 médailles d'or).
+- **Mode Survie** de la borne : des vagues **sans fin** de plus en plus rapides, record dédié. La campagne « 8 vagues + boss » reste dispo à part.
+- Nouveau succès **🕹 Roi de l'arcade** (1000 pts à un jeu de la borne).
+
 ## Nouveautés (v53) — 3e jeu d'arcade : Serpent Invader
 
 - **🐍 Serpent Invader** : un snake où un serpent-invader mange les pièces et s'allonge, accélère, et meurt s'il touche un mur ou sa queue. **Bonus doré** clignotant qui vaut gros, record sauvegardé. Contrôle au **glissé** ou aux flèches ◀▲▼▶.
