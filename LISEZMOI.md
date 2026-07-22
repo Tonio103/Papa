@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v60) — accueil et cinématique peaufinés
+
+- **Écran d'accueil** : après sa révélation « au spray », le titre **respire** doucement (léger flottement + pulsation), et le bouton **Commencer** pulse discrètement pour attirer l'œil.
+- **Cinématique** : le plan du tag (l'artiste qui peint sa pièce) était un peu vide — un **projecteur cyan** met maintenant en valeur la mosaïque, en s'intensifiant à mesure qu'elle se peint. Le moment fort ressort bien mieux.
+
 ## Nouveautés (v59) — repaire réorganisé
 
 - Avec toutes les nouvelles features, le bas du repaire s'allongeait. Les 4 utilitaires (**Carnet, Tableau, Arcade, Réglages**) sont maintenant en **grille 2×2** compacte, sous les deux gros boutons (Tournée, Défi du jour). Plus lisible, plus « appli », moins de défilement.
