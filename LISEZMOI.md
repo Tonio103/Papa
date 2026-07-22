@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v56) — écran Réglages
+
+- **⚙ Réglages** au repaire : **vibrations** on/off (toutes les vibrations passent par ce réglage), **animations réduites** (coupe les décors animés = confort + batterie, réappliqué au démarrage), **difficulté de la borne** (3 ou 5 vies), **remise à zéro des records d'arcade** (double-clic de sécurité), et **revoir le tutoriel**. Tout est sauvegardé.
+- Le tableau de bord affiche aussi la **série du Défi du jour**.
+
 ## Nouveautés (v55) — le Défi du jour (avec série)
 
 - **🎯 Défi du jour** : chaque jour, un des 6 défis est tiré **de la date** (le même pour toute la journée). Le relever fait grimper une **série** (streak 🔥) qui repart à zéro si on saute un jour. Un rendez-vous quotidien pour la forme, sans toucher aux points ni aux étoiles. Débloqué quand les 6 défis « partout » sont finis ; le bouton du repaire affiche la série en cours et « ✓ fait » une fois relevé.

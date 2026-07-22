@@ -1669,6 +1669,33 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 .stat-bar i{ display:block; height:100%; border-radius:6px; }
 .stat-bar-row .sb-val{ flex:0 0 auto; font-family:var(--f-pix); font-size:10px; color:var(--paint); }
 
+/* ══════════ RÉGLAGES ══════════ */
+#options-body{ display:flex; flex-direction:column; gap:12px; width:100%; }
+.opt-row{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px;
+  background:var(--grain) repeat, linear-gradient(180deg, rgba(33,28,42,.96), rgba(19,16,25,.98));
+  background-size:150px 150px, auto; background-blend-mode:soft-light, normal;
+  border:2px solid rgba(255,255,255,.12); box-shadow:4px 5px 0 rgba(0,0,0,.4); }
+.opt-row .opt-txt{ flex:1; min-width:0; }
+.opt-row .opt-name{ font-family:var(--f-tag); font-size:17px; color:var(--paint); }
+.opt-row .opt-sub{ font-size:13px; color:var(--ink-soft); margin-top:1px; }
+/* interrupteur */
+.opt-sw{ flex:0 0 auto; width:54px; height:30px; border-radius:20px; padding:0 !important;
+  background:rgba(255,255,255,.12) !important; border:2px solid rgba(255,255,255,.2) !important;
+  position:relative; box-shadow:none !important; transition:background .2s; }
+.opt-sw::after{ content:""; position:absolute; top:2px; left:2px; width:22px; height:22px;
+  border-radius:50%; background:#eaf0ff; transition:transform .2s; }
+.opt-sw.on{ background:var(--spray-green) !important; border-color:var(--spray-green) !important; }
+.opt-sw.on::after{ transform:translateX(24px); }
+/* choix segmenté */
+.opt-seg{ flex:0 0 auto; display:flex; gap:6px; }
+.opt-seg button{ font-size:13px; padding:8px 12px; border-radius:10px; }
+.opt-seg button.sel{ outline:3px solid var(--spray-cyan); outline-offset:-1px; }
+
+/* animations réduites : on gèle les décors coûteux */
+:root.reduce-fx #wall-art, :root.reduce-fx #sky-deco{ display:none !important; }
+:root.reduce-fx body::before{ animation:none !important; }
+:root.reduce-fx #hub-amb, :root.reduce-fx #stars{ opacity:.25 !important; }
+
 /* ── ÉCRAN DE DÉFI : l'affiche de la station (couleur --st) ───── */
 #game-box{
   background:
@@ -1865,6 +1892,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
       <button id="btn-carnet" class="b3">📖 Carnet de chasse</button>
       <button id="btn-stats" class="b3">📊 Tableau de bord</button>
       <button id="btn-arcade" class="b3" hidden>🕹 Borne d'arcade</button>
+      <button id="btn-options" class="b3">⚙ Réglages</button>
     </div>
   </div>
 </section>
@@ -2080,6 +2108,17 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   </div>
 </section>
 
+<!-- ═══ ÉCRAN 14 : RÉGLAGES ═══ -->
+<section id="options-screen" class="screen">
+  <div class="screen-inner">
+    <h2 style="margin-top:2px;">Réglages</h2>
+    <div id="options-body"></div>
+    <div class="btn-row" style="width:100%; padding-top:12px;">
+      <button id="options-back" class="b3">← Retour au repaire</button>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ ÉCRAN 13 : TABLEAU DE BORD (stats & records) ═══ -->
 <section id="stats-screen" class="screen">
   <div class="screen-inner">
@@ -2254,7 +2293,18 @@ S.stars   = S.stars   || {};     // meilleures étoiles par défi (init tôt : u
 S.succes  = S.succes  || {};     // succès débloqués
 S.log     = S.log     || {};     // carnet : { LV_01:{flashedAt, doneAt, stars, plays} }
 S.arcadeHi= S.arcadeHi|| [];     // table des records de la borne d'arcade
+S.opts    = S.opts    || { haptics:true, arcadeLives:3, reduceFx:false };  // réglages
 function persist(){ Store.save(S); }
+
+/* ── Vibrations : passent toutes par le réglage « haptics » ── */
+(function(){
+  if(navigator.vibrate){
+    const _v = navigator.vibrate.bind(navigator);
+    navigator.vibrate = (...a)=>{ try{ return (S.opts.haptics !== false) && _v(...a); }catch(e){ return false; } };
+  }
+  /* applique tout de suite la préférence « animations réduites » */
+  if(S.opts.reduceFx) document.documentElement.classList.add("reduce-fx");
+})();
 
 /* ═══════════════════════════════════════════════════════════
    3. AUDIOFX — chiptune 100 % Web Audio, zéro fichier
@@ -8704,7 +8754,7 @@ const Arcade = (()=>{
   }
   function startRun(endlessMode){
     endless = !!endlessMode;
-    score = 0; lives = 3; waveIdx = 0;
+    score = 0; lives = (S.opts && S.opts.arcadeLives) || 3; waveIdx = 0;
     player = { x:W/2, w:18, h:8, multi:0, rapid:0, cd:0 };
     initials = ""; ufo = null; ufoT = 8 + Math.random()*8; combo = 0; comboT = 0; popups = [];
     state = "play"; paused = false;
@@ -9425,7 +9475,7 @@ const Breakout = (()=>{
     AudioFX.laser();
   }
   function startRun(){
-    score = 0; lives = 3; lvl = 0; state = "play"; paused = false;
+    score = 0; lives = (S.opts && S.opts.arcadeLives) || 3; lvl = 0; state = "play"; paused = false;
     buildLevel(); hideOverlay();
   }
 
@@ -9881,6 +9931,7 @@ const Stats = (()=>{
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
         ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
+        ${kpi((S.daily&&S.daily.streak)?S.daily.streak+" 🔥":"—", "🎯 Défi du jour (série)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
       </div></div>`);
 
@@ -9908,6 +9959,81 @@ const Stats = (()=>{
       `<div class="stat-block"><h3>Succès (${nSucces}/${SUCCES.length})</h3>${sucRows}</div>`);
   }
   function open(){ build(); show("stats-screen"); }
+  return { open };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   16bis. RÉGLAGES — vibrations, difficulté de la borne, animations
+   réduites, remise à zéro des records. Persistés dans S.opts.
+   ─────────────────────────────────────────────────────────── */
+const Options = (()=>{
+  function toggleRow(name, sub, key){
+    return `<div class="opt-row"><div class="opt-txt"><div class="opt-name">${name}</div>
+      <div class="opt-sub">${sub}</div></div>
+      <button class="opt-sw ${S.opts[key]!==false?"on":""}" data-tog="${key}" aria-label="${name}"></button></div>`;
+  }
+  function build(){
+    const host = $("#options-body"); host.innerHTML = "";
+    host.insertAdjacentHTML("beforeend",
+      toggleRow("Vibrations", "Retour haptique pendant les jeux", "haptics"));
+    host.insertAdjacentHTML("beforeend",
+      toggleRow("Animations réduites", "Coupe les décors animés (batterie / confort)", "reduceFx"));
+    /* difficulté de la borne : segmenté 3 / 5 vies */
+    host.insertAdjacentHTML("beforeend",
+      `<div class="opt-row"><div class="opt-txt"><div class="opt-name">Difficulté de la borne</div>
+        <div class="opt-sub">Nombre de vies dans les jeux d'arcade</div></div>
+        <div class="opt-seg">
+          <button class="b3 ${(S.opts.arcadeLives||3)===3?"sel":""}" data-lives="3">3 ♥</button>
+          <button class="b3 ${(S.opts.arcadeLives||3)===5?"sel":""}" data-lives="5">5 ♥</button>
+        </div></div>`);
+    /* remise à zéro des records d'arcade (double-clic de confirmation) */
+    host.insertAdjacentHTML("beforeend",
+      `<div class="opt-row"><div class="opt-txt"><div class="opt-name">Records d'arcade</div>
+        <div class="opt-sub">Efface les scores de la salle d'arcade</div></div>
+        <button id="opt-reset-arcade" class="b3" style="font-size:13px">Effacer</button></div>`);
+    host.insertAdjacentHTML("beforeend",
+      `<div class="opt-row"><div class="opt-txt"><div class="opt-name">Revoir le tutoriel</div>
+        <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
+        <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
+    host.insertAdjacentHTML("beforeend",
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v55</p>`);
+    wire();
+  }
+  function wire(){
+    $("#options-body").querySelectorAll(".opt-sw").forEach(sw=>{
+      sw.addEventListener("click", ()=>{
+        const k = sw.dataset.tog;
+        S.opts[k] = !sw.classList.contains("on");   // bascule d'après l'état visuel
+        sw.classList.toggle("on", S.opts[k]);
+        persist();
+        AudioFX.select();
+        if(k === "reduceFx") document.documentElement.classList.toggle("reduce-fx", S.opts[k]);
+        if(k === "haptics" && S.opts[k]){ try{ navigator.vibrate && navigator.vibrate(20); }catch(e){} }
+      });
+    });
+    $("#options-body").querySelectorAll("[data-lives]").forEach(bt=>{
+      bt.addEventListener("click", ()=>{
+        S.opts.arcadeLives = +bt.dataset.lives; persist(); AudioFX.select(); build();
+      });
+    });
+    const ra = $("#opt-reset-arcade");
+    if(ra){ let armed = false, tmr = null;
+      ra.addEventListener("click", ()=>{
+        if(!armed){ armed = true; ra.textContent = "Sûr ?"; AudioFX.err();
+          tmr = setTimeout(()=>{ armed = false; ra.textContent = "Effacer"; }, 3000); return; }
+        clearTimeout(tmr); armed = false;
+        S.arcadeHi = []; persist();
+        ["breakout","snake","survie","tournee","tourneeSplits"].forEach(k=>{
+          try{ localStorage.removeItem("invasionLesVans:"+k); }catch(e){} });
+        AudioFX.ok(); ra.textContent = "Effacé ✓";
+        setTimeout(()=>{ ra.textContent = "Effacer"; }, 1500);
+      });
+    }
+    const tu = $("#opt-tuto");
+    if(tu) tu.addEventListener("click", ()=>{ AudioFX.select();
+      renderHub(); show("hub-screen"); setTimeout(()=>{ if(typeof Tuto!=="undefined") Tuto.start(); }, 350); });
+  }
+  function open(){ build(); show("options-screen"); }
   return { open };
 })();
 
@@ -9990,6 +10116,8 @@ const Daily = (()=>{
 
 /* ── câblage des nouveaux écrans ── */
 $("#btn-daily").addEventListener("click", ()=>{ AudioFX.select(); Daily.start(); });
+$("#btn-options").addEventListener("click", ()=>{ AudioFX.select(); Options.open(); });
+$("#options-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
 $("#btn-stats").addEventListener("click", ()=>{ AudioFX.select(); Stats.open(); });
 $("#stats-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
 $("#btn-carnet").addEventListener("click", ()=>{ AudioFX.select(); Carnet.open(); });
