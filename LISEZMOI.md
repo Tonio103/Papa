@@ -54,6 +54,11 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v57) — 4e jeu d'arcade : Pong Invader + partage du poster
+
+- **🏓 Pong Invader** : un pong contre l'IA (ta raquette en bas, l'IA en haut, premier à 7). La balle **accélère** à chaque échange, angle selon l'endroit touché ; **nombre de victoires** sauvegardé. La salle d'arcade compte désormais **4 jeux**.
+- **Partager le poster** : le poster souvenir peut être envoyé directement via le **partage natif** du téléphone (Messages, WhatsApp, Mail…) en plus de l'enregistrement.
+
 ## Nouveautés (v56) — écran Réglages
 
 - **⚙ Réglages** au repaire : **vibrations** on/off (toutes les vibrations passent par ce réglage), **animations réduites** (coupe les décors animés = confort + batterie, réappliqué au démarrage), **difficulté de la borne** (3 ou 5 vies), **remise à zéro des records d'arcade** (double-clic de sécurité), et **revoir le tutoriel**. Tout est sauvegardé.

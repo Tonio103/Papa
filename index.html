@@ -1605,7 +1605,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   border:2.5px solid var(--spray-cyan) !important; border-radius:12px; overflow:hidden;
   background:radial-gradient(120% 90% at 50% 0%, #101430 0%, #0a0a1c 70%, #06060f 100%);
   box-shadow:6px 8px 0 rgba(0,0,0,.45), inset 0 0 40px rgba(43,232,208,.06); }
-#arcade-cv, #brk-cv, #snk-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
+#arcade-cv, #brk-cv, #snk-cv, #png-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
 #arc-overlay{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
   justify-content:center; text-align:center; gap:12px; padding:22px;
   background:rgba(6,6,15,.82); backdrop-filter:blur(3px); }
@@ -2119,6 +2119,26 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   </div>
 </section>
 
+<!-- ═══ ÉCRAN 11quater : PONG INVADER ═══ -->
+<section id="png-screen" class="screen">
+  <div class="screen-inner" id="png-inner">
+    <div id="arcade-hud">
+      <span id="png-score" class="pix">0 · 0</span>
+      <span id="png-info" class="pix">1er à 7</span>
+      <span id="png-best" class="pix">🏆 0</span>
+      <button id="png-pause" class="b3">❚❚</button>
+    </div>
+    <div id="arcade-stage" style="border-color:var(--spray-purple) !important;">
+      <canvas id="png-cv"></canvas>
+      <div id="png-overlay"></div>
+    </div>
+    <div id="arc-pad">
+      <button id="png-left" class="arc-btn">◀</button>
+      <button id="png-right" class="arc-btn">▶</button>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ ÉCRAN 13 : TABLEAU DE BORD (stats & records) ═══ -->
 <section id="stats-screen" class="screen">
   <div class="screen-inner">
@@ -2147,7 +2167,8 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 <div id="poster-modal" aria-hidden="true">
   <img id="poster-img" alt="Poster souvenir">
   <div class="pm-row">
-    <a id="poster-dl" class="b2" download="invasion-des-vans.png" href="#">⬇ Enregistrer l'image</a>
+    <button id="poster-share" class="b2" hidden>📤 Partager</button>
+    <a id="poster-dl" class="b3" download="invasion-des-vans.png" href="#">⬇ Enregistrer</a>
     <button id="poster-close" class="b3">Fermer</button>
   </div>
 </div>
@@ -3053,6 +3074,7 @@ function showNow(id){
   if(id!=="arcade-screen" && typeof Arcade !== "undefined") Arcade.stop();  // stoppe la borne
   if(id!=="brk-screen" && typeof Breakout !== "undefined") Breakout.stop(); // stoppe le casse-briques
   if(id!=="snk-screen" && typeof Snake !== "undefined") Snake.stop();       // stoppe le serpent
+  if(id!=="png-screen" && typeof Pong !== "undefined") Pong.stop();         // stoppe le pong
   if(id==="hub-screen"){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
@@ -9029,11 +9051,13 @@ const Arcade = (()=>{
       <button id="arc-play" class="b2">▶ Campagne (8 vagues)</button>
       <button id="arc-survie" class="b3">♾ Mode survie</button>
       <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>
-      <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>`;
+      <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>
+      <button id="arc-topng" class="b3">🏓 Pong Invader</button>`;
     $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(false); });
     $("#arc-survie").addEventListener("click", ()=>{ AudioFX.select(); startRun(true); });
     $("#arc-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#arc-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
+    $("#arc-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
   }
   function showOver(victory){
     ov().classList.remove("hidden");
@@ -9420,18 +9444,40 @@ const Carnet = (()=>{
     c.fillText("Les Vans, Ardèche — rien que pour toi. 🛸", Wp/2, Hp-52);
     return cv.toDataURL("image/png");
   }
+  let lastPoster = null;
   function showPoster(){
     AudioFX.select();
     /* les polices doivent être prêtes pour un rendu net */
     const go = ()=>{
       const url = makePoster();
+      lastPoster = url;
       $("#poster-img").src = url;
       $("#poster-dl").href = url;
+      /* bouton « Partager » seulement si le partage de fichier existe (mobile) */
+      const canShare = !!(navigator.canShare && navigator.share);
+      $("#poster-share").hidden = !canShare;
       $("#poster-modal").classList.add("on");
     };
     if(document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
   }
-  return { open, render, showPoster };
+  /* partage natif : transforme le PNG en fichier et ouvre la feuille
+     de partage du téléphone (Messages, WhatsApp, Mail…) */
+  async function sharePoster(){
+    if(!lastPoster) return;
+    try{
+      const blob = await (await fetch(lastPoster)).blob();
+      const file = new File([blob], "invasion-des-vans.png", { type:"image/png" });
+      if(navigator.canShare && navigator.canShare({ files:[file] })){
+        await navigator.share({ files:[file], title:"L'Invasion des Vans",
+          text:"Mon carnet de chasse — L'Invasion des Vans 🛸" });
+        AudioFX.ok();
+      }else{
+        await navigator.share({ title:"L'Invasion des Vans",
+          text:"Mon carnet de chasse — L'Invasion des Vans 🛸" });
+      }
+    }catch(e){ /* partage annulé : rien à faire */ }
+  }
+  return { open, render, showPoster, sharePoster };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -9566,10 +9612,12 @@ const Breakout = (()=>{
       <button id="brk-play" class="b2">▶ Jouer</button>
       <button id="brk-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="brk-tosnk" class="b3">🐍 Serpent Invader</button>
+      <button id="brk-topng" class="b3">🏓 Pong Invader</button>
       <button id="brk-quit" class="b3">← Repaire</button>`;
     $("#brk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#brk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#brk-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
+    $("#brk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
     $("#brk-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -9752,10 +9800,12 @@ const Snake = (()=>{
       <button id="snk-play" class="b2">▶ Jouer</button>
       <button id="snk-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="snk-tobrk" class="b3">🧱 Casse-Tag</button>
+      <button id="snk-topng" class="b3">🏓 Pong Invader</button>
       <button id="snk-quit" class="b3">← Repaire</button>`;
     $("#snk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#snk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#snk-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
+    $("#snk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
     $("#snk-quit").addEventListener("click", quit);
   }
   function showOver(){
@@ -9875,6 +9925,174 @@ const Snake = (()=>{
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   15ter. PONG INVADER — le 4e jeu de la borne (pong vs IA)
+   Ta raquette en bas, l'IA en haut, une balle-pixel entre les
+   deux ; premier à 7 gagne. La balle accélère à chaque échange.
+   Nombre de victoires sauvegardé. Glissé ou ◀ ▶.
+   ─────────────────────────────────────────────────────────── */
+const Pong = (()=>{
+  const W = 200; let H = 300;
+  const KEY = "invasionLesVans:pong";
+  let cv, c, raf = null, running = false, paused = false, last = 0, acc = 0;
+  let state = "menu", pScore, aiScore, pad, ai, ball, serveT;
+  const held = { left:false, right:false };
+  const WIN = 7;
+  const wins = ()=>{ const v = +localStorage.getItem(KEY); return v>0?v:0; };
+
+  function serve(dir){
+    ball = { x:W/2, y:H/2, vx:(Math.random()<.5?-1:1)*1.1, vy:dir*1.8, r:3, sp:1.8 };
+    serveT = 0.8;
+  }
+  function startRun(){
+    pScore = 0; aiScore = 0;
+    pad = { x:W/2, w:44, y:0 };          // y calculé au rendu (bas)
+    ai  = { x:W/2, w:40 };
+    serve(Math.random()<.5?-1:1);
+    state = "play"; paused = false; hideOverlay();
+  }
+  function step(dt){
+    const padY = H-16, aiY = 14;
+    if(serveT > 0){ serveT -= dt; }
+    else{
+      ball.x += ball.vx; ball.y += ball.vy;
+      /* murs latéraux */
+      if(ball.x < 4){ ball.x = 4; ball.vx = Math.abs(ball.vx); AudioFX.tick(); }
+      if(ball.x > W-4){ ball.x = W-4; ball.vx = -Math.abs(ball.vx); AudioFX.tick(); }
+      /* raquette joueur (bas) */
+      if(ball.vy > 0 && ball.y > padY-4 && ball.y < padY+2 && ball.x > pad.x-pad.w/2 && ball.x < pad.x+pad.w/2){
+        ball.y = padY-4; bounce(pad);
+      }
+      /* raquette IA (haut) */
+      if(ball.vy < 0 && ball.y < aiY+4 && ball.y > aiY-2 && ball.x > ai.x-ai.w/2 && ball.x < ai.x+ai.w/2){
+        ball.y = aiY+4; bounce(ai);
+      }
+      /* points */
+      if(ball.y > H){ aiScore++; point(-1); }
+      else if(ball.y < 0){ pScore++; point(1); }
+    }
+    /* joueur */
+    const sp = 2.4;
+    if(held.left)  pad.x -= sp;
+    if(held.right) pad.x += sp;
+    pad.x = Math.max(pad.w/2, Math.min(W-pad.w/2, pad.x));
+    /* IA : suit la balle avec un peu de retard (imparfaite = jouable) */
+    const target = ball.vy < 0 ? ball.x : W/2;
+    ai.x += Math.max(-1.7, Math.min(1.7, (target - ai.x) * 0.09));
+    ai.x = Math.max(ai.w/2, Math.min(W-ai.w/2, ai.x));
+  }
+  function bounce(p){
+    const rel = (ball.x - p.x)/(p.w/2);
+    ball.sp = Math.min(4.2, ball.sp*1.06);
+    const ang = rel * 1.0;
+    ball.vx = Math.sin(ang)*ball.sp;
+    ball.vy = (ball.vy > 0 ? -1 : 1) * Math.abs(Math.cos(ang)*ball.sp);
+    AudioFX.pixel(ball.vy<0?600:440);
+    try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+  }
+  function point(who){
+    AudioFX.star(who>0?3:0);
+    if(who>0) try{ navigator.vibrate && navigator.vibrate(20); }catch(e){}
+    if(pScore >= WIN || aiScore >= WIN){ endRun(pScore > aiScore); return; }
+    serve(who>0 ? -1 : 1);              // le perdant du point sert
+  }
+  function endRun(victory){
+    if(victory){ try{ localStorage.setItem(KEY, wins()+1); }catch(e){}
+      if(typeof checkMetaSucces === "function") checkMetaSucces(); }
+    state = "over"; showOver(victory);
+  }
+  const ov = ()=>$("#png-overlay");
+  function hideOverlay(){ ov().classList.add("hidden"); ov().innerHTML = ""; }
+  function showMenu(){
+    state = "menu"; ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>PONG<br>INVADER</h3>
+      <div class="arc-sub">Renvoie la balle. Premier à ${WIN} gagne.<br>Glisse ou ◀ ▶ pour ta raquette.</div>
+      ${wins()?`<div class="arc-sub" style="color:var(--spray-yellow)">Victoires : ${wins()} 🏆</div>`:""}
+      <button id="png-play" class="b2">▶ Jouer</button>
+      <button id="png-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="png-quit" class="b3">← Repaire</button>`;
+    $("#png-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#png-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#png-quit").addEventListener("click", quit);
+  }
+  function showOver(victory){
+    ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>${victory ? "GAGNÉ !" : "PERDU…"}</h3>
+      <div class="arc-sub">${pScore} — ${aiScore}</div>
+      <div class="arc-sub">Victoires : ${wins()} 🏆</div>
+      <button id="png-again" class="b2">↻ Revanche</button>
+      <button id="png-back" class="b3">← Repaire</button>`;
+    $("#png-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#png-back").addEventListener("click", quit);
+  }
+  function draw(){
+    const dpr = Math.min(2, devicePixelRatio||1);
+    const cw = cv.clientWidth||300, ch = cv.clientHeight||400;
+    if(cv.width !== Math.round(cw*dpr)){ cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr); }
+    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,cw,ch);
+    const scale = Math.min(cw/W, ch/H), ox = (cw-W*scale)/2, oy = (ch-H*scale)/2;
+    c.save(); c.translate(ox,oy); c.scale(scale,scale);
+    /* ligne médiane pointillée */
+    c.fillStyle = "rgba(255,255,255,.14)";
+    for(let x=6;x<W-4;x+=14) c.fillRect(x, H/2-1, 8, 2);
+    /* raquettes */
+    c.fillStyle = "#8ef4e6"; c.fillRect(pad.x-pad.w/2, H-16, pad.w, 5);
+    c.fillStyle = "#ff5db4"; c.fillRect(ai.x-ai.w/2, 11, ai.w, 5);
+    /* balle */
+    if(ball){ c.fillStyle = serveT>0 ? "rgba(234,246,255,.5)" : "#eaf6ff";
+      c.fillRect(ball.x-ball.r, ball.y-ball.r, ball.r*2, ball.r*2); }
+    c.restore();
+  }
+  function updateHud(){
+    $("#png-score").textContent = (pScore||0) + " · " + (aiScore||0);
+    $("#png-best").textContent = "🏆 " + wins();
+  }
+  function loop(now){
+    if(!running){ raf = null; return; }
+    if(!$("#png-screen").classList.contains("active")){ raf = requestAnimationFrame(loop); return; }
+    if(cv.clientWidth){ const nh = Math.round(W * cv.clientHeight / cv.clientWidth);
+      if(nh > 240 && nh < 520) H = nh; }
+    const dt = Math.min(0.05,(now-last)/1000); last = now;
+    if(state === "play" && !paused){ acc += dt; while(acc >= 1/60){ step(1/60); acc -= 1/60; } }
+    updateHud(); draw(); raf = requestAnimationFrame(loop);
+  }
+  let bound = false;
+  function bind(){
+    if(bound) return; bound = true;
+    const hold = (id,key)=>{ const el=$(id);
+      const on=e=>{ e.preventDefault(); held[key]=true; el.classList.add("held"); };
+      const off=e=>{ e.preventDefault(); held[key]=false; el.classList.remove("held"); };
+      el.addEventListener("pointerdown",on); el.addEventListener("pointerup",off);
+      el.addEventListener("pointerleave",off); el.addEventListener("pointercancel",off); };
+    hold("#png-left","left"); hold("#png-right","right");
+    let drag=false;
+    cv.addEventListener("pointerdown", e=>{ if(state==="play"&&!paused){ drag=true; moveTo(e); } });
+    cv.addEventListener("pointermove", e=>{ if(drag) moveTo(e); });
+    const end=()=>drag=false; cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
+    $("#png-pause").addEventListener("click", togglePause);
+  }
+  function moveTo(e){ const r=cv.getBoundingClientRect();
+    const scale=Math.min(cv.clientWidth/W, cv.clientHeight/H), ox=(cv.clientWidth-W*scale)/2;
+    pad.x = Math.max(pad.w/2, Math.min(W-pad.w/2, (e.clientX-r.left-ox)/scale)); }
+  function togglePause(){ if(state!=="play") return; paused=!paused; AudioFX.click();
+    if(paused){ ov().classList.remove("hidden");
+      ov().innerHTML = `<h3>PAUSE</h3><button id="png-resume" class="b2">▶ Reprendre</button>
+        <button id="png-give" class="b3">← Repaire</button>`;
+      $("#png-resume").addEventListener("click", togglePause);
+      $("#png-give").addEventListener("click", quit);
+    } else hideOverlay(); }
+  function start(){
+    show("png-screen"); cv = $("#png-cv"); c = cv.getContext("2d"); bind();
+    running = true; paused = false; last = performance.now(); acc = 0;
+    pScore = 0; aiScore = 0; pad = { x:W/2, w:44 }; ai = { x:W/2, w:40 }; serve(1);
+    AudioFX.powerOn(); showMenu();
+    if(!raf) raf = requestAnimationFrame(loop);
+  }
+  function stop(){ running = false; if(raf){ cancelAnimationFrame(raf); raf = null; } }
+  function quit(){ stop(); AudioFX.back(); renderHub(); show("hub-screen"); }
+  return { start, stop, wins };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    16. TABLEAU DE BORD — stats, progression, records
    ─────────────────────────────────────────────────────────── */
 const Stats = (()=>{
@@ -9930,6 +10148,7 @@ const Stats = (()=>{
         ${kpi((+localStorage.getItem("invasionLesVans:survie")||0) ? localStorage.getItem("invasionLesVans:survie")+" pts" : "—", "♾ Survie")}
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
         ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
+        ${kpi(Pong.wins() ? Pong.wins() + " 🏆" : "—", "🏓 Pong (victoires)")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
         ${kpi((S.daily&&S.daily.streak)?S.daily.streak+" 🔥":"—", "🎯 Défi du jour (série)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
@@ -10123,6 +10342,7 @@ $("#stats-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); sh
 $("#btn-carnet").addEventListener("click", ()=>{ AudioFX.select(); Carnet.open(); });
 $("#carnet-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
 $("#carnet-poster").addEventListener("click", ()=>Carnet.showPoster());
+$("#poster-share").addEventListener("click", ()=>Carnet.sharePoster());
 $("#poster-close").addEventListener("click", ()=>$("#poster-modal").classList.remove("on"));
 $("#poster-dl").addEventListener("click", ()=>AudioFX.ok());
 $("#btn-arcade").addEventListener("click", ()=>{ AudioFX.select(); Arcade.start(); });
