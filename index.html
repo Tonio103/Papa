@@ -1860,6 +1860,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     <h2>Galerie de l'invasion</h2>
     <div id="grid"></div>
     <button id="btn-chrono" class="b2" hidden style="margin-top:18px;">🏁 La Tournée de l'artiste</button>
+    <button id="btn-daily" class="b3" hidden style="margin-top:12px;">🎯 Défi du jour</button>
     <div class="btn-row" style="gap:10px; margin-top:12px;">
       <button id="btn-carnet" class="b3">📖 Carnet de chasse</button>
       <button id="btn-stats" class="b3">📊 Tableau de bord</button>
@@ -3310,6 +3311,13 @@ function renderHub(){
   /* la borne d'arcade se débloque dès la 1ère pièce flashée */
   { const ba = $("#btn-arcade");
     if(ba) ba.hidden = Object.keys(S.flashed).length === 0; }
+  /* le défi du jour se débloque quand les 6 défis « partout » sont finis */
+  { const bd = $("#btn-daily");
+    if(bd && typeof Daily !== "undefined"){
+      const un = Daily.unlocked();
+      bd.hidden = !un;
+      if(un) bd.innerHTML = Daily.label();
+    } }
   if(typeof checkMetaSucces === "function") checkMetaSucces();
   Spin3D.start();                 // une seule boucle anime toutes les pièces
 }
@@ -9903,7 +9911,85 @@ const Stats = (()=>{
   return { open };
 })();
 
+/* ═══════════════════════════════════════════════════════════
+   17. LE DÉFI DU JOUR — un défi tiré de la date, avec une SÉRIE
+   (streak) qui grimpe si on revient chaque jour. Débloqué quand
+   les 6 défis « partout » sont finis. Ne touche ni aux points
+   ni aux étoiles : c'est un rendez-vous quotidien pour la forme.
+   ─────────────────────────────────────────────────────────── */
+const Daily = (()=>{
+  const LIST = ["LV_01","LV_02","LV_04","LV_05","LV_06","LV_08"];
+  const unlocked = ()=>LIST.every(c=>S.done[c]);
+  const dayKey = (d=new Date())=>{
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  };
+  const yesterdayKey = ()=>{ const d = new Date(); d.setDate(d.getDate()-1); return dayKey(d); };
+  /* hash déterministe de la date → indice du défi du jour */
+  function pickCode(key=dayKey()){
+    let h = 0; for(let i=0;i<key.length;i++) h = (h*31 + key.charCodeAt(i)) | 0;
+    return LIST[Math.abs(h) % LIST.length];
+  }
+  const data = ()=>{ S.daily = S.daily || { lastWin:null, streak:0, best:{}, count:0 }; return S.daily; };
+  const doneToday = ()=> data().lastWin === dayKey();
+  const fmtDur = ms=> ms ? Math.floor(ms/1000/60)+"min"+String(Math.floor(ms/1000)%60).padStart(2,"0") : "—";
+
+  function label(){
+    const d = data();
+    return "🎯 Défi du jour" + (d.streak>0 ? ` <span style="font-size:14px;opacity:.85">· série ${d.streak}🔥</span>` : "") +
+      (doneToday() ? ` <span style="font-size:13px;opacity:.7">✓ fait</span>` : "");
+  }
+  function start(){
+    const st = CONFIG.stations.find(s=>s.code === pickCode());
+    if(doneToday()){ resultScreen(st, null, true); return; }
+    const t0 = Date.now();
+    startGame(st, (opts)=>{
+      runCleanup(); clearHints();
+      const el = Date.now() - t0;
+      const d = data(), today = dayKey();
+      /* série : +1 si on avait gagné hier, sinon on repart à 1 */
+      d.streak = (d.lastWin === yesterdayKey()) ? d.streak + 1 : 1;
+      d.lastWin = today; d.count = (d.count||0) + 1;
+      if(!d.best[today] || el < d.best[today]) d.best[today] = el;
+      /* on garde aussi le meilleur temps perso du défi */
+      const lg = S.log[st.code] || (S.log[st.code] = {});
+      if(!lg.bestMs || el < lg.bestMs) lg.bestMs = el;
+      persist();
+      resultScreen(st, el, false, opts);
+    });
+    $("#game-title").textContent = "🎯 Défi du jour — " + st.nom;
+  }
+  function resultScreen(st, el, alreadyDone, opts){
+    show("game-screen");
+    $("#game-screen").style.setProperty("--st", st.couleur);
+    $("#game-title").textContent = "🎯 Défi du jour";
+    const box = $("#game-box"); box.innerHTML = "";
+    const d = data();
+    if(alreadyDone){
+      Juice.stamp(box, "REVIENS DEMAIN !", "var(--cyan)");
+      box.insertAdjacentHTML("beforeend",
+        `<p class="sub">Le défi du jour (<b style="color:${st.couleur}">${st.nom}</b>) est déjà plié.</p>
+         <div class="pix" style="font-size:20px;color:var(--jaune);margin-top:6px;">série ${d.streak} 🔥</div>
+         <p class="sub">Un nouveau défi t'attend demain — ne casse pas la série !</p>`);
+    }else{
+      AudioFX.fanfare(); Juice.confetti(box, 26);
+      try{ navigator.vibrate && navigator.vibrate([40,30,40,30,120]); }catch(e){}
+      Juice.stamp(box, d.streak>1 ? `SÉRIE ${d.streak} ! 🔥` : "DÉFI DU JOUR ✔", "var(--magenta)");
+      if(box.lastElementChild) box.lastElementChild.classList.add("parfait");
+      box.insertAdjacentHTML("beforeend",
+        `<div class="pix" style="font-size:22px;color:var(--cyan);margin-top:8px;">${fmtDur(el)}</div>
+         <p class="sub">${st.nom} · série de <b style="color:var(--jaune)">${d.streak}</b> jour${d.streak>1?"s":""} 🔥<br>
+         ${d.count} défi${d.count>1?"s":""} du jour relevé${d.count>1?"s":""} en tout.</p>`);
+    }
+    const back = document.createElement("button");
+    back.className = "b2"; back.textContent = "← Retour au repaire";
+    back.addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
+    box.appendChild(back);
+  }
+  return { start, unlocked, label, doneToday, pickCode };
+})();
+
 /* ── câblage des nouveaux écrans ── */
+$("#btn-daily").addEventListener("click", ()=>{ AudioFX.select(); Daily.start(); });
 $("#btn-stats").addEventListener("click", ()=>{ AudioFX.select(); Stats.open(); });
 $("#stats-back").addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
 $("#btn-carnet").addEventListener("click", ()=>{ AudioFX.select(); Carnet.open(); });
