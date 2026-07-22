@@ -54,6 +54,27 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v51) — LA BORNE D'ARCADE + LE CARNET DE CHASSE
+
+Deux grosses features rejouables, débloquées au repaire.
+
+### 🕹 La Borne d'arcade « Les Vans Defense »
+Un vrai **Space Invaders** jouable (débloqué dès la 1ʳᵉ pièce trouvée) :
+- **8 vagues** aux couleurs des pièces + un **boss final** avec barre de vie
+- **Boucliers destructibles**, **soucoupe mystère** (bonus 50→300 pts), **multiplicateur de combo** (série de kills)
+- **Bonus qui tombent** : triple-tir, tir rapide, gel des ennemis, vie, et **bombe** (nettoie l'écran / rase une rangée)
+- **3 vies**, **pause**, **table des records à 3 lettres** (initiales)
+- Commandes tactiles : ◀ TIR ▶ ou glissé/tap directement sur le terrain
+
+### 📖 Le Carnet de chasse
+Le journal de l'invasion, une fiche par pièce :
+- **Date et heure réelles** de capture et de réussite, nombre de tentatives, **record perso** par défi, étoiles, et une **anecdote** sur-mesure
+- **Rejouer un défi en entraînement** (record perso à battre, sans toucher aux points)
+- **Poster souvenir** généré en grande image **téléchargeable** (PNG) : titre graffiti, les 8 invaders, stats
+
+### ⏱ Tournée : temps intermédiaires
+La Tournée affiche désormais le **split de chaque défi** avec le **delta vs ton meilleur run** (vert si plus rapide, rouge sinon), et les meilleurs splits sont sauvegardés.
+
 ## Nouveautés (v50) — LA TOURNÉE DE L'ARTISTE (mode contre-la-montre)
 
 Le jeu continue de vivre APRÈS la chasse : un vrai mode rejouable.
