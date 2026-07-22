@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v53) — 3e jeu d'arcade : Serpent Invader
+
+- **🐍 Serpent Invader** : un snake où un serpent-invader mange les pièces et s'allonge, accélère, et meurt s'il touche un mur ou sa queue. **Bonus doré** clignotant qui vaut gros, record sauvegardé. Contrôle au **glissé** ou aux flèches ◀▲▼▶.
+- La salle d'arcade compte donc **3 jeux** : on passe de l'un à l'autre depuis n'importe quel menu.
+- Le sprite d'invader plat est désormais **partagé** par les 3 jeux (mis en cache une fois).
+
 ## Nouveautés (v52) — 2e jeu d'arcade + tableau de bord
 
 - **🧱 Casse-Tag** : un deuxième jeu dans la borne, un **casse-briques** où une bille renvoyée par une raquette-bombe détruit un mur en forme d'invader. 3 murs (crab, squid, octo), bonus **raquette large** et **multi-bille**, record sauvegardé. On bascule entre les deux jeux depuis le menu de la borne.

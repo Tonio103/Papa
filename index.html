@@ -1605,7 +1605,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   border:2.5px solid var(--spray-cyan) !important; border-radius:12px; overflow:hidden;
   background:radial-gradient(120% 90% at 50% 0%, #101430 0%, #0a0a1c 70%, #06060f 100%);
   box-shadow:6px 8px 0 rgba(0,0,0,.45), inset 0 0 40px rgba(43,232,208,.06); }
-#arcade-cv, #brk-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
+#arcade-cv, #brk-cv, #snk-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
 #arc-overlay{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
   justify-content:center; text-align:center; gap:12px; padding:22px;
   background:rgba(6,6,15,.82); backdrop-filter:blur(3px); }
@@ -2053,6 +2053,28 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
       <button id="brk-left" class="arc-btn">◀</button>
       <button id="brk-launch" class="arc-btn arc-fire" style="background:linear-gradient(180deg,#8ef4e6,#2ce8d2 60%,#1cb9ac) !important;">LANCER</button>
       <button id="brk-right" class="arc-btn">▶</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ÉCRAN 11ter : SERPENT INVADER (snake) ═══ -->
+<section id="snk-screen" class="screen">
+  <div class="screen-inner" id="snk-inner">
+    <div id="arcade-hud">
+      <span id="snk-score" class="pix">0</span>
+      <span id="snk-len" class="pix">LONG. 3</span>
+      <span id="snk-best" class="pix">★ 0</span>
+      <button id="snk-pause" class="b3">❚❚</button>
+    </div>
+    <div id="arcade-stage" style="border-color:var(--spray-green) !important;">
+      <canvas id="snk-cv"></canvas>
+      <div id="snk-overlay"></div>
+    </div>
+    <div id="arc-pad">
+      <button id="snk-left" class="arc-btn">◀</button>
+      <button id="snk-up" class="arc-btn">▲</button>
+      <button id="snk-down" class="arc-btn">▼</button>
+      <button id="snk-right" class="arc-btn">▶</button>
     </div>
   </div>
 </section>
@@ -2979,6 +3001,7 @@ function showNow(id){
   if(id!=="map-screen" && typeof Radar !== "undefined") Radar.stop();   // coupe le GPS hors radar
   if(id!=="arcade-screen" && typeof Arcade !== "undefined") Arcade.stop();  // stoppe la borne
   if(id!=="brk-screen" && typeof Breakout !== "undefined") Breakout.stop(); // stoppe le casse-briques
+  if(id!=="snk-screen" && typeof Snake !== "undefined") Snake.stop();       // stoppe le serpent
   if(id==="hub-screen"){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
@@ -8559,6 +8582,26 @@ function victoryScene(cv){
   return ()=>{ if(raf) cancelAnimationFrame(raf); };
 }
 
+/* sprite plat 2D d'un invader (canvas mis en cache) — partagé par
+   tous les jeux d'arcade (Invaders, Casse-Tag, Serpent) */
+const _flatCache = {};
+function flatSprite(shapeName, col, px){
+  const key = shapeName + col + px;
+  if(_flatCache[key]) return _flatCache[key];
+  const sh = SHAPES[shapeName] || SHAPES.crab;
+  const cols = sh[0].length, rows = sh.length;
+  const oc = document.createElement("canvas");
+  oc.width = cols*px; oc.height = rows*px;
+  const o = oc.getContext("2d");
+  sh.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    if(ch === "X"){
+      o.fillStyle = col; o.fillRect(x*px, y*px, px, px);
+      o.fillStyle = "rgba(255,255,255,.22)"; o.fillRect(x*px, y*px, px, Math.max(1,px/3));
+    }
+  }));
+  _flatCache[key] = oc; return oc;
+}
+
 /* ═══════════════════════════════════════════════════════════
    13. LA BORNE D'ARCADE — « LES VANS DEFENSE »
    Un vrai Space Invaders jouable au repaire : 8 vagues aux
@@ -8582,24 +8625,6 @@ const Arcade = (()=>{
       shields, pows, boss, freezeT, waveBanner, shake, flashT, initials,
       ufo, ufoT, combo, comboT, popups;
 
-  /* ── cache de sprites plats (dessinés une fois par type+couleur) ── */
-  const spriteCache = {};
-  function flatSprite(shapeName, col, px){
-    const key = shapeName + col + px;
-    if(spriteCache[key]) return spriteCache[key];
-    const sh = SHAPES[shapeName] || SHAPES.crab;
-    const cols = sh[0].length, rows = sh.length;
-    const oc = document.createElement("canvas");
-    oc.width = cols*px; oc.height = rows*px;
-    const o = oc.getContext("2d");
-    sh.forEach((row,y)=>[...row].forEach((ch,x)=>{
-      if(ch === "X"){
-        o.fillStyle = col; o.fillRect(x*px, y*px, px, px);
-        o.fillStyle = "rgba(255,255,255,.22)"; o.fillRect(x*px, y*px, px, Math.max(1,px/3));
-      }
-    }));
-    spriteCache[key] = oc; return oc;
-  }
   const AW = 16, AH = 12;                     // taille d'un alien à l'écran
 
   /* ── construction d'une vague ── */
@@ -8905,9 +8930,11 @@ const Arcade = (()=>{
       <div class="arc-sub" style="color:var(--spray-yellow)">★ MEILLEURS SCORES ★</div>
       ${hiHTML()}
       <button id="arc-play" class="b2">▶ Jouer</button>
-      <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>`;
+      <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>
+      <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>`;
     $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#arc-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
+    $("#arc-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
   }
   function showOver(victory){
     ov().classList.remove("hidden");
@@ -9435,9 +9462,11 @@ const Breakout = (()=>{
       ${b ? `<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${b} pts</div>` : ""}
       <button id="brk-play" class="b2">▶ Jouer</button>
       <button id="brk-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="brk-tosnk" class="b3">🐍 Serpent Invader</button>
       <button id="brk-quit" class="b3">← Repaire</button>`;
     $("#brk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#brk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#brk-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
     $("#brk-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -9533,6 +9562,216 @@ const Breakout = (()=>{
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   15bis. SERPENT INVADER — le 3e jeu de la borne (snake)
+   Un serpent-invader mange les pièces et s'allonge ; il accélère,
+   les murs et sa propre queue sont mortels. Glissé ou ◀▲▼▶.
+   Bonus doré clignotant qui vaut gros. Record sauvegardé.
+   ─────────────────────────────────────────────────────────── */
+const Snake = (()=>{
+  const KEY = "invasionLesVans:snake";
+  let cv, c, raf = null, running = false, paused = false, last = 0, acc = 0;
+  let COLS = 13, ROWS = 18, cell = 16;
+  let state = "menu", score, snake, dir, nextDir, food, bonus, bonusT, speed, growth;
+  const best = ()=>{ const v = +localStorage.getItem(KEY); return v>0?v:0; };
+  const SPRITES = ["crab","squid","octo"];
+
+  function layout(){
+    /* on remplit le stage : ROWS suit le format, cases carrées */
+    const cw = cv.clientWidth||300, ch = cv.clientHeight||400;
+    cell = Math.floor(cw / COLS);
+    ROWS = Math.max(12, Math.floor(ch / cell));
+  }
+  function freeCell(){
+    let x, y, tries = 0;
+    do{ x = (Math.random()*COLS)|0; y = (Math.random()*ROWS)|0; tries++; }
+    while(tries < 200 && snake.some(s=>s.x===x && s.y===y));
+    return { x, y };
+  }
+  function spawnFood(){
+    const f = freeCell();
+    food = { x:f.x, y:f.y, sprite:SPRITES[(Math.random()*SPRITES.length)|0],
+      col:["#2ce8d2","#ffd23f","#ff2f86","#9d5cff","#37e37e"][(Math.random()*5)|0] };
+    /* de temps en temps, un bonus doré temporaire */
+    if(!bonus && Math.random() < 0.25){ const g = freeCell(); bonus = { x:g.x, y:g.y }; bonusT = 6; }
+  }
+  function startRun(){
+    layout();
+    const cx = COLS>>1, cy = ROWS>>1;
+    snake = [{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+    dir = { dx:1, dy:0 }; nextDir = dir;
+    score = 0; speed = 6; growth = 0; bonus = null; bonusT = 0;
+    spawnFood();
+    state = "play"; paused = false; acc = 0;
+    hideOverlay();
+  }
+  function setDir(dx, dy){
+    if(state !== "play" || paused) return;
+    if(dx === -dir.dx && dy === -dir.dy) return;   // pas de demi-tour
+    nextDir = { dx, dy };
+  }
+  function tick(){
+    dir = nextDir;
+    const head = { x:snake[0].x + dir.dx, y:snake[0].y + dir.dy };
+    /* murs */
+    if(head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS){ return gameOver(); }
+    /* sa propre queue (sauf la dernière case qui va libérer) */
+    for(let i=0;i<snake.length-1;i++) if(snake[i].x===head.x && snake[i].y===head.y) return gameOver();
+    snake.unshift(head);
+    let ate = false;
+    if(food && head.x===food.x && head.y===food.y){
+      score += 10; growth += 2; ate = true;
+      speed = Math.min(16, 6 + snake.length*0.25);
+      AudioFX.star(Math.min(4, (snake.length/4)|0));
+      try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
+      spawnFood();
+    }
+    if(bonus && head.x===bonus.x && head.y===bonus.y){
+      score += 50; growth += 1; bonus = null; ate = true;
+      AudioFX.fanfare();
+      try{ navigator.vibrate && navigator.vibrate([20,20,40]); }catch(e){}
+    }
+    if(growth > 0) growth--; else snake.pop();
+    if(!ate) AudioFX.tick();
+  }
+  function gameOver(){
+    AudioFX.boom(); try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
+    if(score > best()){ try{ localStorage.setItem(KEY, score); }catch(e){} }
+    state = "over"; showOver();
+  }
+
+  const ov = ()=>$("#snk-overlay");
+  function hideOverlay(){ ov().classList.add("hidden"); ov().innerHTML = ""; }
+  function showMenu(){
+    state = "menu"; ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>SERPENT<br>INVADER</h3>
+      <div class="arc-sub">Mange les pièces, allonge-toi.<br>Glisse ou ◀▲▼▶. Ne te mords pas !</div>
+      ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} pts</div>`:""}
+      <button id="snk-play" class="b2">▶ Jouer</button>
+      <button id="snk-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="snk-tobrk" class="b3">🧱 Casse-Tag</button>
+      <button id="snk-quit" class="b3">← Repaire</button>`;
+    $("#snk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#snk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#snk-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
+    $("#snk-quit").addEventListener("click", quit);
+  }
+  function showOver(){
+    ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>CROQUÉ !</h3>
+      <div class="arc-sub">Score : <b style="color:var(--spray-yellow)">${score}</b> · longueur ${snake.length}</div>
+      <div class="arc-sub">Record : ${best()} pts</div>
+      <button id="snk-again" class="b2">↻ Rejouer</button>
+      <button id="snk-back" class="b3">← Repaire</button>`;
+    $("#snk-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#snk-back").addEventListener("click", quit);
+  }
+
+  function draw(){
+    const dpr = Math.min(2, devicePixelRatio||1);
+    const cw = cv.clientWidth||300, ch = cv.clientHeight||400;
+    if(cv.width !== Math.round(cw*dpr)){ cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr); }
+    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,cw,ch);
+    const gw = COLS*cell, gh = ROWS*cell, ox = (cw-gw)/2, oy = (ch-gh)/2;
+    c.save(); c.translate(ox, oy);
+    /* damier discret */
+    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+      c.fillStyle = (x+y)%2 ? "rgba(255,255,255,.018)" : "rgba(0,0,0,.12)";
+      c.fillRect(x*cell, y*cell, cell, cell);
+    }
+    /* nourriture (invader) */
+    if(food){
+      const spr = flatSprite(food.sprite, food.col, 2);
+      c.drawImage(spr, food.x*cell+2, food.y*cell+3, cell-4, cell-6);
+    }
+    /* bonus doré clignotant */
+    if(bonus){
+      const p = 0.5 + 0.5*Math.sin(last/120);
+      c.fillStyle = `rgba(255,210,63,${0.5+0.5*p})`;
+      c.beginPath(); c.arc(bonus.x*cell+cell/2, bonus.y*cell+cell/2, cell*0.42, 0, 7); c.fill();
+      c.fillStyle = "#3a2a06"; c.font = `bold ${cell*0.6}px sans-serif`;
+      c.textAlign="center"; c.textBaseline="middle";
+      c.fillText("★", bonus.x*cell+cell/2, bonus.y*cell+cell/2+1);
+    }
+    /* serpent */
+    snake.forEach((s,i)=>{
+      const head = i===0;
+      c.fillStyle = head ? "#8ef4e6" : (i%2 ? "#37e37e" : "#2ce8d2");
+      const pad = head ? 1 : 2;
+      c.fillRect(s.x*cell+pad, s.y*cell+pad, cell-pad*2, cell-pad*2);
+      if(head){
+        c.fillStyle = "#0a0a18";
+        const ex = cell*0.24;
+        c.fillRect(s.x*cell+cell/2-ex-1, s.y*cell+cell*0.32, 2, 2);
+        c.fillRect(s.x*cell+cell/2+ex-1, s.y*cell+cell*0.32, 2, 2);
+      }
+    });
+    c.restore();
+  }
+  function updateHud(){
+    $("#snk-score").textContent = String(score||0).padStart(4,"0");
+    $("#snk-len").textContent = "LONG. " + (snake?snake.length:3);
+    $("#snk-best").textContent = "★ " + best();
+  }
+  function loop(now){
+    if(!running){ raf = null; return; }
+    if(!$("#snk-screen").classList.contains("active")){ raf = requestAnimationFrame(loop); return; }
+    const dt = Math.min(0.05,(now-last)/1000); last = now;
+    if(state === "play" && !paused){
+      if(bonusT > 0){ bonusT -= dt; if(bonusT <= 0) bonus = null; }
+      acc += dt;
+      const stepT = 1/speed;
+      while(acc >= stepT){ tick(); acc -= stepT; if(state!=="play") break; }
+    }
+    updateHud(); draw(); raf = requestAnimationFrame(loop);
+  }
+  let bound = false;
+  function bind(){
+    if(bound) return; bound = true;
+    const press = (id, dx, dy)=>{ const el=$(id);
+      el.addEventListener("pointerdown", e=>{ e.preventDefault(); setDir(dx,dy);
+        el.classList.add("held"); setTimeout(()=>el.classList.remove("held"),120); }); };
+    press("#snk-left",-1,0); press("#snk-right",1,0); press("#snk-up",0,-1); press("#snk-down",0,1);
+    /* glissé directionnel sur le terrain */
+    let sx=0, sy=0, down=false;
+    cv.addEventListener("pointerdown", e=>{ down=true; sx=e.clientX; sy=e.clientY; });
+    cv.addEventListener("pointermove", e=>{
+      if(!down) return;
+      const dx = e.clientX-sx, dy = e.clientY-sy;
+      if(Math.abs(dx) > 22 || Math.abs(dy) > 22){
+        if(Math.abs(dx) > Math.abs(dy)) setDir(dx>0?1:-1, 0); else setDir(0, dy>0?1:-1);
+        down = false;
+      }
+    });
+    cv.addEventListener("pointerup", ()=>down=false);
+    cv.addEventListener("pointercancel", ()=>down=false);
+    $("#snk-pause").addEventListener("click", togglePause);
+    addEventListener("keydown", e=>{
+      if(!$("#snk-screen").classList.contains("active")) return;
+      if(e.key==="ArrowLeft") setDir(-1,0); if(e.key==="ArrowRight") setDir(1,0);
+      if(e.key==="ArrowUp") setDir(0,-1);  if(e.key==="ArrowDown") setDir(0,1);
+    });
+  }
+  function togglePause(){ if(state!=="play") return; paused=!paused; AudioFX.click();
+    if(paused){ ov().classList.remove("hidden");
+      ov().innerHTML = `<h3>PAUSE</h3><button id="snk-resume" class="b2">▶ Reprendre</button>
+        <button id="snk-give" class="b3">← Repaire</button>`;
+      $("#snk-resume").addEventListener("click", togglePause);
+      $("#snk-give").addEventListener("click", quit);
+    } else hideOverlay(); }
+  function start(){
+    show("snk-screen"); cv = $("#snk-cv"); c = cv.getContext("2d"); bind();
+    running = true; paused = false; last = performance.now(); acc = 0;
+    score = 0; snake = [{x:6,y:9},{x:5,y:9},{x:4,y:9}]; dir={dx:1,dy:0}; nextDir=dir;
+    food = null; bonus = null; bonusT = 0; speed = 6;
+    AudioFX.powerOn(); showMenu();
+    if(!raf) raf = requestAnimationFrame(loop);
+  }
+  function stop(){ running = false; if(raf){ cancelAnimationFrame(raf); raf = null; } }
+  function quit(){ stop(); AudioFX.back(); renderHub(); show("hub-screen"); }
+  return { start, stop, best };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    16. TABLEAU DE BORD — stats, progression, records
    ─────────────────────────────────────────────────────────── */
 const Stats = (()=>{
@@ -9580,11 +9819,13 @@ const Stats = (()=>{
     /* Bloc arcade & tournée */
     const arc = (S.arcadeHi||[])[0];
     const brk = Breakout.best();
+    const snk = Snake.best();
     const tour = Chrono.best();
     host.insertAdjacentHTML("beforeend", `<div class="stat-block"><h3>Salle d'arcade</h3>
       <div class="stat-kpis">
         ${kpi(arc ? arc.score + " pts" : "—", "🕹 Les Vans Defense")}
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
+        ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
       </div></div>`);
