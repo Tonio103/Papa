@@ -1792,11 +1792,20 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     box-shadow:0 0 44px rgba(255,210,63,.95); } }
 }
 
-/* ── Le titre du boot se « spraye » (révélation pochoir) ──────── */
+/* ── Le titre du boot se « spraye » (révélation pochoir), puis respire ── */
 @media (prefers-reduced-motion: no-preference){
-  #boot-screen h1{ animation:tagReveal .9s steps(11) .15s both; }
+  #boot-screen h1{ animation:tagReveal .9s steps(11) .15s both,
+    titleBreathe 5s ease-in-out 1.2s infinite; }
   @keyframes tagReveal{ from{ clip-path:inset(0 100% 0 0); filter:blur(3px); }
     to{ clip-path:inset(0 -8% 0 0); filter:none; } }
+  @keyframes titleBreathe{
+    0%,100%{ transform:rotate(-1.6deg) translateY(0) scale(1); }
+    50%{ transform:rotate(-1.6deg) translateY(-4px) scale(1.02); } }
+  /* le bouton « Commencer » attire l'œil (attract mode) */
+  #btn-start{ animation:startPulse 2.3s ease-in-out .6s infinite; }
+  @keyframes startPulse{
+    0%,100%{ transform:rotate(-1deg) scale(1); }
+    50%{ transform:rotate(-1deg) scale(1.035); filter:brightness(1.08); } }
 }
 
 /* ── Invitation à rejouer (défi fini sans les 3★) ─────────────── */
@@ -4920,6 +4929,13 @@ const Cinematic = (()=>{
         const cs = Math.min(W*.4/8, H*.3/8);
         const mx = W*.5 - cs*8 - 14, my = H*.78 - 46 - cs*8;
         const n = t < 1 ? 0 : Math.min(total, Math.floor((t-1)/9.5*total));
+        /* projecteur cyan qui s'intensifie à mesure que le tag se peint */
+        { const cxt = mx + cs*4, cyt = my + cs*4;
+          const spot = c.createRadialGradient(cxt, cyt, cs, cxt, cyt, cs*9);
+          const sa = Math.min(.26, (n/total)*.3);
+          spot.addColorStop(0, `rgba(43,228,208,${sa})`);
+          spot.addColorStop(1, "rgba(43,228,208,0)");
+          c.fillStyle = spot; c.fillRect(0, 0, W, H); }
         mosaic("squid", "#2BE4D0", mx, my, cs, n);
         if(n > 0 && n < total){
           once("c"+n, ()=>{ if(n%2) AudioFX.spray(); else AudioFX.pixel(500 + (n%8)*70); });
