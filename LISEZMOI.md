@@ -54,6 +54,16 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v50) — LA TOURNÉE DE L'ARTISTE (mode contre-la-montre)
+
+Le jeu continue de vivre APRÈS la chasse : un vrai mode rejouable.
+
+- **Débloquée automatiquement** quand les 6 défis « jouables partout » sont finis (Palette, Binaire, Rubik, Simon, Cavale, Pochoir — le Spotting et la Coop restent liés aux balises posées en ville). Un bouton **🏁 La Tournée de l'artiste** apparaît alors au repaire.
+- **On enchaîne les 6 défis d'affilée**, chrono global affiché en direct dans le titre (« ⏱ 1:23 · 3/6 — Le Simon »), sans indices ni passer.
+- **Record sauvegardé** : l'écran de fin affiche le temps, célèbre un **★ RECORD ! ★** (tampon rose rayonnant, confettis, vibrations), et le bouton du repaire affiche le record à battre.
+- **« ↻ La refaire »** immédiat, **« ✕ Abandonner »** disponible à tout moment, et un nouveau succès **🏁 La Tournée**.
+- En mode `?triche=1`, un bouton « ⚡ défi suivant » permet de prévisualiser l'enchaînement.
+
 ## Nouveautés (v49) — finitions street art partout
 
 - **Toast de succès en sticker** : bord pochoir jaune en pointillés, grain béton, léger travers, nom du succès au marqueur — et une **vibration** au déblocage.

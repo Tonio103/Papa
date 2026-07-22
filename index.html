@@ -1783,6 +1783,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
     <p class="sub">Chaque défi réussi révèle un chiffre.</p>
     <h2>Galerie de l'invasion</h2>
     <div id="grid"></div>
+    <button id="btn-chrono" class="b2" hidden style="margin-top:18px;">🏁 La Tournée de l'artiste</button>
   </div>
 </section>
 
@@ -3112,6 +3113,17 @@ function renderHub(){
     }
     g.appendChild(card);
   });
+  /* mode Tournée : visible dès que les 6 défis « partout » sont finis */
+  { const bc = $("#btn-chrono");
+    if(bc){
+      const un = typeof Chrono !== "undefined" && Chrono.unlocked();
+      bc.hidden = !un;
+      if(un){
+        const bt = Chrono.best();
+        bc.innerHTML = "🏁 La Tournée de l'artiste" +
+          (bt ? ` <span style="font-size:14px; opacity:.85;">· record ${Chrono.fmt(bt)}</span>` : "");
+      }
+    } }
   Spin3D.start();                 // une seule boucle anime toutes les pièces
 }
 
@@ -3349,7 +3361,7 @@ function clearHints(){
   $("#btn-skip").hidden = true;
   $("#hint-txt").textContent = "";
 }
-function startGame(st){
+function startGame(st, onWin){
   currentStation = st;
   gameT0 = Date.now(); hintUsedThisGame = false;
   clearHints();
@@ -3362,11 +3374,13 @@ function startGame(st){
   const api = {
     station: st,
     sfx: AudioFX,
-    win(opts){ winGame(st, false, opts); },
+    /* onWin (mode tournée) court-circuite la victoire normale */
+    win(opts){ onWin ? onWin(opts) : winGame(st, false, opts); },
   };
   runCleanup();
   const ret = MiniGames[st.code](box, api);
   if(typeof ret === "function") gameCleanup = ret;
+  if(onWin) return;                     // tournée : ni indice ni passer
 
   // anti-blocage : INDICE à 4 min, PASSER à 7 min (immédiat en triche)
   const d1 = TRICHE ? 1500 : CONFIG.delaiIndiceMs;
@@ -3451,6 +3465,105 @@ function winGame(st, skipped, opts={}){
   btn.addEventListener("click", ()=>maybeTransmission(()=>{ renderHub(); show("hub-screen"); }));
   box.appendChild(btn);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   10bis. LA TOURNÉE DE L'ARTISTE — mode contre-la-montre.
+   Débloquée quand les 6 défis « jouables partout » sont finis :
+   on les enchaîne d'affilée, chrono global, record sauvegardé.
+   (Le Spotting et la Coop, liés aux balises physiques posées en
+   ville, restent dans la chasse.)
+   ─────────────────────────────────────────────────────────── */
+const Chrono = (()=>{
+  const LIST = ["LV_01","LV_02","LV_04","LV_05","LV_06","LV_08"];
+  const KEY = "invasionLesVans:tournee";
+  let running = false, idx = 0, t0 = 0, tickIv = null, quitBt = null, cheatBt = null;
+
+  const unlocked = ()=>LIST.every(c=>S.done[c]);
+  const best = ()=>{ const v = +localStorage.getItem(KEY); return v > 0 ? v : null; };
+  const fmt = ms=>{
+    const s = Math.floor(ms/1000);
+    return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0") + "," + Math.floor(ms%1000/100);
+  };
+
+  function hudTick(){
+    const st = CONFIG.stations.find(s2=>s2.code === LIST[idx]);
+    $("#game-title").textContent =
+      `⏱ ${fmt(Date.now()-t0)} · ${Math.min(idx+1, LIST.length)}/${LIST.length} — ${st ? st.nom : ""}`;
+  }
+  function addButtons(){
+    const bar = $("#hint-bar");
+    quitBt = document.createElement("button");
+    quitBt.className = "b3";
+    quitBt.textContent = "✕ Abandonner la tournée";
+    quitBt.addEventListener("click", ()=>{ AudioFX.back(); stop(); renderHub(); show("hub-screen"); });
+    bar.appendChild(quitBt);
+    if(typeof TRICHE !== "undefined" && TRICHE){
+      cheatBt = document.createElement("button");
+      cheatBt.className = "b3";
+      cheatBt.textContent = "⚡ défi suivant";
+      cheatBt.addEventListener("click", ()=>stepWin());
+      bar.appendChild(cheatBt);
+    }
+  }
+  function stepWin(){
+    if(!running) return;
+    runCleanup(); clearHints();
+    AudioFX.ok();
+    idx++;
+    if(idx >= LIST.length){ finish(); return; }
+    Juice.pop($("#game-box"), `DÉFI ${idx+1}/${LIST.length}`, "var(--cyan)");
+    setTimeout(()=>{ if(running) next(); }, 420);
+  }
+  function next(){
+    const st = CONFIG.stations.find(s2=>s2.code === LIST[idx]);
+    startGame(st, ()=>stepWin());
+    hudTick();
+  }
+  function start(){
+    running = true; idx = 0; t0 = Date.now();
+    addButtons();
+    if(tickIv) clearInterval(tickIv);
+    tickIv = setInterval(()=>{ if(running) hudTick(); }, 200);
+    AudioFX.select();
+    next();
+  }
+  function stop(){
+    running = false;
+    if(tickIv){ clearInterval(tickIv); tickIv = null; }
+    if(quitBt){ quitBt.remove(); quitBt = null; }
+    if(cheatBt){ cheatBt.remove(); cheatBt = null; }
+    runCleanup(); clearHints();
+  }
+  function finish(){
+    const total = Date.now() - t0;
+    const prev = best();
+    const record = !prev || total < prev;
+    if(record){ try{ localStorage.setItem(KEY, total); }catch(e){} }
+    stop();
+    unlockSucces("tournee");
+    const box = $("#game-box"); box.innerHTML = "";
+    $("#game-title").textContent = "🏁 Tournée terminée !";
+    Juice.stamp(box, record ? "★ RECORD ! ★" : "TOURNÉE BOUCLÉE",
+      record ? "var(--magenta)" : "var(--jaune)");
+    if(record && box.lastElementChild) box.lastElementChild.classList.add("parfait");
+    AudioFX.fanfare(); Juice.confetti(box, record ? 34 : 22);
+    try{ navigator.vibrate && navigator.vibrate(record ? [50,40,50,40,140] : [40,60,40]); }catch(e){}
+    box.insertAdjacentHTML("beforeend",
+      `<div class="pix" style="font-size:26px; color:var(--cyan); margin-top:8px;">${fmt(total)}</div>
+       <p class="sub">${record
+          ? (prev ? "Ancien record : " + fmt(prev) : "Premier temps de référence !")
+          : "Record à battre : " + fmt(prev)}</p>`);
+    const again = document.createElement("button");
+    again.className = "b2"; again.textContent = "↻ La refaire";
+    again.addEventListener("click", ()=>start());
+    box.appendChild(again);
+    const back = document.createElement("button");
+    back.className = "b3"; back.textContent = "← Retour au repaire";
+    back.addEventListener("click", ()=>{ AudioFX.back(); renderHub(); show("hub-screen"); });
+    box.appendChild(back);
+  }
+  return { start, stop, unlocked, best, fmt, isRunning:()=>running };
+})();
 
 /* ═══════════════════════════════════════════════════════════
    11bis. MENU 3D — scène navigable au doigt
@@ -4894,6 +5007,7 @@ function goTab(id){
     default:             renderHub(); show("hub-screen");
   }
 }
+$("#btn-chrono").addEventListener("click", ()=>{ AudioFX.select(); Chrono.start(); });
 document.querySelectorAll("#tabbar .tab").forEach(b=>{
   b.addEventListener("click", ()=>{
     const id = b.dataset.screen;
@@ -4951,6 +5065,7 @@ const SUCCES = [
   { id:"speed",  ico:"⏱",  nom:"Éclair",           desc:"Un défi réussi en moins de 30 s" },
   { id:"combo5", ico:"⚡", nom:"Enchaînement",     desc:"Combo ×5 dans la cavale" },
   { id:"master", ico:"👑", nom:"Maître Invader",   desc:"3 étoiles sur les 8 défis" },
+  { id:"tournee",ico:"🏁", nom:"La Tournée",       desc:"Boucler la tournée chrono de l'artiste" },
 ];
 S.succes = S.succes || {};
 S.stars  = S.stars  || {};
