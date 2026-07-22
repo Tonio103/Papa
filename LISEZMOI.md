@@ -54,6 +54,10 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v61) — accueil : projecteurs d'invasion
+
+- L'écran d'accueil gagne en intensité : **deux projecteurs** (cyan et rose) **balaient le ciel** depuis la ville, et un **halo lumineux** entoure l'escadron d'invaders. Le grand vide sombre au milieu est enfin rempli — vraie ambiance « la nuit de l'invasion ».
+
 ## Nouveautés (v60) — accueil et cinématique peaufinés
 
 - **Écran d'accueil** : après sa révélation « au spray », le titre **respire** doucement (léger flottement + pulsation), et le bouton **Commencer** pulse discrètement pour attirer l'œil.
