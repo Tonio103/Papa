@@ -2672,31 +2672,40 @@ function persist(){ Store.save(S); }
    version d'iOS, ça donne une petite tape ou rien du tout. ── */
 (function(){
   let sw = null;
+  /* l'interrupteur DOIT être réellement rendu (pas opacity:0, pas
+     display:none) sinon Safari ne déclenche aucun retour haptique.
+     On le pose donc dans un coin, quasi transparent mais bien présent. */
   function iosBuzz(){
     try{
       if(!sw){
         const l = document.createElement("label");
         l.setAttribute("aria-hidden", "true");
-        l.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;";
+        l.style.cssText = "position:fixed;right:2px;bottom:2px;width:34px;height:22px;"+
+          "opacity:0.012;z-index:-1;pointer-events:none;transform:scale(.9);";
         sw = document.createElement("input");
         sw.type = "checkbox"; sw.tabIndex = -1;
-        sw.setAttribute("switch", "");           // attribut haptique Safari
+        sw.setAttribute("switch", "");           // attribut haptique Safari (iOS 17.4+)
+        sw.style.cssText = "width:34px;height:22px;margin:0;";
         l.appendChild(sw);
         (document.body || document.documentElement).appendChild(l);
       }
-      sw.click();                                // le toggle déclenche le retour haptique iOS
+      sw.click();                                // le toggle déclenche le « toc » système iOS
     }catch(e){}
   }
-  const native = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
+  const native = (typeof navigator.vibrate === "function") ? navigator.vibrate.bind(navigator) : null;
   const buzz = (...a)=>{
     if(S.opts.haptics === false) return false;
     try{
-      if(native){ native(...a); return true; }  // Android & co
-      iosBuzz(); return true;                    // secours iPhone
+      if(native){ native(...a); return true; }  // Android & co (API standard)
+      iosBuzz(); return true;                    // secours iPhone (best-effort)
     }catch(e){ return false; }
   };
-  try{ navigator.vibrate = buzz; }              // route TOUS les appels existants
-  catch(e){ window.__buzz = buzz; }              // si non assignable : secours global
+  /* on route les appels existants ET on expose un accès global fiable,
+     au cas où l'affectation de navigator.vibrate échouerait sur iOS. */
+  window.__buzz = buzz;
+  try{ Object.defineProperty(navigator, "vibrate", { value:buzz, configurable:true, writable:true }); }
+  catch(e){ try{ navigator.vibrate = buzz; }catch(e2){} }
+  window.hapticTest = ()=>buzz([40,60,120]);    // secousse nette pour l'écran Réglages
   /* applique tout de suite la préférence « animations réduites » */
   if(S.opts.reduceFx) document.documentElement.classList.add("reduce-fx");
 })();
@@ -11202,8 +11211,15 @@ const Options = (()=>{
   }
   function build(){
     const host = $("#options-body"); host.innerHTML = "";
+    const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    /* Vibrations : toggle + bouton « Tester » (le tap fournit le geste
+       utilisateur dont iOS a besoin pour tenter un retour haptique). */
     host.insertAdjacentHTML("beforeend",
-      toggleRow("Vibrations", "Léger retour haptique — selon le téléphone (limité sur iPhone)", "haptics"));
+      `<div class="opt-row"><div class="opt-txt"><div class="opt-name">Vibrations</div>
+        <div class="opt-sub">Retour haptique${iOS ? " — sur iPhone, active « Sons &amp; retour haptique › Retour haptique système » dans Réglages iOS, et teste par un vrai appui" : " (selon le téléphone)"}</div></div>
+        <button id="opt-haptic-test" class="b3" style="font-size:13px; margin-right:4px">Tester</button>
+        <button class="opt-sw ${S.opts.haptics!==false?"on":""}" data-tog="haptics" aria-label="Vibrations"></button></div>`);
     host.insertAdjacentHTML("beforeend",
       toggleRow("Animations réduites", "Coupe les décors animés (batterie / confort)", "reduceFx"));
     /* difficulté de la borne : segmenté 3 / 5 vies */
@@ -11224,7 +11240,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v73</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v74</p>`);
     wire();
   }
   function wire(){
@@ -11260,6 +11276,15 @@ const Options = (()=>{
     const tu = $("#opt-tuto");
     if(tu) tu.addEventListener("click", ()=>{ AudioFX.select();
       renderHub(); show("hub-screen"); setTimeout(()=>{ if(typeof Tuto!=="undefined") Tuto.start(); }, 350); });
+    const ht = $("#opt-haptic-test");
+    if(ht) ht.addEventListener("click", ()=>{
+      const was = S.opts.haptics; S.opts.haptics = true;   // force le test même si coupé
+      AudioFX.select();
+      try{ (window.hapticTest || (()=>{}))(); }catch(e){}
+      S.opts.haptics = was;
+      ht.textContent = "Senti ? 📳";
+      setTimeout(()=>{ ht.textContent = "Tester"; }, 1400);
+    });
   }
   function open(){ build(); show("options-screen"); }
   return { open };
