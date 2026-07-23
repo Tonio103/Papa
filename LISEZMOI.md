@@ -54,6 +54,12 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v64) — 5ᵉ jeu d'arcade « Vol de Nuit »
+
+- Nouveau jeu dans la **borne d'arcade** : **🌙 Vol de Nuit** — un « flappy » maison. L'invader s'évade au-dessus des Vans endormis : **touche l'écran** (ou le bouton VOLER) pour un coup d'aile, et faufile-toi entre les murs tagués. Score = murs franchis, record sauvegardé, difficulté qui monte doucement. Ambiance nuit : lune, étoiles, ville en silhouette.
+- Accessible depuis la borne (bouton **Vol de Nuit** dans chaque jeu), record affiché sur le **Tableau de bord**, et nouveau succès **Noctambule** (franchir 15 murs).
+- **Correction** : les menus des jeux d'arcade **Casse-Tag, Serpent et Pong** n'étaient pas centrés (calque mal positionné) — ils s'affichent maintenant correctement en plein écran, comme « Les Vans Defense ».
+
 ## Nouveautés (v63) — passe complète sur les interfaces
 
 Même langage « atelier de tag » appliqué à **tous les écrans**, avec des composants plus lisibles et plus vivants :
