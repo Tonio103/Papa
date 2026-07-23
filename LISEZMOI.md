@@ -54,6 +54,17 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v66) — « Vol de Nuit » prend de la profondeur
+
+Le 5ᵉ jeu d'arcade devient un vrai petit jeu de score avec bonus, pouvoirs et ennemis :
+
+- **🎨 Bombes de peinture** à attraper dans les trous → des points (avec un **combo** : plus tu en enchaînes, plus elles rapportent).
+- **Pouvoirs** : **🛡 Bouclier** (encaisse un choc), **⏳ Ralenti** (les murs ralentissent), **✦ Points ×2** (double la marque un moment).
+- **Bonus de frôlement** : passer au ras d'un bord rapporte un point de plus (« FRÔLÉ ! »).
+- **Difficulté qui monte en paliers** : d'abord de simples murs, puis des **trous qui montent et descendent**, puis des **drones-sentinelles** à esquiver (annoncés par un chevron rouge sur le bord).
+- Détails : traînée derrière l'invader, particules, textes flottants (+points), éclair tous les 10 points.
+- Nouveau succès **Bombeur** (20 bombes en un seul vol). Le record reste affiché au Tableau de bord.
+
 ## Nouveautés (v65) — vibrations : bouton « Tester » + secours iPhone durci
 
 Rappel important : **iPhone/Safari ne fournit AUCUNE API de vibration web** (contrairement à Android). Le jeu tente un secours « best-effort » via un interrupteur système caché — mais sur iPhone ça ne marche **que** si :

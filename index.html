@@ -6043,7 +6043,8 @@ const SUCCES = [
   { id:"master", ico:"👑", nom:"Maître Invader",   desc:"3 étoiles sur les 8 défis" },
   { id:"tournee",ico:"🏁", nom:"La Tournée",       desc:"Boucler la tournée chrono de l'artiste" },
   { id:"arcadeur",ico:"🕹",nom:"Roi de l'arcade",  desc:"1000 pts à un jeu de la borne" },
-  { id:"noctambule",ico:"🌙",nom:"Noctambule",     desc:"Franchir 15 murs en Vol de Nuit" },
+  { id:"noctambule",ico:"🌙",nom:"Noctambule",     desc:"Atteindre 15 points en Vol de Nuit" },
+  { id:"peintre",  ico:"🎨", nom:"Bombeur",         desc:"20 bombes de peinture en un seul vol" },
   { id:"goldrush",ico:"🥇",nom:"Chasseur d'or",    desc:"3 médailles d'or (défis chrono)" },
 ];
 S.succes = S.succes || {};
@@ -10941,6 +10942,9 @@ const Fly = (()=>{
   const KEY = "invasionLesVans:fly";
   let cv, c, raf = null, running = false, paused = false, last = 0, acc = 0;
   let state = "menu", bird, walls, score, spawnX, stars3, city, sprite;
+  let items, parts, paint, combo, shielded, invT, slowT, flashT;   // bonus & pouvoirs
+  let drones, pops, droneSprite;                                    // ennemis + textes flottants
+  let multT, trail;                                                 // multiplicateur ×2 + traînée
   const best = ()=>{ const v = +localStorage.getItem(KEY); return v>0?v:0; };
 
   /* physique relative à la hauteur → même ressenti quel que soit l'écran */
@@ -10949,17 +10953,59 @@ const Fly = (()=>{
   const FLAP  = ()=> -H*.0135;
   const VMAX  = ()=> H*.020;
   const BR    = ()=> H*.016;                                  // rayon de collision
+  const IR    = ()=> H*.021;                                  // rayon d'un objet
   const GROUND= ()=> H*.08;
   const gapH  = ()=> Math.max(H*.24, H*.32 - score*H*.0035);  // se resserre doucement
   const speed = ()=> Math.min(3.0, 1.7 + score*.05);          // accélère doucement
 
   function addWall(x){
-    const g = gapH(), gr = GROUND(), top = H*.06 + Math.random()*(H-gr-H*.12-g);
-    walls.push({ x, top, g, scored:false });
+    const g = gapH(), gr = GROUND(), baseTop = H*.06 + Math.random()*(H-gr-H*.12-g);
+    /* à partir d'un certain score, le trou se met à osciller doucement */
+    const osc = score > 10 && Math.random() < .45 ? (H*.05 + Math.random()*H*.05) : 0;
+    walls.push({ x, top:baseTop, baseTop, g, osc, oscPh:Math.random()*7, scored:false });
+    /* un objet dans le trou, parfois : bombe (fréquent), pouvoirs (rares) */
+    const r = Math.random(); let type = null;
+    if(score > 5 && r < .06) type = "shield";
+    else if(score > 9 && r < .11) type = "mult";
+    else if(score > 7 && r < .17) type = "slow";
+    else if(r < .5) type = "can";
+    if(type) items.push({ x:x + WW/2, y:baseTop + g/2 + (Math.random()-.5)*g*.3,
+      type, ph:Math.random()*7 });
+    /* un drone-sentinelle patrouille (monte/descend), une fois bien lancé */
+    if(score > 15 && Math.random() < .22)
+      drones.push({ x:x + DX*.5, cy:H*.18 + Math.random()*(H-gr-H*.34),
+        y:0, amp:H*.05 + Math.random()*H*.045, ph:Math.random()*7 });
+  }
+  /* petite gerbe de pixels (ramassage, bouclier qui casse…) */
+  function burst(x, y, col, n){
+    for(let i=0;i<n;i++){ const a = Math.random()*7, s = 1 + Math.random()*2.6;
+      parts.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s - 1, life:16+Math.random()*12, col }); }
+  }
+  function collect(it){
+    if(it.type === "can"){
+      combo = Math.min(5, combo + 1); paint++;
+      const gain = (1 + combo) * (multT > 0 ? 2 : 1);         // combo + ×2 = plus de points
+      score += gain;
+      burst(it.x, it.y, "#ffd23f", 8 + combo*2);
+      pops.push({ x:it.x, y:it.y, txt:(combo>1?combo+"× ":"")+"+"+gain, col:"#ffd23f", life:34 });
+      AudioFX.pixel(620 + Math.min(8, combo)*70);
+      if(paint >= 20) unlockSucces("peintre");
+    } else if(it.type === "shield"){
+      shielded = true; burst(it.x, it.y, "#2ce8d2", 16); AudioFX.powerOn();
+      pops.push({ x:it.x, y:it.y, txt:"BOUCLIER", col:"#2ce8d2", life:40 });
+    } else if(it.type === "slow"){
+      slowT = 210; burst(it.x, it.y, "#9d5cff", 16); AudioFX.powerOn();
+      pops.push({ x:it.x, y:it.y, txt:"RALENTI", col:"#c9aaff", life:40 });
+    } else if(it.type === "mult"){
+      multT = 300; burst(it.x, it.y, "#37e37e", 16); AudioFX.powerOn();
+      pops.push({ x:it.x, y:it.y, txt:"POINTS ×2", col:"#8dffb8", life:44 });
+    }
+    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
   }
   function startRun(){
     bird = { y:H*.42, vy:0, rot:0 };
-    walls = []; score = 0; spawnX = W + 24;
+    walls = []; items = []; parts = []; drones = []; pops = []; trail = []; score = 0; spawnX = W + 24;
+    paint = 0; combo = 0; shielded = false; invT = 0; slowT = 0; flashT = 0; multT = 0;
     addWall(spawnX);
     state = "play"; paused = false; hideOverlay();
     AudioFX.select();
@@ -10975,21 +11021,63 @@ const Fly = (()=>{
     bird.vy = Math.min(VMAX(), bird.vy + GRAV());
     bird.y += bird.vy;
     bird.rot = Math.max(-.5, Math.min(1.1, bird.vy*.055));
-    const sp = speed();
+    const sp = speed() * (slowT > 0 ? .5 : 1);                // ralenti = murs plus lents
+    if(slowT > 0) slowT--;
+    if(multT > 0) multT--;
+    if(flashT > 0) flashT--;
+    const now = performance.now(), br0 = BR();
+    /* traînée de l'invader (afterimages) */
+    trail.push({ x:BX, y:bird.y }); if(trail.length > 8) trail.shift();
     walls.forEach(w=>{ w.x -= sp;
-      if(!w.scored && w.x + WW < BX){ w.scored = true; score++; AudioFX.tick();
+      if(w.osc){ w.top = Math.max(H*.05, Math.min(H-GROUND()-H*.07-w.g,
+        w.baseTop + Math.sin(now/600 + w.oscPh)*w.osc)); }   // trou qui monte/descend
+      if(!w.scored && w.x + WW < BX){ w.scored = true; combo = 0;
+        score += (multT > 0 ? 2 : 1); AudioFX.tick();
+        /* bonus de frôlement : passer tout près d'un bord rapporte */
+        const margin = Math.min(bird.y - br0 - w.top, w.top + w.g - (bird.y + br0));
+        if(margin >= 0 && margin < H*.03){ score += (multT > 0 ? 2 : 1);
+          pops.push({ x:BX+18, y:bird.y, txt:"FRÔLÉ !", col:"#ff2f86", life:34 });
+          burst(BX, bird.y, "#ff2f86", 6); AudioFX.pixel(880); }
+        if(score % 10 === 0){ flashT = 12; AudioFX.star(2); }     // palier tous les 10
         try{ navigator.vibrate && navigator.vibrate(6); }catch(e){} }
     });
     if(walls.length && walls[0].x < -WW) walls.shift();
     const lastW = walls[walls.length-1];
     if(!lastW || lastW.x < W - DX) addWall(W + 10);
-    /* collisions : sol/plafond + murs */
-    const by = bird.y, br = BR();
-    if(by - br < 0 || by + br > H - GROUND()){ return die(); }
-    for(const w of walls){
+    /* objets : défilent, se ramassent au contact */
+    const br = BR(), ir = IR();
+    for(let i=items.length-1;i>=0;i--){ const it = items[i]; it.x -= sp;
+      if(it.x < -16){ items.splice(i,1); continue; }
+      if(Math.abs(it.x - BX) < br+ir && Math.abs(it.y - bird.y) < br+ir){
+        items.splice(i,1); collect(it); }
+    }
+    /* drones-sentinelles : patrouillent en oscillant, à éviter */
+    const dr = H*.022;
+    for(let i=drones.length-1;i>=0;i--){ const d = drones[i]; d.x -= sp;
+      d.y = d.cy + Math.sin(now/500 + d.ph)*d.amp;
+      if(d.x < -20) drones.splice(i,1); }
+    /* particules + textes flottants */
+    for(let i=parts.length-1;i>=0;i--){ const p = parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .12; if(--p.life <= 0) parts.splice(i,1); }
+    for(let i=pops.length-1;i>=0;i--){ const p = pops[i]; p.y -= .7; if(--p.life <= 0) pops.splice(i,1); }
+    /* collisions : sol/plafond + murs + drones — le bouclier en absorbe une */
+    if(invT > 0){ invT--; return; }
+    const by = bird.y;
+    let hit = (by - br < 0 || by + br > H - GROUND());
+    if(!hit){ for(const w of walls){
       if(BX + br > w.x && BX - br < w.x + WW){
-        if(by - br < w.top || by + br > w.top + w.g){ return die(); }
+        if(by - br < w.top || by + br > w.top + w.g){ hit = true; break; }
       }
+    }}
+    if(!hit){ for(const d of drones){
+      if(Math.abs(d.x - BX) < br+dr && Math.abs(d.y - by) < br+dr){ hit = true; break; }
+    }}
+    if(hit){
+      if(shielded){ shielded = false; invT = 34;
+        bird.vy = (by < H*.4) ? Math.abs(FLAP())*.5 : FLAP()*.6;   // rebond loin du bord
+        burst(BX, by, "#2ce8d2", 20); AudioFX.err();
+        try{ navigator.vibrate && navigator.vibrate([18,28,18]); }catch(e){}
+      } else return die();
     }
   }
   function die(){
@@ -11006,8 +11094,8 @@ const Fly = (()=>{
   function showMenu(){
     state = "menu"; ov().classList.remove("hidden");
     ov().innerHTML = `<h3>VOL DE<br>NUIT</h3>
-      <div class="arc-sub">L'invader s'évade au-dessus des Vans.<br>TOUCHE l'écran pour un coup d'aile,<br>faufile-toi entre les murs.</div>
-      ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} murs 🏆</div>`:""}
+      <div class="arc-sub">L'invader s'évade au-dessus des Vans.<br>TOUCHE l'écran pour un coup d'aile, faufile-toi.<br>🎨 bombes = points · 🛡 bouclier · ⏳ ralenti</div>
+      ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} pts 🏆</div>`:""}
       <button id="fly-play" class="b2">▶ S'envoler</button>
       <button id="fly-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="fly-quit" class="b3">← Repaire</button>`;
@@ -11018,7 +11106,7 @@ const Fly = (()=>{
   function showOver(rec){
     ov().classList.remove("hidden");
     ov().innerHTML = `<h3>${rec ? "RECORD !" : "PERDU…"}</h3>
-      <div class="arc-sub">${score} mur${score>1?"s":""} franchi${score>1?"s":""}</div>
+      <div class="arc-sub">${score} point${score>1?"s":""}${paint?` · 🎨 ${paint} bombe${paint>1?"s":""}`:""}</div>
       <div class="arc-sub">Record : ${best()} 🏆</div>
       <button id="fly-again" class="b2">↻ Rejouer</button>
       <button id="fly-back" class="b3">← Repaire</button>`;
@@ -11054,16 +11142,96 @@ const Fly = (()=>{
     /* ville silhouette + sol */
     c.fillStyle = "#0d0d22"; c.fillRect(0, H-gr, W, gr);
     city.forEach(b=> c.fillRect(b[0], H-gr-b[1], b[2], b[1]) );
+    /* objets à ramasser */
+    const ir = IR(), now = performance.now();
+    (items||[]).forEach(it=>{
+      const bob = Math.sin(now/300 + it.ph)*2.5, ix = it.x, iy = it.y + bob;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const gcol = it.type==="shield" ? "#2ce8d2" : it.type==="slow" ? "#9d5cff"
+        : it.type==="mult" ? "#37e37e" : "#ffd23f";
+      const gg = c.createRadialGradient(ix, iy, 1, ix, iy, ir*2.4);
+      gg.addColorStop(0, hexA(gcol,.5)); gg.addColorStop(1, hexA(gcol,0));
+      c.fillStyle = gg; c.beginPath(); c.arc(ix, iy, ir*2.4, 0, 7); c.fill(); c.restore();
+      if(it.type === "can"){                                   // bombe de peinture
+        c.fillStyle = "#ffd23f"; c.fillRect(ix-ir*.45, iy-ir*.7, ir*.9, ir*1.4);
+        c.fillStyle = "#0a0710"; c.fillRect(ix-ir*.2, iy-ir*.95, ir*.4, ir*.28);
+        c.fillStyle = "#ff2f86"; c.fillRect(ix-ir*.45, iy-ir*.1, ir*.9, ir*.28);
+      } else if(it.type === "shield"){                         // bouclier
+        c.strokeStyle = "#2ce8d2"; c.lineWidth = 2;
+        c.beginPath(); c.arc(ix, iy, ir*.8, 0, 7); c.stroke();
+        c.fillStyle = "#2ce8d2"; c.fillRect(ix-1, iy-ir*.55, 2, ir*1.1);
+        c.fillRect(ix-ir*.55, iy-1, ir*1.1, 2);
+      } else if(it.type === "slow"){                           // ralenti (sablier)
+        c.fillStyle = "#c9aaff";
+        c.beginPath(); c.moveTo(ix-ir*.55, iy-ir*.6); c.lineTo(ix+ir*.55, iy-ir*.6);
+        c.lineTo(ix, iy); c.closePath(); c.fill();
+        c.beginPath(); c.moveTo(ix-ir*.55, iy+ir*.6); c.lineTo(ix+ir*.55, iy+ir*.6);
+        c.lineTo(ix, iy); c.closePath(); c.fill();
+      } else {                                                 // ×2 (étoile verte)
+        c.fillStyle = "#8dffb8"; c.font = `800 ${ir*1.5}px 'Baloo 2', sans-serif`;
+        c.textAlign = "center"; c.fillText("★", ix, iy+ir*.55); c.textAlign = "left";
+      }
+    });
+    /* drones-sentinelles ennemis (invader rouge + halo menaçant) */
+    const dsz = Math.max(14, H*.028);
+    (drones||[]).forEach(d=>{
+      c.save(); c.globalCompositeOperation = "lighter";
+      const gg = c.createRadialGradient(d.x, d.y, 1, d.x, d.y, dsz*1.6);
+      gg.addColorStop(0, "rgba(255,47,134,.4)"); gg.addColorStop(1, "rgba(255,47,134,0)");
+      c.fillStyle = gg; c.beginPath(); c.arc(d.x, d.y, dsz*1.6, 0, 7); c.fill(); c.restore();
+      if(droneSprite){ c.imageSmoothingEnabled = false;
+        c.drawImage(droneSprite, d.x-dsz*.5, d.y-dsz*.45, dsz, dsz*.9); }
+      else{ c.fillStyle = "#ff2f86"; c.fillRect(d.x-dsz*.5, d.y-dsz*.4, dsz, dsz*.8); }
+      /* chevron d'alerte au bord droit quand le drone n'est pas encore visible */
+      if(d.x > W - 2){
+        const wy = Math.max(8, Math.min(H-GROUND()-8, d.y)), bl = .4 + Math.abs(Math.sin(now/140))*.6;
+        c.fillStyle = hexA("#ff2f86", bl);
+        c.beginPath(); c.moveTo(W-3, wy-6); c.lineTo(W-3, wy+6); c.lineTo(W-11, wy); c.closePath(); c.fill();
+      }
+    });
+    /* traînée de l'invader */
+    c.globalCompositeOperation = "lighter";
+    (trail||[]).forEach((t,i)=>{ c.globalAlpha = (i/trail.length)*.28;
+      c.fillStyle = multT>0 ? "#8dffb8" : "#2ce8d2";
+      const r = Math.max(9, H*.018)*(i/trail.length);
+      c.beginPath(); c.arc(t.x, t.y, r, 0, 7); c.fill(); });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
     /* l'invader (avec inclinaison selon la vitesse) */
     const sz = Math.max(16, H*.032);
     c.save(); c.translate(BX, bird.y); c.rotate(bird.rot);
     if(sprite){ c.imageSmoothingEnabled = false; c.drawImage(sprite, -sz*.56, -sz*.5, sz*1.12, sz); }
     else{ c.fillStyle = "#2ce8d2"; c.fillRect(-sz*.5,-sz*.42,sz,sz*.85); }
     c.restore();
+    /* bulle de bouclier autour de l'invader */
+    if(shielded || invT > 0){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const pr = sz*(.95 + Math.sin(now/160)*.08), a = invT>0 ? (invT/34)*.5+.3 : .6;
+      c.strokeStyle = hexA("#2ce8d2", a); c.lineWidth = 2;
+      c.beginPath(); c.arc(BX, bird.y, pr, 0, 7); c.stroke(); c.restore();
+    }
+    /* particules */
+    c.globalCompositeOperation = "lighter";
+    (parts||[]).forEach(p=>{ c.globalAlpha = Math.max(0, p.life/28); c.fillStyle = p.col;
+      c.fillRect(p.x-1.5, p.y-1.5, 3, 3); });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    /* textes flottants (« +3 », « BOUCLIER »…) */
+    c.textAlign = "center"; c.font = `800 ${Math.max(9,H*.022)}px 'Baloo 2', sans-serif`;
+    (pops||[]).forEach(p=>{ c.globalAlpha = Math.max(0, p.life/34); c.fillStyle = p.col;
+      c.fillText(p.txt, p.x, p.y); });
+    c.globalAlpha = 1; c.textAlign = "left";
+    /* teinte violette pendant le ralenti + éclair de palier */
+    if(slowT > 0){ c.fillStyle = "rgba(120,70,200,.12)"; c.fillRect(0,0,W,H); }
+    if(flashT > 0){ c.fillStyle = `rgba(255,255,255,${flashT/12*.18})`; c.fillRect(0,0,W,H); }
     c.restore();
   }
   function updateHud(){
     $("#fly-score").textContent = score|0;
+    let info = "VOL DE NUIT";
+    if(multT > 0) info = "✦ POINTS ×2";
+    else if(shielded) info = "🛡 BOUCLIER";
+    else if(slowT > 0) info = "⏳ RALENTI";
+    else if(paint > 0) info = "🎨 " + paint;
+    $("#fly-info").textContent = info;
     $("#fly-best").textContent = "🏆 " + best();
   }
   function loop(now){
@@ -11098,6 +11266,7 @@ const Fly = (()=>{
     city = []; { let x=0; while(x<W){ const bw=10+Math.random()*16, bh=6+Math.random()*18;
       city.push([x, bh, bw]); x += bw+2; } }
     if(!sprite){ try{ sprite = flatSprite("squid", "#2ce8d2", 4); }catch(e){ sprite = null; } }
+    if(!droneSprite){ try{ droneSprite = flatSprite("crab", "#ff2f86", 4); }catch(e){ droneSprite = null; } }
     AudioFX.powerOn(); showMenu();
     if(!raf) raf = requestAnimationFrame(loop);
   }
@@ -11105,7 +11274,9 @@ const Fly = (()=>{
   function quit(){ stop(); AudioFX.back(); renderHub(); show("hub-screen"); }
   /* getter lecture seule pour l'auto-test (état privé du jeu) */
   const peek = ()=>({ y:bird&&bird.y, walls:(walls||[]).map(w=>({x:w.x,top:w.top,g:w.g})),
-    H, BX, WW, playing:state==="play", score });
+    items:(items||[]).map(it=>({x:it.x,y:it.y,type:it.type})),
+    drones:(drones||[]).map(d=>({x:d.x,y:d.y})),
+    H, BX, WW, playing:state==="play", score, paint, shielded, slow:slowT>0 });
   return { start, stop, best, peek };
 })();
 
@@ -11240,7 +11411,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v74</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v75</p>`);
     wire();
   }
   function wire(){
