@@ -54,6 +54,15 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v62) — accueil vivant + une vraie cinématique
+
+- **Écran d'accueil** : la ville prend vie. Sur les toits du premier plan, un **artiste à capuche bombe un invader en boucle** (tesselle par tesselle, halo qui grandit, jet de peinture), pendant qu'il **pleut**, que la **poussière lumineuse monte**, que **deux réverbères** réchauffent la scène et qu'un **chat de gouttière** veille. Le texte d'intro raconte enfin une histoire (« cette nuit, 8 pièces ont été posées… PAPA, à toi de jouer »).
+- **Cinématique** : nouveau plan **« LA TOURNÉE »** — la caméra longe un mur sans fin où les **8 vraies pièces du jeu s'allument une à une, avec le nom de leur défi** (La Palette, Le Binaire… Le Pochoir), tandis que l'artiste court de toit en toit. On « vend » la chasse à venir.
+- **Nuit vivante** partout : poussière de peinture qui monte, **voiture** dont les phares balaient le mur, **chat**, **enseigne néon** qui grésille, **antenne** au phare rouge clignotant.
+- **Radar** enrichi : chaque écho porte désormais le **nom du lieu-défi**, avec triangulation et **réticule de verrouillage** doré.
+- **Aube** : rayons de soleil levant entre les immeubles, et l'artiste qui **s'éloigne dans la lumière**, sa tournée finie.
+- **Final** repensé : les **six invaders se matérialisent en arc** dans une onde de choc et un jaillissement d'hyperespace, avant le tampon « AGENT [prénom] · LA CHASSE COMMENCE ».
+
 ## Nouveautés (v61) — accueil : projecteurs d'invasion
 
 - L'écran d'accueil gagne en intensité : **deux projecteurs** (cyan et rose) **balaient le ciel** depuis la ville, et un **halo lumineux** entoure l'escadron d'invaders. Le grand vide sombre au milieu est enfin rempli — vraie ambiance « la nuit de l'invasion ».
