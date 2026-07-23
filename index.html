@@ -1605,14 +1605,18 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   border:2.5px solid var(--spray-cyan) !important; border-radius:12px; overflow:hidden;
   background:radial-gradient(120% 90% at 50% 0%, #101430 0%, #0a0a1c 70%, #06060f 100%);
   box-shadow:6px 8px 0 rgba(0,0,0,.45), inset 0 0 40px rgba(43,232,208,.06); }
-#arcade-cv, #brk-cv, #snk-cv, #png-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
-#arc-overlay{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+#arcade-cv, #brk-cv, #snk-cv, #png-cv, #fly-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
+#arc-overlay, #brk-overlay, #snk-overlay, #png-overlay, #fly-overlay{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
   justify-content:center; text-align:center; gap:12px; padding:22px;
   background:rgba(6,6,15,.82); backdrop-filter:blur(3px); }
-#arc-overlay.hidden{ display:none; }
-#arc-overlay h3{ font-family:var(--f-graff); font-size:30px; color:var(--paint);
+#arc-overlay.hidden, #brk-overlay.hidden, #snk-overlay.hidden,
+#png-overlay.hidden, #fly-overlay.hidden{ display:none; }
+#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3{
+  font-family:var(--f-graff); font-size:30px; color:var(--paint);
   letter-spacing:1.5px; text-shadow:3px 4px 0 var(--spray-pink), 0 0 22px rgba(255,47,134,.5); }
-#arc-overlay .arc-sub{ color:var(--ink-soft); font-size:16px; line-height:1.4; }
+#arc-overlay .arc-sub, #brk-overlay .arc-sub, #snk-overlay .arc-sub,
+#png-overlay .arc-sub, #fly-overlay .arc-sub{ color:var(--ink-soft); font-size:16px; line-height:1.4; }
 #arc-overlay .hi-list{ font-family:var(--f-pix); font-size:12px; line-height:1.9; color:var(--spray-yellow); }
 #arc-overlay input{ font-family:var(--f-pix); font-size:22px; text-transform:uppercase; text-align:center;
   width:120px; letter-spacing:8px; padding:10px; border-radius:10px; border:2.5px solid var(--spray-cyan);
@@ -1989,12 +1993,12 @@ button:focus-visible, input:focus-visible, .tab:focus-visible{
 
 /* ── L. OVERLAYS D'ARCADE : texte lisible sur un voile béton ───── */
 #arc-overlay:not(.hidden), #brk-overlay:not(.hidden),
-#snk-overlay:not(.hidden), #png-overlay:not(.hidden){
+#snk-overlay:not(.hidden), #png-overlay:not(.hidden), #fly-overlay:not(.hidden){
   background:
     radial-gradient(120% 90% at 50% 40%, rgba(12,10,18,.55), rgba(8,7,14,.86)) !important;
   backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
 }
-#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3{
+#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3{
   text-shadow:-2px -2px 0 #0a0710, 2px -2px 0 #0a0710, -2px 2px 0 #0a0710, 2px 2px 0 #0a0710,
     0 0 22px rgba(255,47,134,.4) !important; }
 #arc-overlay .hi-list{ background:rgba(0,0,0,.3); border:1.5px solid rgba(255,210,63,.3);
@@ -2459,6 +2463,25 @@ button.b2{ color:#04231d !important; }
     <div id="arc-pad">
       <button id="png-left" class="arc-btn">◀</button>
       <button id="png-right" class="arc-btn">▶</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ÉCRAN 11quinquies : VOL DE NUIT (flappy invader) ═══ -->
+<section id="fly-screen" class="screen">
+  <div class="screen-inner" id="fly-inner">
+    <div id="arcade-hud">
+      <span id="fly-score" class="pix">0</span>
+      <span id="fly-info" class="pix">VOL DE NUIT</span>
+      <span id="fly-best" class="pix">🏆 0</span>
+      <button id="fly-pause" class="b3">❚❚</button>
+    </div>
+    <div id="arcade-stage" style="border-color:var(--spray-cyan) !important;">
+      <canvas id="fly-cv"></canvas>
+      <div id="fly-overlay"></div>
+    </div>
+    <div id="arc-pad">
+      <button id="fly-flap" class="arc-btn arc-fire" style="flex:1;">◆ VOLER</button>
     </div>
   </div>
 </section>
@@ -3426,6 +3449,7 @@ function showNow(id){
   if(id!=="brk-screen" && typeof Breakout !== "undefined") Breakout.stop(); // stoppe le casse-briques
   if(id!=="snk-screen" && typeof Snake !== "undefined") Snake.stop();       // stoppe le serpent
   if(id!=="png-screen" && typeof Pong !== "undefined") Pong.stop();         // stoppe le pong
+  if(id!=="fly-screen" && typeof Fly !== "undefined") Fly.stop();           // stoppe le vol de nuit
   if(id==="hub-screen"){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
@@ -6010,6 +6034,7 @@ const SUCCES = [
   { id:"master", ico:"👑", nom:"Maître Invader",   desc:"3 étoiles sur les 8 défis" },
   { id:"tournee",ico:"🏁", nom:"La Tournée",       desc:"Boucler la tournée chrono de l'artiste" },
   { id:"arcadeur",ico:"🕹",nom:"Roi de l'arcade",  desc:"1000 pts à un jeu de la borne" },
+  { id:"noctambule",ico:"🌙",nom:"Noctambule",     desc:"Franchir 15 murs en Vol de Nuit" },
   { id:"goldrush",ico:"🥇",nom:"Chasseur d'or",    desc:"3 médailles d'or (défis chrono)" },
 ];
 S.succes = S.succes || {};
@@ -9849,12 +9874,14 @@ const Arcade = (()=>{
       <button id="arc-survie" class="b3">♾ Mode survie</button>
       <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>
       <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>
-      <button id="arc-topng" class="b3">🏓 Pong Invader</button>`;
+      <button id="arc-topng" class="b3">🏓 Pong Invader</button>
+      <button id="arc-tofly" class="b3">🌙 Vol de Nuit</button>`;
     $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(false); });
     $("#arc-survie").addEventListener("click", ()=>{ AudioFX.select(); startRun(true); });
     $("#arc-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#arc-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
     $("#arc-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
+    $("#arc-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
   }
   function showOver(victory){
     ov().classList.remove("hidden");
@@ -10410,11 +10437,13 @@ const Breakout = (()=>{
       <button id="brk-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="brk-tosnk" class="b3">🐍 Serpent Invader</button>
       <button id="brk-topng" class="b3">🏓 Pong Invader</button>
+      <button id="brk-tofly" class="b3">🌙 Vol de Nuit</button>
       <button id="brk-quit" class="b3">← Repaire</button>`;
     $("#brk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#brk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#brk-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
     $("#brk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
+    $("#brk-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
     $("#brk-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -10598,11 +10627,13 @@ const Snake = (()=>{
       <button id="snk-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="snk-tobrk" class="b3">🧱 Casse-Tag</button>
       <button id="snk-topng" class="b3">🏓 Pong Invader</button>
+      <button id="snk-tofly" class="b3">🌙 Vol de Nuit</button>
       <button id="snk-quit" class="b3">← Repaire</button>`;
     $("#snk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#snk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#snk-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#snk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
+    $("#snk-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
     $("#snk-quit").addEventListener("click", quit);
   }
   function showOver(){
@@ -10806,9 +10837,11 @@ const Pong = (()=>{
       ${wins()?`<div class="arc-sub" style="color:var(--spray-yellow)">Victoires : ${wins()} 🏆</div>`:""}
       <button id="png-play" class="b2">▶ Jouer</button>
       <button id="png-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="png-tofly" class="b3">🌙 Vol de Nuit</button>
       <button id="png-quit" class="b3">← Repaire</button>`;
     $("#png-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#png-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#png-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
     $("#png-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -10890,6 +10923,184 @@ const Pong = (()=>{
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   15quinquies. VOL DE NUIT — l'invader s'échappe au-dessus des
+   Vans endormis : un seul geste (TAP = coup d'aile), il faut
+   se faufiler entre les murs tagués. Score = murs franchis.
+   ─────────────────────────────────────────────────────────── */
+const Fly = (()=>{
+  const W = 180; let H = 520;
+  const KEY = "invasionLesVans:fly";
+  let cv, c, raf = null, running = false, paused = false, last = 0, acc = 0;
+  let state = "menu", bird, walls, score, spawnX, stars3, city, sprite;
+  const best = ()=>{ const v = +localStorage.getItem(KEY); return v>0?v:0; };
+
+  /* physique relative à la hauteur → même ressenti quel que soit l'écran */
+  const BX = 48, WW = 28, DX = 118;
+  const GRAV  = ()=> H*.00082;
+  const FLAP  = ()=> -H*.0135;
+  const VMAX  = ()=> H*.020;
+  const BR    = ()=> H*.016;                                  // rayon de collision
+  const GROUND= ()=> H*.08;
+  const gapH  = ()=> Math.max(H*.24, H*.32 - score*H*.0035);  // se resserre doucement
+  const speed = ()=> Math.min(3.0, 1.7 + score*.05);          // accélère doucement
+
+  function addWall(x){
+    const g = gapH(), gr = GROUND(), top = H*.06 + Math.random()*(H-gr-H*.12-g);
+    walls.push({ x, top, g, scored:false });
+  }
+  function startRun(){
+    bird = { y:H*.42, vy:0, rot:0 };
+    walls = []; score = 0; spawnX = W + 24;
+    addWall(spawnX);
+    state = "play"; paused = false; hideOverlay();
+    AudioFX.select();
+  }
+  function flap(){
+    if(state === "menu"){ startRun(); return; }
+    if(state === "over"){ return; }
+    if(paused) return;
+    bird.vy = FLAP(); AudioFX.pixel(720);
+    try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+  }
+  function step(){
+    bird.vy = Math.min(VMAX(), bird.vy + GRAV());
+    bird.y += bird.vy;
+    bird.rot = Math.max(-.5, Math.min(1.1, bird.vy*.055));
+    const sp = speed();
+    walls.forEach(w=>{ w.x -= sp;
+      if(!w.scored && w.x + WW < BX){ w.scored = true; score++; AudioFX.tick();
+        try{ navigator.vibrate && navigator.vibrate(6); }catch(e){} }
+    });
+    if(walls.length && walls[0].x < -WW) walls.shift();
+    const lastW = walls[walls.length-1];
+    if(!lastW || lastW.x < W - DX) addWall(W + 10);
+    /* collisions : sol/plafond + murs */
+    const by = bird.y, br = BR();
+    if(by - br < 0 || by + br > H - GROUND()){ return die(); }
+    for(const w of walls){
+      if(BX + br > w.x && BX - br < w.x + WW){
+        if(by - br < w.top || by + br > w.top + w.g){ return die(); }
+      }
+    }
+  }
+  function die(){
+    AudioFX.err();
+    try{ navigator.vibrate && navigator.vibrate([30,40,90]); }catch(e){}
+    const rec = score > best();
+    if(rec){ try{ localStorage.setItem(KEY, score); }catch(e){}
+      if(typeof checkMetaSucces === "function") checkMetaSucces(); }
+    if(score >= 15) unlockSucces("noctambule");
+    state = "over"; showOver(rec);
+  }
+  const ov = ()=>$("#fly-overlay");
+  function hideOverlay(){ ov().classList.add("hidden"); ov().innerHTML = ""; }
+  function showMenu(){
+    state = "menu"; ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>VOL DE<br>NUIT</h3>
+      <div class="arc-sub">L'invader s'évade au-dessus des Vans.<br>TOUCHE l'écran pour un coup d'aile,<br>faufile-toi entre les murs.</div>
+      ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} murs 🏆</div>`:""}
+      <button id="fly-play" class="b2">▶ S'envoler</button>
+      <button id="fly-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="fly-quit" class="b3">← Repaire</button>`;
+    $("#fly-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#fly-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#fly-quit").addEventListener("click", quit);
+  }
+  function showOver(rec){
+    ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>${rec ? "RECORD !" : "PERDU…"}</h3>
+      <div class="arc-sub">${score} mur${score>1?"s":""} franchi${score>1?"s":""}</div>
+      <div class="arc-sub">Record : ${best()} 🏆</div>
+      <button id="fly-again" class="b2">↻ Rejouer</button>
+      <button id="fly-back" class="b3">← Repaire</button>`;
+    $("#fly-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#fly-back").addEventListener("click", quit);
+  }
+  function draw(){
+    const dpr = Math.min(2, devicePixelRatio||1);
+    const cw = cv.clientWidth||300, ch = cv.clientHeight||400;
+    if(cv.width !== Math.round(cw*dpr)){ cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr); }
+    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,cw,ch);
+    const scale = Math.min(cw/W, ch/H), ox = (cw-W*scale)/2, oy = (ch-H*scale)/2;
+    c.save(); c.translate(ox,oy); c.scale(scale,scale);
+    /* ciel de nuit */
+    const sky = c.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,"#0a0a20"); sky.addColorStop(1,"#191436");
+    c.fillStyle = sky; c.fillRect(0,0,W,H);
+    const gr = GROUND();
+    /* lune + étoiles */
+    c.fillStyle = "rgba(244,240,214,.9)"; c.beginPath(); c.arc(W-34, H*.09, 13, 0, 7); c.fill();
+    c.fillStyle = "rgba(223,230,255,.7)";
+    stars3.forEach(s=>c.fillRect(s[0], s[1]*H, s[2], s[2]));
+    /* murs tagués */
+    walls.forEach(w=>{
+      c.fillStyle = "#241f3e"; c.strokeStyle = "#2ce8d2"; c.lineWidth = 1.5;
+      c.fillRect(w.x, 0, WW, w.top);
+      c.fillRect(w.x, w.top+w.g, WW, H-gr-(w.top+w.g));
+      c.strokeRect(w.x+.75, w.top-6, WW-1.5, 6);            // rebord haut
+      c.strokeRect(w.x+.75, w.top+w.g, WW-1.5, 6);          // rebord bas
+      c.fillStyle = "rgba(44,232,210,.10)";                 // liseré néon du passage
+      c.fillRect(w.x-1, w.top-1, 2, w.g+2); c.fillRect(w.x+WW-1, w.top-1, 2, w.g+2);
+    });
+    /* ville silhouette + sol */
+    c.fillStyle = "#0d0d22"; c.fillRect(0, H-gr, W, gr);
+    city.forEach(b=> c.fillRect(b[0], H-gr-b[1], b[2], b[1]) );
+    /* l'invader (avec inclinaison selon la vitesse) */
+    const sz = Math.max(16, H*.032);
+    c.save(); c.translate(BX, bird.y); c.rotate(bird.rot);
+    if(sprite){ c.imageSmoothingEnabled = false; c.drawImage(sprite, -sz*.56, -sz*.5, sz*1.12, sz); }
+    else{ c.fillStyle = "#2ce8d2"; c.fillRect(-sz*.5,-sz*.42,sz,sz*.85); }
+    c.restore();
+    c.restore();
+  }
+  function updateHud(){
+    $("#fly-score").textContent = score|0;
+    $("#fly-best").textContent = "🏆 " + best();
+  }
+  function loop(now){
+    if(!running){ raf = null; return; }
+    if(!$("#fly-screen").classList.contains("active")){ raf = requestAnimationFrame(loop); return; }
+    if(cv.clientWidth){ const nh = Math.round(W * cv.clientHeight / cv.clientWidth);
+      if(nh > 340 && nh < 940) H = nh; }
+    const dt = Math.min(0.05,(now-last)/1000); last = now;
+    if(state === "play" && !paused){ acc += dt; while(acc >= 1/60){ step(); acc -= 1/60; } }
+    updateHud(); draw(); raf = requestAnimationFrame(loop);
+  }
+  let bound = false;
+  function bind(){
+    if(bound) return; bound = true;
+    const tap = e=>{ e.preventDefault(); flap(); };
+    cv.addEventListener("pointerdown", tap);
+    $("#fly-flap").addEventListener("pointerdown", tap);
+    $("#fly-pause").addEventListener("click", togglePause);
+  }
+  function togglePause(){ if(state!=="play") return; paused=!paused; AudioFX.click();
+    if(paused){ ov().classList.remove("hidden");
+      ov().innerHTML = `<h3>PAUSE</h3><button id="fly-resume" class="b2">▶ Reprendre</button>
+        <button id="fly-give" class="b3">← Repaire</button>`;
+      $("#fly-resume").addEventListener("click", togglePause);
+      $("#fly-give").addEventListener("click", quit);
+    } else hideOverlay(); }
+  function start(){
+    show("fly-screen"); cv = $("#fly-cv"); c = cv.getContext("2d"); bind();
+    running = true; paused = false; last = performance.now(); acc = 0;
+    score = 0; walls = []; bird = { y:H*.42, vy:0, rot:0 };
+    stars3 = Array.from({length:26}, ()=>[Math.random()*W, Math.random()*.6, Math.random()<.3?2:1]);
+    city = []; { let x=0; while(x<W){ const bw=10+Math.random()*16, bh=6+Math.random()*18;
+      city.push([x, bh, bw]); x += bw+2; } }
+    if(!sprite){ try{ sprite = flatSprite("squid", "#2ce8d2", 4); }catch(e){ sprite = null; } }
+    AudioFX.powerOn(); showMenu();
+    if(!raf) raf = requestAnimationFrame(loop);
+  }
+  function stop(){ running = false; if(raf){ cancelAnimationFrame(raf); raf = null; } }
+  function quit(){ stop(); AudioFX.back(); renderHub(); show("hub-screen"); }
+  /* getter lecture seule pour l'auto-test (état privé du jeu) */
+  const peek = ()=>({ y:bird&&bird.y, walls:(walls||[]).map(w=>({x:w.x,top:w.top,g:w.g})),
+    H, BX, WW, playing:state==="play", score });
+  return { start, stop, best, peek };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    16. TABLEAU DE BORD — stats, progression, records
    ─────────────────────────────────────────────────────────── */
 const Stats = (()=>{
@@ -10946,6 +11157,7 @@ const Stats = (()=>{
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
         ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
         ${kpi(Pong.wins() ? Pong.wins() + " 🏆" : "—", "🏓 Pong (victoires)")}
+        ${kpi(Fly.best() ? Fly.best() + " murs" : "—", "🌙 Vol de Nuit")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
         ${kpi((S.daily&&S.daily.streak)?S.daily.streak+" 🔥":"—", "🎯 Défi du jour (série)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
@@ -11012,7 +11224,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v72</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v73</p>`);
     wire();
   }
   function wire(){
