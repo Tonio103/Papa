@@ -1818,6 +1818,317 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   .replay-chip{ animation:replayPulse 2.4s ease-in-out infinite; }
   @keyframes replayPulse{ 50%{ opacity:.5; } }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ✦✦ PASSE UI COMPLÈTE ✦✦ — même langage « atelier de tag » sur TOUS
+   les écrans : viseurs à équerres, radar-lunette, clavier pochoir,
+   champs sprayés, puces d'état, fondus de défilement. Ciblage par ID
+   (aucune retouche HTML) → dernier bloc, gagne la cascade.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── A. En-têtes d'écran : respiration + petit repère cohérent ──── */
+.screen-inner > h2:first-child{ margin-top:calc(10px + var(--sat,0px)); }
+.screen-inner > .sub{ margin-bottom:4px; }
+/* accessibilité : focus visible au clavier sur tous les contrôles */
+button:focus-visible, input:focus-visible, .tab:focus-visible{
+  outline:3px solid var(--spray-cyan) !important; outline-offset:2px !important; }
+
+/* ── B. Champs de saisie = plaque pochoir sprayée ──────────────── */
+#manual input, #manual-in{
+  flex:1 1 auto !important; min-width:0 !important;
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.28)) !important;
+  background-size:150px 150px, auto !important;
+  background-blend-mode:soft-light, normal !important;
+  color:var(--paint) !important; font-family:var(--f-graff) !important;
+  letter-spacing:2px !important; font-size:20px !important; text-align:center;
+  border:2.5px solid rgba(255,255,255,.28) !important; border-radius:12px !important;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.5), 4px 5px 0 rgba(0,0,0,.4) !important;
+}
+#manual input::placeholder, #manual-in::placeholder{
+  color:rgba(243,238,226,.32) !important; letter-spacing:2px; }
+#manual input:focus, #manual-in:focus{
+  border-color:var(--spray-cyan) !important;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.5), 0 0 0 3px rgba(44,232,210,.25),
+    0 0 18px rgba(44,232,210,.4) !important; }
+#manual{ align-items:center; }
+#manual button{ flex:0 0 auto; padding:14px 22px !important; }
+
+/* ── C. VISEURS (scan + selfie) : équerres de ciblage animées ──── */
+#cam-wrap, #selfie-wrap{ position:relative; overflow:hidden;
+  border:2.5px solid rgba(255,255,255,.22) !important; border-radius:16px !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), inset 0 0 60px rgba(0,0,0,.55) !important; }
+/* les 4 équerres, dessinées en 8 traits de dégradé (coins nets) */
+#cam-wrap::before, #selfie-wrap::before{
+  content:""; position:absolute; inset:12px; z-index:5; pointer-events:none;
+  --ac:var(--spray-cyan); --l:26px; --t:3px;
+  background:
+    linear-gradient(var(--ac),var(--ac)) 0 0/var(--l) var(--t) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 0 0/var(--t) var(--l) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 100% 0/var(--l) var(--t) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 100% 0/var(--t) var(--l) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 0 100%/var(--l) var(--t) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 0 100%/var(--t) var(--l) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 100% 100%/var(--l) var(--t) no-repeat,
+    linear-gradient(var(--ac),var(--ac)) 100% 100%/var(--t) var(--l) no-repeat;
+  filter:drop-shadow(0 0 5px var(--ac));
+}
+#selfie-wrap::before{ --ac:var(--spray-pink); }
+@media (prefers-reduced-motion: no-preference){
+  #scan-screen.active #cam-wrap::before,
+  #selfie-screen.active #selfie-wrap::before{ animation:aimPulse 1.8s ease-in-out infinite; }
+  @keyframes aimPulse{ 0%,100%{ inset:12px; opacity:.9; } 50%{ inset:8px; opacity:1; } }
+}
+/* petite mire centrale sur le viseur selfie */
+#selfie-wrap::after{ content:""; position:absolute; left:50%; top:50%; width:16px; height:16px;
+  transform:translate(-50%,-50%); z-index:5; pointer-events:none; border-radius:50%;
+  border:2px solid rgba(255,47,134,.7); box-shadow:0 0 10px rgba(255,47,134,.6); }
+#scan-msg, #selfie-msg{ font-family:var(--f-tag) !important; color:var(--spray-cyan) !important;
+  letter-spacing:.4px; }
+
+/* ── D. RADAR = vraie lunette de visée ─────────────────────────── */
+#radar-wrap{
+  border:2.5px solid rgba(55,227,126,.55) !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.4), inset 0 0 40px rgba(0,0,0,.6),
+    0 0 24px rgba(55,227,126,.2) !important;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, transparent 0 15%, rgba(55,227,126,.10) 15% 15.4%, transparent 15.4% 30%),
+    radial-gradient(circle at 50% 50%, rgba(10,26,18,.5), rgba(4,10,8,.85)) !important;
+}
+/* couronne de graduations (tirets réguliers via conic + masque anneau) */
+#radar-wrap::before{
+  content:""; position:absolute; inset:-3px; border-radius:50%; z-index:2; pointer-events:none;
+  background:repeating-conic-gradient(from 0deg, rgba(55,227,126,.6) 0 1.1deg, transparent 1.1deg 6deg);
+  -webkit-mask:radial-gradient(circle, transparent calc(50% - 9px), #000 calc(50% - 9px) calc(50% - 2px), transparent calc(50% - 2px));
+  mask:radial-gradient(circle, transparent calc(50% - 9px), #000 calc(50% - 9px) calc(50% - 2px), transparent calc(50% - 2px));
+}
+/* réticule en croix au repos (le canvas passe par-dessus une fois actif) */
+#radar-wrap::after{
+  content:""; position:absolute; inset:0; z-index:1; pointer-events:none; border-radius:50%;
+  background:
+    linear-gradient(rgba(55,227,126,.28),rgba(55,227,126,.28)) 50% 0/1.5px 100% no-repeat,
+    linear-gradient(rgba(55,227,126,.28),rgba(55,227,126,.28)) 0 50%/100% 1.5px no-repeat;
+}
+#radar-wrap{ position:relative; }
+#radar-cv{ position:relative; z-index:3; }
+/* état = puce lumineuse */
+#radar-state{
+  display:inline-block; margin:14px auto 0; padding:5px 16px; border-radius:20px;
+  font-size:15px !important; letter-spacing:1px !important;
+  background:rgba(0,0,0,.35); border:2px solid rgba(55,227,126,.4);
+  color:var(--spray-green) !important; text-shadow:0 0 10px rgba(55,227,126,.5) !important; }
+#radar-state::before{ content:"● "; opacity:.85; }
+
+/* ── E. CODE FINAL : cadenas, cases-chiffres, clavier béton ────── */
+#final-cells{ gap:7px !important; }
+#final-cells > *{
+  border:2.5px solid rgba(255,255,255,.22) !important; border-radius:10px !important;
+  background:var(--grain) repeat, linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.2)) !important;
+  background-size:150px 150px, auto !important; background-blend-mode:soft-light, normal !important;
+  font-family:var(--f-graff) !important; box-shadow:inset 0 2px 6px rgba(0,0,0,.5) !important; }
+#keypad{ gap:9px !important; }
+#keypad button{
+  border:2.5px solid #0a0710 !important; border-radius:12px !important;
+  color:var(--paint) !important; font-family:var(--f-graff) !important; letter-spacing:1px !important;
+  background:
+    var(--grain) repeat,
+    linear-gradient(180deg, rgba(46,40,54,.98), rgba(26,22,32,.98)) !important;
+  background-size:150px 150px, auto !important; background-blend-mode:soft-light, normal !important;
+  box-shadow:0 5px 0 #0a0710, 0 9px 14px rgba(0,0,0,.5) !important; }
+#keypad button:active{ transform:translateY(5px) !important;
+  box-shadow:0 1px 0 #0a0710, 0 3px 8px rgba(0,0,0,.45) !important; }
+#keypad button.k-del{ color:var(--spray-pink) !important; }
+#keypad button.k-ok{ color:#04231d !important;
+  background:linear-gradient(180deg,#8ef4e6,#2ce8d2 55%,#12b6a6) !important; }
+#lock-badge{ filter:drop-shadow(0 6px 10px rgba(0,0,0,.5)) drop-shadow(0 0 14px rgba(255,210,63,.25)); }
+#lock-badge.open{ filter:drop-shadow(0 6px 10px rgba(0,0,0,.5)) drop-shadow(0 0 22px rgba(55,227,126,.7)); }
+
+/* ── F. TRANSMISSION : moniteur scotché au mur ─────────────────── */
+#msg-card{ border:2.5px solid var(--spray-green) !important;
+  box-shadow:6px 8px 0 rgba(0,0,0,.45), 0 0 30px rgba(55,227,126,.18) !important; }
+#msg-card::before{                          /* bout de scotch en haut */
+  content:""; position:absolute; top:-10px; left:50%; width:70px; height:17px; z-index:3;
+  transform:translateX(-50%) rotate(-3deg); pointer-events:none;
+  background:rgba(243,238,226,.32); border:1px dashed rgba(255,255,255,.4); border-radius:2px;
+  box-shadow:0 2px 5px rgba(0,0,0,.3); }
+#msg-rec{ color:var(--spray-pink) !important; }
+
+/* ── G. MENU (panneau détaillé) : liseré titre + défilement doux ── */
+#menu-panel{ max-height:min(64vh, 520px); overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:16px !important; }
+#menu-panel h2, #menu-panel h3:first-child{ margin-top:2px; }
+
+/* ── H. STATS : barres qui se remplissent, KPI accentués ───────── */
+.stat-kpi{ border:1.5px solid rgba(255,255,255,.08); box-shadow:inset 0 1px 0 rgba(255,255,255,.06); }
+.stat-kpi .k-v{ color:var(--spray-yellow) !important; text-shadow:0 0 10px rgba(255,210,63,.3); }
+@media (prefers-reduced-motion: no-preference){
+  #stats-screen.active .stat-bar i{ animation:barGrow .8s cubic-bezier(.2,1,.3,1) both; transform-origin:left; }
+  @keyframes barGrow{ from{ transform:scaleX(0); } }
+}
+
+/* ── I. Fondu de défilement en bas des écrans longs ────────────── */
+#hub-screen .screen-inner, #carnet-screen .screen-inner,
+#stats-screen .screen-inner, #options-screen .screen-inner{
+  -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 20px), transparent 100%);
+  mask-image:linear-gradient(180deg, transparent 0, #000 18px, #000 calc(100% - 20px), transparent 100%);
+}
+
+/* ── J. Boutons « retour » : discrets mais lisibles, alignés ───── */
+#options-back, #stats-back, #carnet-back, #btn-panel-close, #btn-msg-ok{
+  letter-spacing:.3px !important; }
+/* les gros CTA d'action gardent leur relief, on renforce juste le halo */
+#btn-radar-on, #carnet-poster{ box-shadow:0 5px 0 #0a0710, 0 10px 16px rgba(0,0,0,.5),
+  0 0 24px rgba(255,120,140,.25) !important; }
+
+/* ── K. Transition d'entrée d'écran un peu plus « posée » ──────── */
+@media (prefers-reduced-motion: no-preference){
+  .screen.active .screen-inner{ animation:enterUp .34s cubic-bezier(.2,1,.3,1) both; }
+  @keyframes enterUp{ from{ opacity:0; transform:translateY(10px); } }
+}
+
+/* ── L. OVERLAYS D'ARCADE : texte lisible sur un voile béton ───── */
+#arc-overlay:not(.hidden), #brk-overlay:not(.hidden),
+#snk-overlay:not(.hidden), #png-overlay:not(.hidden){
+  background:
+    radial-gradient(120% 90% at 50% 40%, rgba(12,10,18,.55), rgba(8,7,14,.86)) !important;
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+}
+#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3{
+  text-shadow:-2px -2px 0 #0a0710, 2px -2px 0 #0a0710, -2px 2px 0 #0a0710, 2px 2px 0 #0a0710,
+    0 0 22px rgba(255,47,134,.4) !important; }
+#arc-overlay .hi-list{ background:rgba(0,0,0,.3); border:1.5px solid rgba(255,210,63,.3);
+  border-radius:10px; padding:8px 16px; }
+
+/* ── M. VICTOIRE : tuiles de stats en pochoir ──────────────────── */
+#victory-stats > *{
+  background:var(--grain) repeat, linear-gradient(180deg, rgba(34,29,42,.96), rgba(20,17,26,.98)) !important;
+  background-size:150px 150px, auto !important; background-blend-mode:soft-light, normal !important;
+  border:2px solid rgba(255,255,255,.14) !important; border-radius:11px !important;
+  box-shadow:4px 5px 0 rgba(0,0,0,.4) !important; }
+#victory-rank .rk-badge{ box-shadow:0 4px 0 rgba(0,0,0,.45), 0 0 18px rgba(255,210,63,.3) !important; }
+
+/* ── N. Indice du menu 3D = étiquette scotchée ─────────────────── */
+#menu-hint{
+  font-family:var(--f-tag) !important; color:var(--spray-cyan) !important;
+  background:rgba(20,17,26,.72); border:2px dashed rgba(44,232,210,.4);
+  border-radius:10px; padding:6px 14px; letter-spacing:.4px !important;
+  box-shadow:0 4px 10px rgba(0,0,0,.4); }
+
+/* ── O. MODALE POSTER : boutons + cadre nets ───────────────────── */
+#poster-modal img{ border:3px solid var(--paint) !important;
+  box-shadow:8px 10px 0 rgba(0,0,0,.5), 0 20px 50px rgba(0,0,0,.6) !important; }
+#poster-modal .pm-row button{ font-size:16px !important; padding:12px 18px !important; }
+
+/* ── P. FLASH RÉUSSI : badge « pièce X/8 » comme un tampon ──────── */
+#flash-badge{ border:2px solid #0a0710 !important; border-radius:8px !important;
+  box-shadow:0 3px 0 #0a0710, 0 0 16px var(--c, rgba(44,232,210,.4)) !important;
+  transform:rotate(-2deg); }
+#flash-name{ font-family:var(--f-tag) !important; }
+
+/* ── Q. HUD : séparateurs discrets, boutons alignés ────────────── */
+#hud .hud-item{ box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 3px 0 rgba(0,0,0,.35) !important; }
+#hud button:active{ transform:translateY(3px); }
+
+/* ── R. DÉFI : barre d'indice centrée, boutons cohérents ───────── */
+#hint-bar button{ font-size:16px !important; }
+#hint-txt{ background:rgba(0,0,0,.28); border-radius:10px; padding:8px 14px;
+  border-left:3px solid var(--spray-yellow); }
+#hint-txt:empty{ display:none; }
+
+/* ── S. CARNET : les cases encore verrouillées = pochoir vide ──── */
+.carnet-card.locked .cn-name{ color:rgba(243,238,226,.45) !important; }
+.carnet-card.locked::after{ content:"?"; position:absolute; right:14px; top:50%;
+  transform:translateY(-50%); font-family:var(--f-graff); font-size:34px;
+  color:rgba(255,255,255,.12); }
+
+/* ── T. Onglet actif : petit rebond quand on le sélectionne ────── */
+@media (prefers-reduced-motion: no-preference){
+  .tab.sel .tico{ animation:tabHop .4s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes tabHop{ 0%{ transform:translateY(0); } 40%{ transform:translateY(-4px); } }
+}
+
+/* ── U. Puce d'état réutilisable (signal, statut) ──────────────── */
+.status-chip{ display:inline-flex; align-items:center; gap:6px; padding:4px 12px;
+  border-radius:20px; font-family:var(--f-pix); font-size:12px;
+  background:rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.18); }
+
+/* ── V. Barre de défilement discrète (menu, panneaux longs) ────── */
+#menu-panel::-webkit-scrollbar{ width:6px; }
+#menu-panel::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:6px; }
+
+/* ── W. SELFIE : sous-titre + message cohérents ────────────────── */
+#selfie-sub b{ color:var(--spray-pink) !important; }
+#selfie-msg{ text-shadow:0 0 10px rgba(255,47,134,.5) !important; }
+
+/* ── X. RADAR (mode réglage) : les pastilles de spot ───────────── */
+#radar-chips{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:10px 0; }
+#radar-chips > *{ font-family:var(--f-pix); font-size:12px; padding:5px 11px; border-radius:20px;
+  background:rgba(0,0,0,.35); border:2px solid rgba(55,227,126,.35); color:var(--spray-green); }
+#radar-dist{ font-family:var(--f-graff); font-size:26px; letter-spacing:1px;
+  color:var(--paint); margin-top:8px; text-shadow:0 2px 0 #0a0710, 0 0 16px rgba(55,227,126,.4); }
+
+/* ── Y. TRANSMISSION : les barres de signal grésillent ─────────── */
+#msg-bars i{ background:var(--spray-green) !important; }
+@media (prefers-reduced-motion: no-preference){
+  #msg-screen.active #msg-bars i{ animation:sigBar 1.1s steps(2) infinite; }
+  #msg-screen.active #msg-bars i:nth-child(2){ animation-delay:.15s; }
+  #msg-screen.active #msg-bars i:nth-child(3){ animation-delay:.3s; }
+  #msg-screen.active #msg-bars i:nth-child(4){ animation-delay:.45s; }
+  #msg-screen.active #msg-bars i:nth-child(5){ animation-delay:.6s; }
+  @keyframes sigBar{ 50%{ opacity:.3; transform:scaleY(.5); } }
+}
+
+/* ── Z. BOOT : le ruban « édition » comme une étiquette collée ──── */
+#boot-ribbon{
+  background:rgba(20,17,26,.7) !important; border:2px dashed var(--spray-yellow) !important;
+  border-radius:9px !important; padding:5px 14px !important; color:var(--spray-yellow) !important;
+  box-shadow:0 4px 10px rgba(0,0,0,.4); transform:rotate(-1.4deg); }
+
+/* ── AA. Lignes de texte : rythme homogène partout ─────────────── */
+.sub{ line-height:1.45; }
+.dim{ line-height:1.4; }
+p.sub + .btn-row{ margin-top:8px; }
+
+/* ── BB. DÉFI (mini-jeu) : la boîte de jeu ENTRE en scène ───────── */
+@media (prefers-reduced-motion: no-preference){
+  #game-screen.active #game-box{ animation:boxIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes boxIn{ from{ opacity:0; transform:translateY(12px) scale(.97); } }
+}
+
+/* ── CC. Message du code final : vert si bon, rose si faux ──────── */
+#final-msg.ok{ color:var(--spray-green) !important; text-shadow:0 0 12px rgba(55,227,126,.5) !important; }
+#final-msg.ko{ color:var(--spray-pink) !important; }
+
+/* ── DD. Retour au repaire : gros bouton, coin bas cohérent ────── */
+.screen-inner > .btn-row:last-child{ padding-top:14px; }
+
+/* ── EE. Cartes de la galerie : liseré couleur au survol/appui ─── */
+#grid .card:active{ filter:brightness(1.08); }
+
+/* ── FF. VICTOIRE : la bande souvenir encadrée comme une photo ─── */
+#victory-strip canvas{ border:2.5px solid var(--paint); border-radius:8px;
+  box-shadow:5px 6px 0 rgba(0,0,0,.45); }
+#victory-screen h1{ margin-bottom:2px; }
+
+/* ── GG. MENU 3D : les lignes de succès/transmission en relief ─── */
+#menu-panel .suc{ background:var(--grain) repeat,
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)) !important;
+  background-size:150px 150px, auto !important; background-blend-mode:soft-light, normal !important;
+  border:2px solid rgba(255,255,255,.12) !important; box-shadow:3px 4px 0 rgba(0,0,0,.35) !important; }
+#menu-panel .suc.on{ border-color:var(--spray-yellow) !important;
+  box-shadow:3px 4px 0 rgba(0,0,0,.35), 0 0 16px rgba(255,210,63,.25) !important; }
+#msg-txt{ line-height:1.5; }
+
+/* ── HH. Grain fin par-dessus les cartes de contenu (cohérence) ── */
+.stat-block, .opt-row, .carnet-card{ position:relative; }
+
+/* ── II. Boutons secondaires (b3) : texte plus lisible ─────────── */
+button.b3{ color:var(--paint) !important; }
+
+/* ── JJ. Les gros CTA colorés : lettres bien détourées ─────────── */
+#btn-radar-on, #carnet-poster, #btn-challenge, #btn-selfie-go{ color:#3a1024 !important; }
+button.b2{ color:#04231d !important; }
 </style>
 </head>
 <body>
@@ -10701,7 +11012,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v55</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v72</p>`);
     wire();
   }
   function wire(){

@@ -54,6 +54,17 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v63) — passe complète sur les interfaces
+
+Même langage « atelier de tag » appliqué à **tous les écrans**, avec des composants plus lisibles et plus vivants :
+
+- **Flash / Scanner** : le cadre caméra devient un vrai **viseur à équerres** cyan (coins de ciblage animés), et le champ de saisie manuelle est repensé en **plaque pochoir** sprayée (le bouton OK ne déborde plus).
+- **Radar** : la lunette passe d'un rond vide à un **vrai scope** — cercles concentriques, réticule en croix, couronne de graduations, bordure verte lumineuse, et l'état affiché en **puce** (● RADAR COUPÉ).
+- **Code final** : cadenas avec halo, **8 cases-chiffres en pochoir**, et un **clavier béton** (touches détourées, effacer en rose, valider en cyan).
+- **Transmission de l'invader** : moniteur **scotché au mur**, barres de signal qui grésillent.
+- **Menu 3D, Tableau de bord, Carnet, Réglages, Victoire** : panneaux béton cohérents, **KPI dorés** qui ressortent, barres de stats qui se remplissent à l'ouverture, tuiles de victoire encadrées, étiquettes scotchées.
+- **Partout** : fondu de défilement en bas des écrans longs, **focus clavier visible** (accessibilité), transitions d'entrée un peu plus posées, boutons secondaires plus lisibles.
+
 ## Nouveautés (v62) — accueil vivant + une vraie cinématique
 
 - **Écran d'accueil** : la ville prend vie. Sur les toits du premier plan, un **artiste à capuche bombe un invader en boucle** (tesselle par tesselle, halo qui grandit, jet de peinture), pendant qu'il **pleut**, que la **poussière lumineuse monte**, que **deux réverbères** réchauffent la scène et qu'un **chat de gouttière** veille. Le texte d'intro raconte enfin une histoire (« cette nuit, 8 pièces ont été posées… PAPA, à toi de jouer »).
