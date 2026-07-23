@@ -7758,6 +7758,26 @@ MiniGames["LV_02"] = function(box, api){
        <span style="opacity:.7">(ex. 4+2 = 6)</span>
      </div>`);
 
+  /* addition en direct : on VOIT la somme se construire sur la ligne active
+     (« 4 + 2 = 6 »), pile ce que demande la consigne « additionne-les » */
+  const mathLine = document.createElement("div");
+  mathLine.className = "pix";
+  mathLine.style.cssText = "text-align:center;font-size:17px;font-weight:800;min-height:24px;" +
+    "letter-spacing:.5px;margin:0 0 4px;transition:color .15s;";
+  box.appendChild(mathLine);
+  function updateMath(){
+    if(!started || active >= TARGETS.length){ mathLine.innerHTML = "&nbsp;"; return; }
+    const tgt = TARGETS[active];
+    const parts = [];
+    rows[active].forEach((on, i)=>{ if(on) parts.push(VAL[i]); });
+    const sum = parts.reduce((a,b)=>a+b, 0);
+    const col = sum > tgt ? "var(--rouge)" : sum === tgt ? "var(--jaune)" : "var(--spray-cyan)";
+    const left = parts.length ? parts.join(" + ") : "0";
+    mathLine.innerHTML = `<span style="color:var(--ink-soft)">${left}</span>` +
+      ` <span style="color:${col}">= ${sum}</span>` +
+      `<span style="color:var(--ink-soft);font-size:13px"> → ${tgt}</span>`;
+  }
+
   /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
   const starRow = document.createElement("div");
   starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;";
@@ -7889,6 +7909,7 @@ MiniGames["LV_02"] = function(box, api){
         labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>${hint}`;
       }
     });
+    updateMath();
     if(locked.every(Boolean) && !done){
       done = true;
       clearInterval(starIv);
@@ -7940,7 +7961,7 @@ MiniGames["LV_02"] = function(box, api){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches){ renderTwr(.4); }
   else{ const tw0 = performance.now();
     (function twloop(now){ renderTwr((now-tw0)/1000); twraf = requestAnimationFrame(twloop); })(performance.now()); }
-  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); });
+  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); updateMath(); });
   return ()=>{ clearInterval(starIv); if(twraf) cancelAnimationFrame(twraf); };
 };
 
