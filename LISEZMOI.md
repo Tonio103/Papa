@@ -54,6 +54,19 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v67) — 6ᵉ jeu d'arcade « Traversée »
+
+Un nouveau jeu complet dans la borne : **🚦 Traversée**, un Frogger maison où l'invader traverse les rues des Vans.
+
+- **But** : atteindre le mur d'**ARRIVÉE** en haut. **▲** pour avancer, **◀ ▶** pour te décaler (ou glisse sur l'écran). Chaque traversée rapporte des points.
+- **Circulation variée** : voitures, **camions** (longs), **motos** (rapides), **voies rapides** (liseré rouge) et **voies ferrées** avec un **train télégraphié** (⚠ avant qu'il déboule).
+- **Bonus & pouvoirs** sur les terre-pleins : 🎨 points, ★ jackpot, ♥ vie, 🛡 bouclier, ⏳ ralenti, ❄ stop.
+- **Score malin** : enchaîne les traversées **sans te faire toucher** pour un multiplicateur, gagne une **prime de rapidité** et une **vie bonus** tous les 5, et un point de **frôlement** quand tu esquives de justesse.
+- **Ne traîne pas** : un **drone rôdeur** finit par fondre sur toi si tu restes trop longtemps sur place.
+- Ambiance : pluie de nuit, phares, flaques, vignette, jauge de progression, cœurs de vie. Records (traversées **et** meilleure série) au Tableau de bord, deux nouveaux succès (**Roi de la rue**, **Sans un accroc**).
+
+Vérifié par un auto-joueur (esquive le trafic et les trains) : jusqu'à ~60 traversées, aucune erreur. La borne compte désormais **6 jeux**.
+
 ## Nouveautés (v66) — « Vol de Nuit » prend de la profondeur
 
 Le 5ᵉ jeu d'arcade devient un vrai petit jeu de score avec bonus, pouvoirs et ennemis :
