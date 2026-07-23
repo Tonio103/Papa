@@ -54,6 +54,17 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v68) — les 4 défis « réflexion » approfondis
+
+Grosse passe sur les mini-jeux à énigme (~290 lignes), avec de vraies aides pour Papa et plus de feedback :
+
+- **LV_01 · La Palette** : à côté du MODÈLE, une 2ᵉ pièce 3D **« TON ŒUVRE »** se reconstruit en direct pendant que tu poses les blocs. Boutons **Annuler / Recommencer / Aperçu** (montre le modèle sur le plateau), interrupteur **Miroir** (pose en symétrie — les invaders sont symétriques), jauge « X/Y blocs », et tour d'honneur de ta pièce à la fin.
+- **LV_02 · Le Binaire** : **pense-bête des valeurs** (8·4·2·1) toujours visible, bouton **« Montrer les blocs »** (surligne la bonne combinaison de la ligne active), indication **« +X à ajouter / trop ! »** en direct, et une **tour 3D « cible vs toi »** pour visualiser la hauteur à atteindre.
+- **LV_04 · Rubikcubisme** : bouton **Annuler le coup** (vrai take-back), bouton **Conseil** (fait briller une ligne/colonne encore mal placée), et compteur **« X/9 en place »**.
+- **LV_05 · Le Simon** : bouton **« Revoir »** (2 fois) pour réécouter, **barre de lecture** qui suit la séquence puis ta saisie, compteur d'erreurs, **meilleur niveau** enregistré, et onde lumineuse sur chaque pad.
+
+Les aides (aperçu, conseil, revoir…) coûtent l'étoile parfaite, pour garder le défi. Tout est testé (rendu, interaction, victoire), zéro erreur console. Les défis physiques (Spotting, Coop) et les jeux d'action déjà riches (Cavale, Pochoir) sont laissés tels quels pour ne rien casser.
+
 ## Nouveautés (v67) — 6ᵉ jeu d'arcade « Traversée »
 
 Un nouveau jeu complet dans la borne : **🚦 Traversée**, un Frogger maison où l'invader traverse les rues des Vans.
