@@ -7701,12 +7701,36 @@ MiniGames["LV_01"] = function(box, api){
       done = true;
       mine.style.transition = "transform .4s, filter .4s";
       mine.style.transform = "scale(1.1)"; mine.style.filter = "drop-shadow(0 0 16px " + COL + ")";
-      AudioFX.fanfare(); Juice.confetti(box, 26);
       /* 3★ = pièce propre du premier coup (peu d'erreurs, peu de gâchis, sans aperçu) */
       const clean = errors <= 2 && moves <= totalOn + 3 && peeksUsed === 0;
       const stars = clean ? 3 : errors <= 6 ? 2 : 1;
+      /* MAIN SÛRE : chaque touche a fait mouche — autant de coups que de blocs,
+         zéro erreur, zéro aperçu. Panache pur, n'ajoute pas d'étoile (3★ déjà
+         atteint dès qu'on est propre) : la course ne frustre jamais Papa. */
+      const flawless = errors === 0 && peeksUsed === 0 && moves === totalOn;
+      AudioFX.fanfare();
+      Juice.confetti(box, flawless ? 46 : 26);
+      if(flawless){
+        AudioFX.star && AudioFX.star(2);
+        const flash = document.createElement("div");
+        flash.textContent = "✦ MAIN SÛRE ✦";
+        flash.style.cssText =
+          "position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);" +
+          "font-family:'Press Start 2P',monospace; font-size:16px; color:" + COL + ";" +
+          "text-shadow:0 0 12px " + COL + ", 0 3px 0 rgba(0,0,0,.5); pointer-events:none; z-index:40; opacity:0;";
+        box.style.position = box.style.position || "relative";
+        box.appendChild(flash);
+        flash.animate(
+          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-5deg)" },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1.14) rotate(3deg)", offset:.35 },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+          { duration:1350, easing:"cubic-bezier(.2,1.4,.4,1)" }
+        ).onfinish = ()=>flash.remove();
+      }
       setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? "PERFECT !" : "PIÈCE RECONSTRUITE !" }), 700);
+        label: flawless ? "MAIN SÛRE !" : stars === 3 ? "PERFECT !" : "PIÈCE RECONSTRUITE !" }),
+        flawless ? 1100 : 700);
     }
   }
   Juice.readyGo(box, ()=>{ playing = true; });
@@ -7771,6 +7795,7 @@ MiniGames["LV_02"] = function(box, api){
   const locked = TARGETS.map(()=>false);
   const cellEls = [], labels = [];
   let active = 0;
+  let overshoots = 0;                        // nombre de fois où l'on a dépassé la cible
 
   /* aide visuelle 3D : la CIBLE (bleue, translucide) et TON TOTAL (or)
      en tours de cubes — tu dois monter à la même hauteur */
@@ -7811,6 +7836,7 @@ MiniGames["LV_02"] = function(box, api){
         cell.classList.toggle("on", !!rows[r][b]);
         /* franchit la cible vers le haut → alerte ; sinon tic normal */
         if(val(r) > tgt && before <= tgt){
+          overshoots++;
           AudioFX.err(); Juice.shake(board);
           try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
         }else AudioFX.tick();
@@ -7866,12 +7892,35 @@ MiniGames["LV_02"] = function(box, api){
     if(locked.every(Boolean) && !done){
       done = true;
       clearInterval(starIv);
-      AudioFX.fanfare(); Juice.confetti(box, 22);
       const s = (Date.now() - t0)/1000;
       let stars = s < 45 ? 3 : s < 90 ? 2 : 1;
       if(hintsUsed > 0) stars = Math.min(stars, 2);        // le coup de pouce coûte l'étoile parfaite
+      /* SANS FAUTE : 3★, aucun coup de pouce, jamais dépassé la cible.
+         Panache pur — n'ajoute pas d'étoile, 3★ reste atteignable en tâtonnant. */
+      const sansFaute = stars === 3 && hintsUsed === 0 && overshoots === 0;
+      AudioFX.fanfare();
+      Juice.confetti(box, sansFaute ? 40 : 22);
+      if(sansFaute){
+        AudioFX.star && AudioFX.star(2);
+        const flash = document.createElement("div");
+        flash.textContent = "✦ SANS FAUTE ✦";
+        flash.style.cssText =
+          "position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);" +
+          "font-family:'Press Start 2P',monospace; font-size:17px; color:#4db8ff;" +
+          "text-shadow:0 0 12px #2a8fff, 0 3px 0 #04386e; pointer-events:none; z-index:40; opacity:0;";
+        box.style.position = box.style.position || "relative";
+        box.appendChild(flash);
+        flash.animate(
+          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-5deg)" },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1.14) rotate(3deg)", offset:.35 },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+          { duration:1350, easing:"cubic-bezier(.2,1.4,.4,1)" }
+        ).onfinish = ()=>flash.remove();
+      }
       setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }), 700);
+        label: sansFaute ? "SANS FAUTE !" : stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }),
+        sansFaute ? 1100 : 700);
     }
   }
   /* jauge : plein → vide sur la fenêtre 3★, puis fenêtre 2★ */
@@ -7923,6 +7972,7 @@ MiniGames["LV_05"] = function(box, api){
   const bestLvl = ()=>+localStorage.getItem(SBKEY) || 0;
   /* barre d'infos : niveau, série d'erreurs, bouton « Revoir » (limité) */
   let replaysLeft = 2, usedReplay = false;
+  let reverseMode = false, revSeq = [], revIdx = 0, bonusStars = 0;   // manche bonus « à l'envers »
   const infoRow = document.createElement("div");
   infoRow.style.cssText = "display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:4px;font-size:14px;";
   const lvlLab = document.createElement("span"); lvlLab.className = "pix"; lvlLab.style.color = "var(--spray-cyan)";
@@ -8003,6 +8053,7 @@ MiniGames["LV_05"] = function(box, api){
     playSeq();
   }
   function press(i){
+    if(reverseMode) return pressReverse(i);
     if(!accepting) return;
     light(i, 170);
     if(i !== seq[idx]){
@@ -8025,12 +8076,52 @@ MiniGames["LV_05"] = function(box, api){
         status.textContent = "SÉQUENCE COMPLÈTE !";
         AudioFX.fanfare(); Juice.confetti(box, 24);
         /* 3★ = zéro faute ET sans utiliser « Revoir » */
-        const stars = (errors === 0 && !usedReplay) ? 3 : errors <= 2 ? 2 : 1;
-        T(()=>api.win({ stars,
-          label: stars === 3 ? "MÉMOIRE PARFAITE !" : "SÉQUENCE MAÎTRISÉE !" }), 800);
+        bonusStars = (errors === 0 && !usedReplay) ? 3 : errors <= 2 ? 2 : 1;
+        offerBonus();
       }else{
         AudioFX.ok(); status.textContent = "BIEN !"; T(next, 850);
       }
+    }
+  }
+  /* manche BONUS : rejouer la séquence complète À L'ENVERS, de mémoire.
+     Réussie → 3★ « MÉMOIRE INVERSÉE ». Ratée → aucune punition, on garde
+     les étoiles déjà acquises. On peut aussi terminer directement. */
+  function offerBonus(){
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px;";
+    const finish = document.createElement("button"); finish.className = "b2";
+    finish.textContent = "✓ Terminer (" + "★".repeat(bonusStars) + ")";
+    finish.style.cssText = "font-size:15px;padding:10px 16px;";
+    const rev = document.createElement("button"); rev.className = "b3";
+    rev.textContent = "🔁 Défi bonus : à l'envers";
+    rev.style.cssText = "font-size:15px;padding:10px 16px;";
+    row.appendChild(finish); row.appendChild(rev); box.appendChild(row);
+    finish.addEventListener("click", ()=>{ row.remove();
+      api.win({ stars:bonusStars, label: bonusStars === 3 ? "MÉMOIRE PARFAITE !" : "SÉQUENCE MAÎTRISÉE !" }); });
+    rev.addEventListener("click", ()=>{ row.remove();
+      revSeq = seq.slice().reverse(); revIdx = 0; reverseMode = true;
+      [...pips.children].forEach(p=>p.classList.remove("on"));
+      status.textContent = "REJOUE-LA À L'ENVERS !"; AudioFX.select(); fillTo(0);
+    });
+  }
+  function pressReverse(i){
+    light(i, 170);
+    if(i !== revSeq[revIdx]){
+      reverseMode = false;
+      AudioFX.err(); Juice.shake(box); status.textContent = "presque ! bonus manqué";
+      try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
+      T(()=>api.win({ stars:bonusStars, label:"SÉQUENCE MAÎTRISÉE !" }), 1000);
+      return;
+    }
+    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
+    revIdx++; status.textContent = "À L'ENVERS ! " + revIdx + "/" + revSeq.length; fillTo(revIdx/revSeq.length);
+    if(revIdx >= revSeq.length){
+      reverseMode = false;
+      [...pips.children].forEach(p=>p.classList.add("on"));
+      status.textContent = "MÉMOIRE INVERSÉE !";
+      AudioFX.fanfare(); Juice.confetti(box, 30);
+      try{ navigator.vibrate && navigator.vibrate([40,30,40,30,120]); }catch(e){}
+      T(()=>api.win({ stars:3, label:"MÉMOIRE INVERSÉE !" }), 900);
     }
   }
   updateInfo();
@@ -9423,6 +9514,8 @@ MiniGames["LV_04"] = function(box, api){
   let g = TARGET.map(r=>r.slice());
   let moves = 0, playing = false, solved = false;
   const history = []; let usedUndo = false, hintsUsed = 0;
+  let solveT0 = 0, solveEnd = 0;              // chrono : départ (fin du mélange) → arrivée
+  const ECLAIR = 15;                          // sous 15 s au PAR = « ÉCLAIR ! »
 
   const shiftRow = (r,d)=>{ g[r] = d>0 ? [g[r][2],g[r][0],g[r][1]] : [g[r][1],g[r][2],g[r][0]]; };
   const shiftCol = (cc,d)=>{
@@ -9589,17 +9682,51 @@ MiniGames["LV_04"] = function(box, api){
     let would = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
     if(usedUndo || hintsUsed > 0) would = Math.min(would, 2);
     let ok = 0; for(let r=0;r<3;r++) for(let x=0;x<3;x++) if(g[r][x]===TARGET[r][x]) ok++;
-    hudLine.innerHTML = `COUPS : ${moves} · ${ok}/9 en place · <span style="color:var(--jaune)">${"★".repeat(would)}</span>`;
+    /* chrono : il tourne dès la fin du mélange, s'arrête à la victoire */
+    const secs = solveT0 ? (( (solved ? solveEnd : performance.now()) - solveT0)/1000) : 0;
+    /* l'éclair s'allume tant qu'on est dans les temps ET au PAR : on VOIT la cible bonus */
+    const onFire = playing && !solved && solveT0 && secs <= ECLAIR && moves <= PAR;
+    const chrono = solveT0
+      ? ` · <span style="color:${onFire?'#8effc0':'#9aa'}">${onFire?'⚡':'⏱'} ${secs.toFixed(1)}s</span>`
+      : "";
+    hudLine.innerHTML = `COUPS : ${moves} · ${ok}/9 en place${chrono} · <span style="color:var(--jaune)">${"★".repeat(would)}</span>`;
   }
   function check(){
     if(JSON.stringify(g) === JSON.stringify(TARGET)){
-      solved = true;
-      try{ navigator.vibrate && navigator.vibrate([50,40,50,40,130]); }catch(e){}
-      AudioFX.fanfare(); Juice.confetti(box, 26);
+      solved = true; solveEnd = performance.now();
+      const secs = (solveEnd - solveT0)/1000;
       let stars = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
       if(usedUndo || hintsUsed > 0) stars = Math.min(stars, 2);
+      /* ÉCLAIR : résolu au PAR, à mains nues, sous le temps → gerbe spéciale.
+         N'AJOUTE PAS d'étoile (3★ reste atteignable sans course) : c'est un
+         panache pour ceux qui foncent, jamais une contrainte pour Papa. */
+      const eclair = stars === 3 && secs <= ECLAIR;
+      try{ navigator.vibrate && navigator.vibrate(eclair ? [40,30,40,30,40,30,150] : [50,40,50,40,130]); }catch(e){}
+      AudioFX.fanfare();
+      Juice.confetti(box, eclair ? 44 : 26);
+      hud();                                   // fige le chrono à l'écran
+      if(eclair){
+        AudioFX.star && AudioFX.star(2);
+        const flash = document.createElement("div");
+        flash.textContent = "⚡ ÉCLAIR ! ⚡";
+        flash.style.cssText =
+          "position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.4);" +
+          "font-family:'Press Start 2P',monospace; font-size:20px; color:#8effc0;" +
+          "text-shadow:0 0 12px #3affa0, 0 3px 0 #067; pointer-events:none; z-index:40; opacity:0;";
+        box.style.position = box.style.position || "relative";
+        box.appendChild(flash);
+        flash.animate(
+          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-6deg)" },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1.15) rotate(3deg)", offset:.35 },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+          { duration:1400, easing:"cubic-bezier(.2,1.4,.4,1)" }
+        ).onfinish = ()=>flash.remove();
+      }
       setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? `PAR EN ${moves} COUPS !` : `RÉSOLU EN ${moves} COUPS !` }), 800);
+        label: eclair ? `ÉCLAIR ! PAR EN ${secs.toFixed(1)}s`
+             : stars === 3 ? `PAR EN ${moves} COUPS !`
+             : `RÉSOLU EN ${moves} COUPS !` }), eclair ? 1150 : 800);
     }
   }
 
@@ -9609,6 +9736,7 @@ MiniGames["LV_04"] = function(box, api){
   const t0 = performance.now();
   const miniCells = [];
   TARGET.forEach((row,y)=>row.forEach((v,x)=>miniCells.push({ x, y, col:COLS[v] })));
+  let hudTick = 0;
   function frame(now){
     const t = (now - t0)/1000;
     yaw = .42 + Math.sin(t*.45)*.10;          // léger balancement (le cube « vit »)
@@ -9616,6 +9744,8 @@ MiniGames["LV_04"] = function(box, api){
     pulse *= .88;
     render();
     Voxel.renderCells(mini, miniCells, 3, 3, Math.sin(t*.5)*.7, -.3 + Math.sin(t*.35)*.12);
+    /* le chrono s'écoule à l'écran ~10 fois/s tant que la partie court */
+    if(playing && !solved && solveT0 && (++hudTick % 6 === 0)) hud();
     raf = requestAnimationFrame(frame);
   }
   hud();
@@ -9637,7 +9767,7 @@ MiniGames["LV_04"] = function(box, api){
       isRow ? shiftRow(i,d) : shiftCol(i,d);
       AudioFX.tick(); pulse = .10;
       render();
-      if(++k >= scramble.length){ clearInterval(iv); playing = true; moves = 0; hud(); }
+      if(++k >= scramble.length){ clearInterval(iv); playing = true; moves = 0; solveT0 = performance.now(); hud(); }
     }, 240);
   });
   return ()=>{ if(raf) cancelAnimationFrame(raf); };
@@ -12106,7 +12236,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v77</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v78</p>`);
     wire();
   }
   function wire(){

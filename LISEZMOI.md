@@ -54,6 +54,17 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v78) — les 4 énigmes gagnent une « prime de maîtrise »
+
+Deuxième passe sur les mêmes défis à réflexion : chacun récompense désormais la *manière* de gagner, sans jamais durcir la note. **Toutes ces primes sont du panache pur — les 3★ restent atteignables tranquillement, en tâtonnant, sans course.** C'est une carotte pour ceux qui foncent, jamais une contrainte pour Papa.
+
+- **LV_01 · La Palette** — **« MAIN SÛRE »** : si chaque touche a fait mouche (autant de coups que de blocs, zéro erreur, zéro aperçu), une gerbe de confettis et un flash spécial saluent le sans-faute.
+- **LV_02 · Le Binaire** — **« SANS FAUTE »** : décoder les trois lignes en 3★, sans coup de pouce et **sans jamais dépasser la cible**, déclenche un flash bleu et une pluie de confettis en plus.
+- **LV_04 · Rubikcubisme** — **chrono + « ÉCLAIR »** : un chronomètre s'affiche dès la fin du mélange (⏱, et ⚡ vert tant qu'on reste dans les temps au PAR). Résoudre au PAR **sous 15 s** allume un éclair et double les confettis. Le chrono n'ajoute **aucune** étoile : les 3★ s'obtiennent au nombre de coups, à ton rythme.
+- **LV_05 · Le Simon** — **manche bonus « à l'envers »** : la séquence complète réussie, un bouton propose de la **rejouer à l'envers, de mémoire**. Réussie → 3★ « MÉMOIRE INVERSÉE ». Ratée → aucune punition, on garde les étoiles déjà acquises (ou on termine directement).
+
+Tout est testé (rendu, interaction, victoire, mode « à l'envers ») : zéro erreur console. Les défis physiques (Spotting, Coop) et les jeux d'action déjà riches (Cavale, Pochoir) restent inchangés.
+
 ## Nouveautés (v68) — les 4 défis « réflexion » approfondis
 
 Grosse passe sur les mini-jeux à énigme (~290 lignes), avec de vraies aides pour Papa et plus de feedback :
