@@ -54,6 +54,18 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v65) — vibrations : bouton « Tester » + secours iPhone durci
+
+Rappel important : **iPhone/Safari ne fournit AUCUNE API de vibration web** (contrairement à Android). Le jeu tente un secours « best-effort » via un interrupteur système caché — mais sur iPhone ça ne marche **que** si :
+1. **Réglages iOS › Sons & retour haptique › Retour haptique système** est **activé** ;
+2. le téléphone **n'est pas en mode économie d'énergie** ;
+3. c'est déclenché par un **vrai appui** (les vibrations automatiques en plein jeu, elles, ne peuvent pas se déclencher sur iPhone).
+
+Nouveautés de cette version :
+- **Bouton « Tester »** dans Réglages, à côté du toggle Vibrations : un appui direct = le meilleur moyen de savoir si ton téléphone répond.
+- Secours iPhone **durci** : l'interrupteur haptique est maintenant réellement rendu (Safari ignorait un contrôle en `opacity:0`), et la fonction est exposée de façon fiable même si Safari refuse de réassigner `navigator.vibrate`.
+- Texte d'aide adapté quand on est sur iPhone (rappelle le réglage iOS à activer).
+
 ## Nouveautés (v64) — 5ᵉ jeu d'arcade « Vol de Nuit »
 
 - Nouveau jeu dans la **borne d'arcade** : **🌙 Vol de Nuit** — un « flappy » maison. L'invader s'évade au-dessus des Vans endormis : **touche l'écran** (ou le bouton VOLER) pour un coup d'aile, et faufile-toi entre les murs tagués. Score = murs franchis, record sauvegardé, difficulté qui monte doucement. Ambiance nuit : lune, étoiles, ville en silhouette.
