@@ -1605,18 +1605,18 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   border:2.5px solid var(--spray-cyan) !important; border-radius:12px; overflow:hidden;
   background:radial-gradient(120% 90% at 50% 0%, #101430 0%, #0a0a1c 70%, #06060f 100%);
   box-shadow:6px 8px 0 rgba(0,0,0,.45), inset 0 0 40px rgba(43,232,208,.06); }
-#arcade-cv, #brk-cv, #snk-cv, #png-cv, #fly-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
-#arc-overlay, #brk-overlay, #snk-overlay, #png-overlay, #fly-overlay{
+#arcade-cv, #brk-cv, #snk-cv, #png-cv, #fly-cv, #trv-cv{ display:block; width:100%; height:100%; touch-action:none; image-rendering:pixelated; }
+#arc-overlay, #brk-overlay, #snk-overlay, #png-overlay, #fly-overlay, #trv-overlay{
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
   justify-content:center; text-align:center; gap:12px; padding:22px;
   background:rgba(6,6,15,.82); backdrop-filter:blur(3px); }
 #arc-overlay.hidden, #brk-overlay.hidden, #snk-overlay.hidden,
-#png-overlay.hidden, #fly-overlay.hidden{ display:none; }
-#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3{
+#png-overlay.hidden, #fly-overlay.hidden, #trv-overlay.hidden{ display:none; }
+#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3, #trv-overlay h3{
   font-family:var(--f-graff); font-size:30px; color:var(--paint);
   letter-spacing:1.5px; text-shadow:3px 4px 0 var(--spray-pink), 0 0 22px rgba(255,47,134,.5); }
 #arc-overlay .arc-sub, #brk-overlay .arc-sub, #snk-overlay .arc-sub,
-#png-overlay .arc-sub, #fly-overlay .arc-sub{ color:var(--ink-soft); font-size:16px; line-height:1.4; }
+#png-overlay .arc-sub, #fly-overlay .arc-sub, #trv-overlay .arc-sub{ color:var(--ink-soft); font-size:16px; line-height:1.4; }
 #arc-overlay .hi-list{ font-family:var(--f-pix); font-size:12px; line-height:1.9; color:var(--spray-yellow); }
 #arc-overlay input{ font-family:var(--f-pix); font-size:22px; text-transform:uppercase; text-align:center;
   width:120px; letter-spacing:8px; padding:10px; border-radius:10px; border:2.5px solid var(--spray-cyan);
@@ -1993,12 +1993,12 @@ button:focus-visible, input:focus-visible, .tab:focus-visible{
 
 /* ── L. OVERLAYS D'ARCADE : texte lisible sur un voile béton ───── */
 #arc-overlay:not(.hidden), #brk-overlay:not(.hidden),
-#snk-overlay:not(.hidden), #png-overlay:not(.hidden), #fly-overlay:not(.hidden){
+#snk-overlay:not(.hidden), #png-overlay:not(.hidden), #fly-overlay:not(.hidden), #trv-overlay:not(.hidden){
   background:
     radial-gradient(120% 90% at 50% 40%, rgba(12,10,18,.55), rgba(8,7,14,.86)) !important;
   backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
 }
-#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3{
+#arc-overlay h3, #brk-overlay h3, #snk-overlay h3, #png-overlay h3, #fly-overlay h3, #trv-overlay h3{
   text-shadow:-2px -2px 0 #0a0710, 2px -2px 0 #0a0710, -2px 2px 0 #0a0710, 2px 2px 0 #0a0710,
     0 0 22px rgba(255,47,134,.4) !important; }
 #arc-overlay .hi-list{ background:rgba(0,0,0,.3); border:1.5px solid rgba(255,210,63,.3);
@@ -2482,6 +2482,28 @@ button.b2{ color:#04231d !important; }
     </div>
     <div id="arc-pad">
       <button id="fly-flap" class="arc-btn arc-fire" style="flex:1;">◆ VOLER</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ÉCRAN 11sexies : TRAVERSÉE (frogger des rues des Vans) ═══ -->
+<section id="trv-screen" class="screen">
+  <div class="screen-inner" id="trv-inner">
+    <div id="arcade-hud">
+      <span id="trv-score" class="pix">0</span>
+      <span id="trv-info" class="pix">♥♥♥</span>
+      <span id="trv-best" class="pix">🏆 0</span>
+      <button id="trv-pause" class="b3">❚❚</button>
+    </div>
+    <div id="arcade-stage" style="border-color:var(--spray-orange) !important;">
+      <canvas id="trv-cv"></canvas>
+      <div id="trv-overlay"></div>
+    </div>
+    <div id="arc-pad">
+      <button id="trv-left" class="arc-btn">◀</button>
+      <button id="trv-up" class="arc-btn arc-fire" style="flex:1.4;">▲</button>
+      <button id="trv-down" class="arc-btn">▼</button>
+      <button id="trv-right" class="arc-btn">▶</button>
     </div>
   </div>
 </section>
@@ -3459,6 +3481,7 @@ function showNow(id){
   if(id!=="snk-screen" && typeof Snake !== "undefined") Snake.stop();       // stoppe le serpent
   if(id!=="png-screen" && typeof Pong !== "undefined") Pong.stop();         // stoppe le pong
   if(id!=="fly-screen" && typeof Fly !== "undefined") Fly.stop();           // stoppe le vol de nuit
+  if(id!=="trv-screen" && typeof Trav !== "undefined") Trav.stop();         // stoppe la traversée
   if(id==="hub-screen"){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
@@ -6045,6 +6068,8 @@ const SUCCES = [
   { id:"arcadeur",ico:"🕹",nom:"Roi de l'arcade",  desc:"1000 pts à un jeu de la borne" },
   { id:"noctambule",ico:"🌙",nom:"Noctambule",     desc:"Atteindre 15 points en Vol de Nuit" },
   { id:"peintre",  ico:"🎨", nom:"Bombeur",         desc:"20 bombes de peinture en un seul vol" },
+  { id:"traversee",ico:"🚦", nom:"Roi de la rue",   desc:"10 traversées dans Traversée" },
+  { id:"dedale",   ico:"🏙", nom:"Sans un accroc",  desc:"Série de 8 traversées sans te faire toucher" },
   { id:"goldrush",ico:"🥇",nom:"Chasseur d'or",    desc:"3 médailles d'or (défis chrono)" },
 ];
 S.succes = S.succes || {};
@@ -9885,13 +9910,15 @@ const Arcade = (()=>{
       <button id="arc-tobrk" class="b3">🧱 Casse-Tag</button>
       <button id="arc-tosnk" class="b3">🐍 Serpent Invader</button>
       <button id="arc-topng" class="b3">🏓 Pong Invader</button>
-      <button id="arc-tofly" class="b3">🌙 Vol de Nuit</button>`;
+      <button id="arc-tofly" class="b3">🌙 Vol de Nuit</button>
+      <button id="arc-totrv" class="b3">🚦 Traversée</button>`;
     $("#arc-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(false); });
     $("#arc-survie").addEventListener("click", ()=>{ AudioFX.select(); startRun(true); });
     $("#arc-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#arc-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
     $("#arc-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
     $("#arc-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
+    $("#arc-totrv").addEventListener("click", ()=>{ stop(); Trav.start(); });
   }
   function showOver(victory){
     ov().classList.remove("hidden");
@@ -10448,12 +10475,14 @@ const Breakout = (()=>{
       <button id="brk-tosnk" class="b3">🐍 Serpent Invader</button>
       <button id="brk-topng" class="b3">🏓 Pong Invader</button>
       <button id="brk-tofly" class="b3">🌙 Vol de Nuit</button>
+      <button id="brk-totrv" class="b3">🚦 Traversée</button>
       <button id="brk-quit" class="b3">← Repaire</button>`;
     $("#brk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#brk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#brk-tosnk").addEventListener("click", ()=>{ stop(); Snake.start(); });
     $("#brk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
     $("#brk-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
+    $("#brk-totrv").addEventListener("click", ()=>{ stop(); Trav.start(); });
     $("#brk-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -10638,12 +10667,14 @@ const Snake = (()=>{
       <button id="snk-tobrk" class="b3">🧱 Casse-Tag</button>
       <button id="snk-topng" class="b3">🏓 Pong Invader</button>
       <button id="snk-tofly" class="b3">🌙 Vol de Nuit</button>
+      <button id="snk-totrv" class="b3">🚦 Traversée</button>
       <button id="snk-quit" class="b3">← Repaire</button>`;
     $("#snk-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#snk-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#snk-tobrk").addEventListener("click", ()=>{ stop(); Breakout.start(); });
     $("#snk-topng").addEventListener("click", ()=>{ stop(); Pong.start(); });
     $("#snk-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
+    $("#snk-totrv").addEventListener("click", ()=>{ stop(); Trav.start(); });
     $("#snk-quit").addEventListener("click", quit);
   }
   function showOver(){
@@ -10848,10 +10879,12 @@ const Pong = (()=>{
       <button id="png-play" class="b2">▶ Jouer</button>
       <button id="png-toinv" class="b3">🕹 Les Vans Defense</button>
       <button id="png-tofly" class="b3">🌙 Vol de Nuit</button>
+      <button id="png-totrv" class="b3">🚦 Traversée</button>
       <button id="png-quit" class="b3">← Repaire</button>`;
     $("#png-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#png-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
     $("#png-tofly").addEventListener("click", ()=>{ stop(); Fly.start(); });
+    $("#png-totrv").addEventListener("click", ()=>{ stop(); Trav.start(); });
     $("#png-quit").addEventListener("click", quit);
   }
   function showOver(victory){
@@ -11098,9 +11131,11 @@ const Fly = (()=>{
       ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} pts 🏆</div>`:""}
       <button id="fly-play" class="b2">▶ S'envoler</button>
       <button id="fly-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="fly-totrv" class="b3">🚦 Traversée</button>
       <button id="fly-quit" class="b3">← Repaire</button>`;
     $("#fly-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
     $("#fly-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#fly-totrv").addEventListener("click", ()=>{ stop(); Trav.start(); });
     $("#fly-quit").addEventListener("click", quit);
   }
   function showOver(rec){
@@ -11281,6 +11316,451 @@ const Fly = (()=>{
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   15sexies. TRAVERSÉE — l'invader traverse les rues des Vans en
+   esquivant la circulation (façon Frogger). Chaque traversée
+   rapporte un point ; la ville s'anime de plus en plus vite.
+   ─────────────────────────────────────────────────────────── */
+const Trav = (()=>{
+  const W = 180; let H = 560;
+  const KEY = "invasionLesVans:trav";
+  const KEY2 = "invasionLesVans:travStreak";
+  const bestStreak = ()=>{ const v = +localStorage.getItem(KEY2); return v>0?v:0; };
+  const ROWS = 11;                                            // 0 = départ, ROWS-1 = arrivée
+  let cv, c, raf = null, running = false, paused = false, last = 0, acc = 0;
+  let state = "menu", lanes, player, score, lives, invT, speedMul, parts, pops, sprite, swipe;
+  let shield, slowT, freezeT, streak, crossClock;            // pouvoirs, série, chrono de traversée
+  let idleClock, eagle, eagleSprite, rain3, flash;           // anti-flânerie, pluie, éclair de traversée
+  const best = ()=>{ const v = +localStorage.getItem(KEY); return v>0?v:0; };
+  const CARC = ["#ff2f86","#ffd23f","#37e37e","#9d5cff","#4db8ff"];
+
+  const rh = ()=> H/ROWS;
+  const rowY = r=> H - (r + .5)*rh();
+  const minX = ()=> W*.08, maxX = ()=> W*.92, cell = ()=> (maxX()-minX())/6;
+
+  function fillCars(L){
+    L.cars = []; const n = 2 + Math.floor(Math.random()*2), gap = W*1.6/n;
+    for(let i=0;i<n;i++){
+      const roll = Math.random();
+      const truck = roll < .22, moto = !truck && roll < .40;   // camions longs / motos rapides
+      L.cars.push({ x:i*gap + Math.random()*gap*.4,
+        w:truck ? W*(.30+Math.random()*.12) : moto ? W*.085 : W*(.15+Math.random()*.07),
+        col:CARC[Math.floor(Math.random()*CARC.length)], truck, moto, vf:moto ? 1.7 : 1 });
+    }
+  }
+  const ITYPES = ["can","can","can","shield","slow","freeze","star","life"];  // bombes + pouvoirs + jackpot/vie rares
+  function buildLanes(){
+    lanes = [];
+    for(let r=0;r<ROWS;r++){
+      if(r === 0 || r === ROWS-1) lanes.push({ type:"safe" });
+      else if(r % 4 === 0){ const L = { type:"safe" };            // trottoir / terre-plein
+        if(Math.random() < .6) L.item = { x:minX()+Math.random()*(maxX()-minX()),
+          taken:false, kind:ITYPES[Math.floor(Math.random()*ITYPES.length)] };
+        lanes.push(L);
+      } else if(r > 1 && r < ROWS-2 && Math.random() < .14){        // voie ferrée (train télégraphié)
+        lanes.push({ type:"rail", dir:Math.random()<.5?-1:1,
+          timer:80 + Math.random()*140, phase:"idle", train:null });
+      } else { const express = Math.random() < .18;                  // voie rapide
+        lanes.push({ type:"road", dir:Math.random()<.5?-1:1,
+          speed:(.5+Math.random()*.9)*(express?1.7:1), express, cars:[],
+          puddles:Array.from({length:1+Math.floor(Math.random()*2)},
+            ()=>minX()+Math.random()*(maxX()-minX())) }); }
+    }
+    lanes.forEach(L=>{ if(L.type === "road") fillCars(L); });
+  }
+  function resetPlayer(){ player = { x:W/2, tx:W/2, row:0, py:rowY(0), hop:0, trail:[] };
+    crossClock = 0; idleClock = 0; eagle = null; }
+  function startRun(){
+    buildLanes(); resetPlayer();
+    score = 0; lives = (S.opts && S.opts.arcadeLives) || 3; invT = 0; speedMul = 1;
+    parts = []; pops = []; shield = false; slowT = 0; freezeT = 0; streak = 0;
+    state = "play"; paused = false; hideOverlay(); AudioFX.select();
+  }
+  function burst(x, y, col, n){ for(let i=0;i<n;i++){ const a = Math.random()*7, s = 1+Math.random()*2.4;
+    parts.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:16+Math.random()*10, col }); } }
+  function hop(dx, drow){
+    if(state !== "play" || paused) return;
+    if(drow > 0 && player.row < ROWS-1){ const from = lanes[player.row];
+      player.row++; player.hop = 1; idleClock = 0; eagle = null; AudioFX.pixel(720);
+      try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+      /* prime de frôlement : quitter une route avec une voiture toute proche */
+      if(from && from.type === "road"){
+        for(const car of from.cars){ if(Math.abs(player.x - (car.x+car.w/2)) < W*.12 + car.w/2){
+          score++; pops.push({ x:player.x, y:player.py, txt:"OUF ! +1", col:"#8dffb8", life:30 });
+          AudioFX.pixel(900); break; } }
+      }
+    }
+    else if(drow < 0 && player.row > 0){ player.row--; player.hop = 1; AudioFX.pixel(500); }
+    else if(dx){ player.tx = Math.max(minX(), Math.min(maxX(), player.tx + dx*cell()));
+      player.hop = 1; AudioFX.pixel(620); }
+  }
+  function crossing(){
+    streak++; flash = 1;
+    let gain = 1 + Math.min(4, Math.floor(streak/2));         // série sans accroc = plus de points
+    const fast = Math.max(0, 5 - Math.floor(crossClock/45));  // prime de rapidité
+    gain += fast;
+    score += gain;
+    burst(player.x, rowY(ROWS-1), "#ffd23f", 18);
+    pops.push({ x:W/2, y:H*.12, txt:(streak>=2?streak+"× ":"")+"TRAVERSÉE +"+gain, col:"#ffd23f", life:44 });
+    if(fast >= 3) pops.push({ x:W/2, y:H*.18, txt:"RAPIDE !", col:"#8dffb8", life:34 });
+    AudioFX.star(2); try{ navigator.vibrate && navigator.vibrate([20,25,60]); }catch(e){}
+    if(score >= 10) unlockSucces("traversee");
+    if(streak >= 8) unlockSucces("dedale");
+    if(streak > bestStreak()){ try{ localStorage.setItem(KEY2, streak); }catch(e){} }
+    /* toutes les 5 traversées : une vie bonus (plafonnée) */
+    if(streak % 5 === 0 && lives < 6){ lives++;
+      pops.push({ x:W/2, y:H*.24, txt:"♥ VIE BONUS", col:"#ff6b6b", life:40 }); AudioFX.ok && AudioFX.ok(); }
+    /* palier tous les 10 : la ville s'anime */
+    if(streak % 10 === 0) pops.push({ x:W/2, y:H*.30, txt:"LA VILLE S'ANIME !", col:"#8dffb8", life:46 });
+    speedMul = Math.min(2.4, 1 + score*.05);
+    if(score % 3 === 0){ const roads = lanes.filter(L=>L.type==="road");
+      if(roads.length){ const L = roads[Math.floor(Math.random()*roads.length)];
+        L.cars.push({ x:-W*.3, w:W*(.15+Math.random()*.07), col:CARC[Math.floor(Math.random()*CARC.length)] }); } }
+    resetPlayer();
+  }
+  function hit(){
+    idleClock = 0; eagle = null;
+    if(shield){ shield = false; invT = 60; burst(player.x, player.py, "#2ce8d2", 22);
+      pops.push({ x:player.x, y:player.py, txt:"BOUCLIER !", col:"#2ce8d2", life:36 });
+      AudioFX.err(); try{ navigator.vibrate && navigator.vibrate([16,26,16]); }catch(e){} return; }
+    lives--; streak = 0; invT = 100; burst(player.x, player.py, "#ff6b6b", 20);
+    AudioFX.err(); try{ navigator.vibrate && navigator.vibrate([30,40,90]); }catch(e){}
+    if(lives <= 0){ return over(); }
+    player.x = W/2; player.tx = W/2; player.row = 0; player.py = rowY(0);
+  }
+  function over(){
+    const rec = score > best();
+    if(rec){ try{ localStorage.setItem(KEY, score); }catch(e){}
+      if(typeof checkMetaSucces === "function") checkMetaSucces(); }
+    state = "over"; showOver(rec);
+  }
+  function collectItem(it, y){
+    it.taken = true;
+    if(it.kind === "shield"){ shield = true;
+      pops.push({ x:it.x, y, txt:"BOUCLIER", col:"#2ce8d2", life:36 }); burst(it.x, y, "#2ce8d2", 14); AudioFX.powerOn(); }
+    else if(it.kind === "slow"){ slowT = 260;
+      pops.push({ x:it.x, y, txt:"RALENTI", col:"#c9aaff", life:36 }); burst(it.x, y, "#9d5cff", 14); AudioFX.powerOn(); }
+    else if(it.kind === "freeze"){ freezeT = 150;
+      pops.push({ x:it.x, y, txt:"STOP !", col:"#8dffb8", life:36 }); burst(it.x, y, "#37e37e", 14); AudioFX.powerOn(); }
+    else if(it.kind === "star"){ score += 5;                  // jackpot doré
+      pops.push({ x:it.x, y, txt:"JACKPOT +5", col:"#ffe08a", life:44 }); burst(it.x, y, "#ffe08a", 22);
+      AudioFX.star(2); }
+    else if(it.kind === "life"){                              // cœur : une vie de plus (plafonnée)
+      if(lives < 6){ lives++; pops.push({ x:it.x, y, txt:"♥ +1 VIE", col:"#ff6b6b", life:42 }); }
+      else { score += 3; pops.push({ x:it.x, y, txt:"+3", col:"#ff6b6b", life:32 }); }
+      burst(it.x, y, "#ff6b6b", 16); AudioFX.ok && AudioFX.ok(); }
+    else { score += 2; pops.push({ x:it.x, y, txt:"+2", col:"#ffd23f", life:30 });
+      burst(it.x, y, "#ffd23f", 12); AudioFX.pixel(760); }
+    try{ navigator.vibrate && navigator.vibrate(10); }catch(e){}
+  }
+  function step(){
+    if(invT > 0) invT--;
+    if(slowT > 0) slowT--;
+    if(freezeT > 0) freezeT--;
+    if(player.row > 0) crossClock++;                           // le chrono ne tourne pas au départ
+    /* voitures (ralenties / gelées selon les pouvoirs) */
+    const tf = freezeT > 0 ? 0 : (slowT > 0 ? .4 : 1);
+    lanes.forEach(L=>{ if(L.type !== "road") return;
+      const base = L.speed * L.dir * speedMul * tf;
+      L.cars.forEach(car=>{ const v = base * (car.vf||1); car.x += v;
+        if(v > 0 && car.x > W + car.w) car.x = -car.w - Math.random()*W*.4;
+        else if(v < 0 && car.x < -car.w) car.x = W + car.w + Math.random()*W*.4;
+      });
+    });
+    /* voies ferrées : cycle inactif → alerte → train qui déboule */
+    lanes.forEach(L=>{ if(L.type !== "rail") return;
+      if(freezeT > 0) return;                                  // le stop gèle aussi les trains
+      L.timer--;
+      if(L.phase === "idle" && L.timer <= 0){ L.phase = "warn"; L.timer = 46; AudioFX.tick(); }
+      else if(L.phase === "warn" && L.timer <= 0){ L.phase = "train"; L.timer = 42;
+        L.train = { x:L.dir > 0 ? -W*.85 : W, w:W*.82 }; }
+      else if(L.phase === "train"){ if(L.train) L.train.x += L.dir * W*.062 * (slowT>0?.5:1);
+        if(L.timer <= 0){ L.phase = "idle"; L.timer = 120 + Math.random()*150; L.train = null; } }
+    });
+    /* interpolation du saut + traînée */
+    if(flash > 0) flash = Math.max(0, flash - .06);
+    player.x += (player.tx - player.x)*.4;
+    player.py += (rowY(player.row) - player.py)*.4;
+    const wasHop = player.hop;
+    if(player.hop > 0) player.hop = Math.max(0, player.hop - .12);
+    if(wasHop > 0 && player.hop === 0){ const dy = player.py + rh()*.34;   // poussière à l'atterrissage
+      for(let i=0;i<5;i++) parts.push({ x:player.x+(Math.random()-.5)*rh()*.4, y:dy,
+        vx:(Math.random()-.5)*1.4, vy:-Math.random()*.5, life:12, col:"rgba(200,205,230,.7)" }); }
+    player.trail.push({ x:player.x, y:player.py }); if(player.trail.length > 6) player.trail.shift();
+    /* arrivée en haut */
+    if(player.row === ROWS-1){ crossing(); return; }
+    /* objet sur le terre-plein */
+    const L = lanes[player.row];
+    if(L && L.item && !L.item.taken && Math.abs(player.x - L.item.x) < W*.08)
+      collectItem(L.item, rowY(player.row));
+    /* collision voiture */
+    if(invT <= 0 && L && L.type === "road"){
+      const hw = W*.055;
+      for(const car of L.cars){ if(Math.abs(player.x - (car.x + car.w/2)) < hw + car.w/2){ hit(); break; } }
+    }
+    /* collision train (seulement pendant le passage) */
+    if(invT <= 0 && L && L.type === "rail" && L.phase === "train" && L.train){
+      const hw = W*.055;
+      if(Math.abs(player.x - (L.train.x + L.train.w/2)) < hw + L.train.w/2) hit();
+    }
+    /* le drone rôdeur : trop de temps sans avancer → il fond sur toi
+       (le pouvoir « stop » gèle aussi sa descente, pour rester cohérent) */
+    if(player.row > 0 && player.row < ROWS-1 && freezeT <= 0){
+      idleClock++;
+      if(idleClock === 340){ pops.push({ x:player.x, y:player.py-rh()*.6, txt:"AVANCE !", col:"#ff2f3c", life:44 });
+        AudioFX.tick(); }
+      if(idleClock > 360){
+        if(!eagle) eagle = { x:player.x, y:-rh() };
+        eagle.x += (player.x - eagle.x)*.1; eagle.y += H*.02;
+        if(eagle.y >= player.py){ burst(player.x, player.py, "#ff2f3c", 18); eagle = null; hit(); return; }
+      }
+    } else { idleClock = 0; eagle = null; }
+    /* particules + textes */
+    for(let i=parts.length-1;i>=0;i--){ const p = parts[i]; p.x += p.vx; p.y += p.vy;
+      p.vy += .1; if(--p.life <= 0) parts.splice(i,1); }
+    for(let i=pops.length-1;i>=0;i--){ const p = pops[i]; p.y -= .6; if(--p.life <= 0) pops.splice(i,1); }
+  }
+  function draw(){
+    const dpr = Math.min(2, devicePixelRatio||1);
+    const cw = cv.clientWidth||300, ch = cv.clientHeight||400;
+    if(cv.width !== Math.round(cw*dpr)){ cv.width = Math.round(cw*dpr); cv.height = Math.round(ch*dpr); }
+    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,cw,ch);
+    const scale = Math.min(cw/W, ch/H), ox = (cw-W*scale)/2, oy = (ch-H*scale)/2;
+    c.save(); c.translate(ox,oy); c.scale(scale,scale);
+    const H2 = H, r_h = rh();
+    c.fillStyle = "#0a0a20"; c.fillRect(0,0,W,H2);
+    /* voies */
+    lanes.forEach((L,r)=>{
+      const y = H2 - (r+1)*r_h;
+      if(r === ROWS-1){                                        // arrivée : le mur à taguer
+        c.fillStyle = "#1b1836"; c.fillRect(0,y,W,r_h);
+        c.strokeStyle = "rgba(44,232,210,.5)"; c.lineWidth = 1.5; c.strokeRect(1,y+1,W-2,r_h-2);
+        c.fillStyle = "#2ce8d2"; c.font = `700 ${r_h*.4}px 'Baloo 2', sans-serif`;
+        c.textAlign = "center"; c.fillText("ARRIVÉE", W/2, y+r_h*.62); c.textAlign = "left";
+      } else if(L.type === "safe"){
+        c.fillStyle = r===0 ? "#233" : "#1a2a1f"; c.fillRect(0,y,W,r_h);   // trottoir / terre-plein
+        c.fillStyle = "rgba(255,255,255,.05)"; for(let x=4;x<W;x+=14) c.fillRect(x,y+r_h-3,7,2);
+        if(L.item && !L.item.taken){ const iy = y+r_h/2, ix = L.item.x, k = L.item.kind;
+          const col = k==="shield"?"#2ce8d2":k==="slow"?"#9d5cff":k==="freeze"?"#37e37e":k==="star"?"#ffe08a":k==="life"?"#ff6b6b":"#ffd23f";
+          c.save(); c.globalCompositeOperation = "lighter";     // halo
+          const gg = c.createRadialGradient(ix,iy,1,ix,iy,k==="star"?13:10);
+          gg.addColorStop(0,hexA(col,.5)); gg.addColorStop(1,hexA(col,0));
+          c.fillStyle = gg; c.beginPath(); c.arc(ix,iy,k==="star"?13:10,0,7); c.fill(); c.restore();
+          if(k==="can"){ c.fillStyle="#ffd23f"; c.fillRect(ix-3,iy-5,6,10);
+            c.fillStyle="#ff2f86"; c.fillRect(ix-3,iy-1,6,3); }
+          else if(k==="shield"){ c.strokeStyle="#2ce8d2"; c.lineWidth=2;
+            c.beginPath(); c.arc(ix,iy,4.5,0,7); c.stroke(); }
+          else if(k==="star"){ c.fillStyle="#ffe08a"; c.font=`800 15px 'Baloo 2',sans-serif`;
+            c.textAlign="center"; c.fillText("★", ix, iy+5); c.textAlign="left"; }
+          else if(k==="life"){ c.fillStyle="#ff6b6b"; c.font=`800 13px 'Baloo 2',sans-serif`;
+            c.textAlign="center"; c.fillText("♥", ix, iy+5); c.textAlign="left"; }
+          else{ c.fillStyle=col; c.font=`800 12px 'Baloo 2',sans-serif`; c.textAlign="center";
+            c.fillText(k==="slow"?"⏳":"❄", ix, iy+4); c.textAlign="left"; }
+        }
+      } else if(L.type === "road"){                            // route (voie rapide = liseré rouge)
+        c.fillStyle = "#15151f"; c.fillRect(0,y,W,r_h);
+        (L.puddles||[]).forEach(px=>{ c.save(); c.globalCompositeOperation="lighter";  // flaques reflets
+          c.fillStyle = "rgba(90,120,180,.10)"; c.beginPath();
+          c.ellipse(px, y+r_h*.7, r_h*.5, r_h*.16, 0, 0, 7); c.fill(); c.restore(); });
+        if(L.express){ c.fillStyle = "rgba(255,47,134,.09)"; c.fillRect(0,y,W,r_h);
+          c.fillStyle = "rgba(255,47,134,.5)"; c.fillRect(0,y,W,1.5); c.fillRect(0,y+r_h-1.5,W,1.5); }
+        c.fillStyle = "rgba(255,210,63,.28)"; for(let x=6;x<W;x+=20) c.fillRect(x,y+r_h/2-1,10,2);
+      } else {                                                 // voie ferrée
+        c.fillStyle = "#12121a"; c.fillRect(0,y,W,r_h);
+        c.fillStyle = "rgba(120,90,60,.45)"; for(let x=0;x<W;x+=10) c.fillRect(x, y+r_h*.28, 3, r_h*.44);
+        c.fillStyle = "rgba(180,185,205,.35)"; c.fillRect(0, y+r_h*.32, W, 2); c.fillRect(0, y+r_h*.64, W, 2);
+        if(L.phase === "warn"){
+          if(Math.floor(performance.now()/110)%2){ c.fillStyle = "rgba(255,47,60,.20)"; c.fillRect(0,y,W,r_h); }
+          c.fillStyle = "#ff2f3c"; c.font = `800 ${r_h*.5}px 'Baloo 2',sans-serif`; c.textAlign = "center";
+          c.fillText("⚠", W*.14, y+r_h*.68); c.fillText("⚠", W*.86, y+r_h*.68); c.textAlign = "left";
+        }
+      }
+    });
+    /* voitures */
+    lanes.forEach((L,r)=>{ if(L.type !== "road") return;
+      const y = H2 - (r+1)*r_h, cy = y + r_h/2, ch2 = r_h*.62;
+      L.cars.forEach(car=>{
+        c.save(); c.globalCompositeOperation = "lighter";      // halo des phares
+        const hx = car.x + (L.dir>0 ? car.w : 0);
+        const gg = c.createRadialGradient(hx, cy, 1, hx, cy, car.w*.7);
+        gg.addColorStop(0, "rgba(255,240,200,.5)"); gg.addColorStop(1, "rgba(255,240,200,0)");
+        c.fillStyle = gg; c.fillRect(car.x-car.w*.6, cy-ch2, car.w*2.2, ch2*2); c.restore();
+        c.fillStyle = car.col; c.fillRect(car.x, cy-ch2/2, car.w, ch2);
+        c.fillStyle = "rgba(0,0,0,.4)"; c.fillRect(car.x+car.w*.15, cy-ch2/2+2, car.w*.7, ch2*.35);
+        c.fillStyle = "#fff"; const fx = L.dir>0 ? car.x+car.w-2 : car.x; c.fillRect(fx, cy-2, 2, 4);
+      });
+    });
+    /* trains (par-dessus les voies) */
+    lanes.forEach((L,r)=>{ if(L.type !== "rail" || L.phase !== "train" || !L.train) return;
+      const y = H2-(r+1)*r_h, cy = y+r_h/2, th = r_h*.7, t = L.train;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const hx = t.x + (L.dir>0 ? t.w : 0);
+      const gg = c.createRadialGradient(hx, cy, 1, hx, cy, r_h);
+      gg.addColorStop(0,"rgba(255,240,200,.6)"); gg.addColorStop(1,"rgba(255,240,200,0)");
+      c.fillStyle = gg; c.fillRect(t.x-r_h, cy-th, t.w+r_h*2, th*2); c.restore();
+      c.fillStyle = "#c0143c"; c.fillRect(t.x, cy-th/2, t.w, th);
+      c.fillStyle = "#7a0c26"; c.fillRect(t.x, cy-th/2, t.w, 2);
+      c.fillStyle = "rgba(255,255,255,.28)";
+      for(let wx=t.x+6; wx<t.x+t.w-6; wx+=14) c.fillRect(wx, cy-th/4, 7, th*.4);
+    });
+    /* traînée de l'invader */
+    c.globalCompositeOperation = "lighter";
+    (player.trail||[]).forEach((t,i)=>{ c.globalAlpha = (i/player.trail.length)*.2; c.fillStyle = "#ff7a29";
+      const rr = (r_h*.28)*(i/player.trail.length); c.beginPath(); c.arc(t.x, t.y, rr, 0, 7); c.fill(); });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    /* l'invader (saut = petit rebond/écrasement, respiration au repos) */
+    const sq = 1 + player.hop*.35, sz = r_h*.62;
+    const bob = player.hop < .05 ? Math.sin(performance.now()/320)*r_h*.05 : 0;
+    c.save(); c.translate(player.x, player.py + bob);
+    c.globalAlpha = (invT>0 && Math.floor(invT/6)%2) ? .4 : 1;
+    c.scale(1/ (sq*.7+.3), sq);
+    if(sprite){ c.imageSmoothingEnabled = false; c.drawImage(sprite, -sz*.5, -sz*.45, sz, sz*.9); }
+    else{ c.fillStyle = "#ff7a29"; c.fillRect(-sz*.5,-sz*.4,sz,sz*.8); }
+    c.globalAlpha = 1; c.restore();
+    /* bulle de bouclier */
+    if(shield){ c.save(); c.globalCompositeOperation = "lighter";
+      c.strokeStyle = hexA("#2ce8d2", .5 + Math.sin(performance.now()/160)*.2); c.lineWidth = 2;
+      c.beginPath(); c.arc(player.x, player.py, sz*.75, 0, 7); c.stroke(); c.restore(); }
+    /* le drone rôdeur qui plonge (avec son ombre au sol) */
+    if(eagle){
+      c.save(); c.globalAlpha = .3; c.fillStyle = "#000";
+      c.beginPath(); c.ellipse(player.x, player.py+sz*.45, sz*.5, sz*.18, 0, 0, 7); c.fill(); c.restore();
+      c.save(); c.globalCompositeOperation = "lighter";
+      const gg = c.createRadialGradient(eagle.x, eagle.y, 1, eagle.x, eagle.y, sz*1.5);
+      gg.addColorStop(0, "rgba(255,47,60,.45)"); gg.addColorStop(1, "rgba(255,47,60,0)");
+      c.fillStyle = gg; c.beginPath(); c.arc(eagle.x, eagle.y, sz*1.5, 0, 7); c.fill(); c.restore();
+      if(eagleSprite){ c.imageSmoothingEnabled = false;
+        c.drawImage(eagleSprite, eagle.x-sz*.6, eagle.y-sz*.5, sz*1.2, sz*1.1); }
+      else{ c.fillStyle = "#ff2f3c"; c.fillRect(eagle.x-sz*.6, eagle.y-sz*.5, sz*1.2, sz); }
+    }
+    /* aura dorée quand la série grimpe (récompense visuelle) */
+    if(streak >= 5){ c.save(); c.globalCompositeOperation = "lighter";
+      const ar = sz*(.8 + Math.sin(performance.now()/150)*.12);
+      c.strokeStyle = hexA("#ffe08a", .42); c.lineWidth = 2;
+      c.beginPath(); c.arc(player.x, player.py, ar, 0, 7); c.stroke(); c.restore(); }
+    /* teinte des pouvoirs de temps */
+    if(freezeT > 0){ c.fillStyle = "rgba(55,227,126,.10)"; c.fillRect(0,0,W,H2); }
+    else if(slowT > 0){ c.fillStyle = "rgba(120,70,200,.10)"; c.fillRect(0,0,W,H2); }
+    /* pluie fine de nuit (ambiance) */
+    c.strokeStyle = "rgba(150,170,220,.16)"; c.lineWidth = 1; c.lineCap = "round";
+    (rain3||[]).forEach(d=>{ d.y += d.s*.02; d.x -= d.s*.004;
+      if(d.y > 1.05){ d.y = -.05; d.x = Math.random(); } if(d.x < -.05) d.x = 1.05;
+      const rx = d.x*W, ry = d.y*H2; c.beginPath(); c.moveTo(rx, ry); c.lineTo(rx-3, ry+d.l*H2); c.stroke(); });
+    /* éclair blanc à chaque traversée réussie */
+    if(flash > 0){ c.fillStyle = hexA("#ffffff", flash*.16); c.fillRect(0,0,W,H2); }
+    /* vignette nocturne */
+    { const vg = c.createRadialGradient(W/2, H2*.5, H2*.3, W/2, H2*.5, H2*.72);
+      vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.4)");
+      c.fillStyle = vg; c.fillRect(0,0,W,H2); }
+    /* jauge de progression verticale (combien il reste avant l'arrivée) */
+    c.fillStyle = "rgba(255,255,255,.10)"; c.fillRect(W-4, H2*.12, 2, H2*.76);
+    { const pr = Math.max(0, Math.min(1, player.row/(ROWS-1)));
+      c.fillStyle = "#ff7a29"; c.fillRect(W-4, H2*.88 - pr*H2*.76, 2, pr*H2*.76); }
+    /* vies restantes en petits cœurs, dans le coin bas gauche */
+    c.font = `700 ${Math.max(9,r_h*.34)}px 'Baloo 2', sans-serif`; c.textAlign = "left";
+    for(let i=0;i<Math.max(0,lives);i++){ c.fillStyle = "#ff6b6b";
+      c.fillText("♥", 5 + i*(r_h*.4), H2-5); }
+    /* particules + textes */
+    c.globalCompositeOperation = "lighter";
+    (parts||[]).forEach(p=>{ c.globalAlpha = Math.max(0,p.life/26); c.fillStyle = p.col;
+      c.fillRect(p.x-1.5,p.y-1.5,3,3); });
+    c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    c.textAlign = "center"; c.font = `800 ${Math.max(10,H*.024)}px 'Baloo 2', sans-serif`;
+    (pops||[]).forEach(p=>{ c.globalAlpha = Math.max(0,p.life/40); c.fillStyle = p.col;
+      c.fillText(p.txt, p.x, p.y); });
+    c.globalAlpha = 1; c.textAlign = "left";
+    c.restore();
+  }
+  function updateHud(){
+    $("#trv-score").textContent = score|0;
+    let info = "♥".repeat(Math.max(0,lives)) || "—";
+    const pw = (shield?"🛡":"") + (freezeT>0?"❄":slowT>0?"⏳":"");
+    if(pw) info = pw + " " + info;
+    if(streak >= 2) info = streak + "× " + info;
+    if(idleClock > 320) info = "⚠ " + info;
+    $("#trv-info").textContent = info;
+    $("#trv-best").textContent = "🏆 " + best();
+  }
+  function loop(now){
+    if(!running){ raf = null; return; }
+    if(!$("#trv-screen").classList.contains("active")){ raf = requestAnimationFrame(loop); return; }
+    if(cv.clientWidth){ const nh = Math.round(W * cv.clientHeight / cv.clientWidth);
+      if(nh > 340 && nh < 940) H = nh; }
+    const dt = Math.min(0.05,(now-last)/1000); last = now;
+    if(state === "play" && !paused){ acc += dt; while(acc >= 1/60){ step(); acc -= 1/60; } }
+    updateHud(); draw(); raf = requestAnimationFrame(loop);
+  }
+  const ov = ()=>$("#trv-overlay");
+  function hideOverlay(){ ov().classList.add("hidden"); ov().innerHTML = ""; }
+  function showMenu(){
+    state = "menu"; ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>TRAVERSÉE</h3>
+      <div class="arc-sub">Traverse les rues des Vans jusqu'au mur.<br>▲ avance, ◀ ▶ décale-toi, évite le trafic.<br>🎨 points · 🛡 bouclier · ⏳ ralenti · ❄ stop</div>
+      ${best()?`<div class="arc-sub" style="color:var(--spray-yellow)">Record : ${best()} traversées 🏆${bestStreak()>1?` · série ${bestStreak()}×`:""}</div>`:""}
+      <div class="arc-sub" style="font-size:14px; opacity:.8">Astuce : enchaîne sans te faire toucher pour un gros bonus, et n'traîne pas — un drone rôde 🐦</div>
+      <button id="trv-play" class="b2">▶ Traverser</button>
+      <button id="trv-toinv" class="b3">🕹 Les Vans Defense</button>
+      <button id="trv-quit" class="b3">← Repaire</button>`;
+    $("#trv-play").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#trv-toinv").addEventListener("click", ()=>{ stop(); Arcade.start(); });
+    $("#trv-quit").addEventListener("click", quit);
+  }
+  function showOver(rec){
+    ov().classList.remove("hidden");
+    ov().innerHTML = `<h3>${rec ? "RECORD !" : "ÉCRASÉ…"}</h3>
+      <div class="arc-sub">${score} traversée${score>1?"s":""}${bestStreak()>1?` · meilleure série ${bestStreak()}×`:""}</div>
+      <div class="arc-sub">Record : ${best()} 🏆</div>
+      <button id="trv-again" class="b2">↻ Rejouer</button>
+      <button id="trv-back" class="b3">← Repaire</button>`;
+    $("#trv-again").addEventListener("click", ()=>{ AudioFX.select(); startRun(); });
+    $("#trv-back").addEventListener("click", quit);
+  }
+  function togglePause(){ if(state!=="play") return; paused=!paused; AudioFX.click();
+    if(paused){ ov().classList.remove("hidden");
+      ov().innerHTML = `<h3>PAUSE</h3><button id="trv-resume" class="b2">▶ Reprendre</button>
+        <button id="trv-give" class="b3">← Repaire</button>`;
+      $("#trv-resume").addEventListener("click", togglePause);
+      $("#trv-give").addEventListener("click", quit);
+    } else hideOverlay(); }
+  let bound = false;
+  function bind(){
+    if(bound) return; bound = true;
+    const press = fn=>e=>{ e.preventDefault(); fn(); };
+    $("#trv-up").addEventListener("pointerdown", press(()=>hop(0,1)));
+    $("#trv-down").addEventListener("pointerdown", press(()=>hop(0,-1)));
+    $("#trv-left").addEventListener("pointerdown", press(()=>hop(-1,0)));
+    $("#trv-right").addEventListener("pointerdown", press(()=>hop(1,0)));
+    $("#trv-pause").addEventListener("click", togglePause);
+    /* balayage sur le terrain */
+    cv.addEventListener("pointerdown", e=>{ swipe = { x:e.clientX, y:e.clientY }; });
+    cv.addEventListener("pointerup", e=>{ if(!swipe) return;
+      const dx = e.clientX-swipe.x, dy = e.clientY-swipe.y; swipe = null;
+      if(Math.abs(dx) < 12 && Math.abs(dy) < 12){ hop(0,1); return; }   // tap = avancer
+      if(Math.abs(dx) > Math.abs(dy)) hop(dx>0?1:-1, 0); else hop(0, dy<0?1:-1); });
+  }
+  function start(){
+    show("trv-screen"); cv = $("#trv-cv"); c = cv.getContext("2d"); bind();
+    running = true; paused = false; last = performance.now(); acc = 0;
+    buildLanes(); resetPlayer(); score = 0; lives = 3; invT = 0; speedMul = 1; parts = []; pops = [];
+    if(!sprite){ try{ sprite = flatSprite("squid", "#ff7a29", 4); }catch(e){ sprite = null; } }
+    if(!eagleSprite){ try{ eagleSprite = flatSprite("octo", "#ff2f3c", 4); }catch(e){ eagleSprite = null; } }
+    rain3 = Array.from({length:32}, ()=>({ x:Math.random(), y:Math.random(),
+      l:.015+Math.random()*.025, s:.9+Math.random()*.7 }));
+    AudioFX.powerOn(); showMenu();
+    if(!raf) raf = requestAnimationFrame(loop);
+  }
+  function stop(){ running = false; if(raf){ cancelAnimationFrame(raf); raf = null; } }
+  function quit(){ stop(); AudioFX.back(); renderHub(); show("hub-screen"); }
+  /* getter lecture seule pour l'auto-test */
+  const peek = ()=>({ x:player&&player.x, row:player&&player.row, ROWS, W, H,
+    lanes:(lanes||[]).map(L=>({ type:L.type, dir:L.dir, speed:L.speed, express:L.express,
+      phase:L.phase, train:L.train?{x:L.train.x,w:L.train.w}:null,
+      cars:(L.cars||[]).map(c2=>({x:c2.x,w:c2.w})) })),
+    cell:cell(), playing:state==="play", score, lives, shield, streak,
+    slow:slowT>0, freeze:freezeT>0, idle:idleClock, eagle:!!eagle });
+  return { start, stop, best, bestStreak, peek };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    16. TABLEAU DE BORD — stats, progression, records
    ─────────────────────────────────────────────────────────── */
 const Stats = (()=>{
@@ -11337,7 +11817,9 @@ const Stats = (()=>{
         ${kpi(brk ? brk + " pts" : "—", "🧱 Casse-Tag")}
         ${kpi(snk ? snk + " pts" : "—", "🐍 Serpent Invader")}
         ${kpi(Pong.wins() ? Pong.wins() + " 🏆" : "—", "🏓 Pong (victoires)")}
-        ${kpi(Fly.best() ? Fly.best() + " murs" : "—", "🌙 Vol de Nuit")}
+        ${kpi(Fly.best() ? Fly.best() + " pts" : "—", "🌙 Vol de Nuit")}
+        ${kpi(Trav.best() ? Trav.best() + " trav." : "—", "🚦 Traversée")}
+        ${kpi(Trav.bestStreak() ? Trav.bestStreak() + "× d'affilée" : "—", "🏙 Meilleure série")}
         ${kpi(tour ? fmtT(tour) : "—", "🏁 Tournée (record)")}
         ${kpi((S.daily&&S.daily.streak)?S.daily.streak+" 🔥":"—", "🎯 Défi du jour (série)")}
         ${kpi(playtime ? fmtDur(playtime) : "—", "⏱ Temps de chasse")}
@@ -11411,7 +11893,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v75</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v76</p>`);
     wire();
   }
   function wire(){
@@ -11438,7 +11920,8 @@ const Options = (()=>{
           tmr = setTimeout(()=>{ armed = false; ra.textContent = "Effacer"; }, 3000); return; }
         clearTimeout(tmr); armed = false;
         S.arcadeHi = []; persist();
-        ["breakout","snake","survie","tournee","tourneeSplits"].forEach(k=>{
+        ["breakout","snake","survie","tournee","tourneeSplits",
+         "pong","fly","trav","travStreak"].forEach(k=>{
           try{ localStorage.removeItem("invasionLesVans:"+k); }catch(e){} });
         AudioFX.ok(); ra.textContent = "Effacé ✓";
         setTimeout(()=>{ ra.textContent = "Effacer"; }, 1500);
