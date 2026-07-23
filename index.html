@@ -7550,34 +7550,57 @@ MiniGames["LV_08"] = function(box, api){
    SORTIR un bloc du plateau incliné. 3★ = ≤2 erreurs. */
 MiniGames["LV_01"] = function(box, api){
   const target = SHAPES.squid;
-  const cols = target[0].length;
+  const cols = target[0].length, rowsN = target.length;
   const totalOn = target.join("").split("X").length - 1;
   const COL = api.station.couleur;
 
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Reconstruis la pièce en 3D.<br>Touche une case : le bloc sort du plateau.</p>`);
+    `<p class="sub">Reconstruis la pièce en 3D.<br>Touche une case : le bloc sort du plateau — et ton œuvre prend forme à côté du modèle.</p>`);
 
-  /* le modèle : une vraie pièce voxel qui tourne */
+  /* MODÈLE (gauche) + TON ŒUVRE (droite) : deux pièces voxel qui tournent */
   const duo = document.createElement("div"); duo.className = "duo3d";
   const mWrap = document.createElement("div");
   const model = document.createElement("canvas");
-  model.width = 200; model.height = 168;
-  model.style.cssText = "width:125px;height:105px;";
+  model.width = 200; model.height = 168; model.style.cssText = "width:118px;height:99px;";
   model.className = "model3d";
   mWrap.appendChild(model);
   mWrap.insertAdjacentHTML("beforeend", `<div class="model-lab">MODÈLE</div>`);
   duo.appendChild(mWrap);
+  const yWrap = document.createElement("div");
+  const mine = document.createElement("canvas");
+  mine.width = 200; mine.height = 168; mine.style.cssText = "width:118px;height:99px;";
+  mine.className = "model3d";
+  yWrap.appendChild(mine);
+  yWrap.insertAdjacentHTML("beforeend", `<div class="model-lab" style="color:var(--spray-cyan)">TON ŒUVRE</div>`);
+  duo.appendChild(yWrap);
   box.appendChild(duo);
+
+  /* état du jeu (déclaré tôt : la boucle 3D lit `state` dès la 1re image) */
+  const state = target.map(r=>[...r].map(()=>false));
+  const cellRef = target.map(r=>[...r].map(()=>null));
+  const history = [];
+  let combo = 0, errors = 0, moves = 0, done = false, playing = false;
+  let peeksUsed = 0;                          // aperçus du modèle sur le plateau
+  let sym = false;                            // pose en miroir (les invaders sont symétriques)
 
   const SCENE = { ground:5.6, cam:{ scale:13, focal:11, dist:7, y:-8 } };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let raf = null;
-  if(reduced) Voxel.draw(model, "squid", COL, .5, -.3, SCENE);
+  /* les cellules déjà posées par le joueur, en 3D (reconstruites à la volée) */
+  function myCells(){ const out = [];
+    target.forEach((row,y)=>[...row].forEach((_,x)=>{ if(state[y][x]) out.push({ x, y, col:COL }); }));
+    return out; }
+  function renderMine(t){
+    Voxel.renderScene(mine, [{ cells:myCells(), cols, rows:rowsN, pos:[0,0,0], size:1,
+      yaw:t*.7, pitch:-.3 + Math.sin(t*.6)*.1 }], SCENE);
+  }
+  if(reduced){ Voxel.draw(model, "squid", COL, .5, -.3, SCENE); renderMine(0); }
   else{
     const t0 = performance.now();
     (function spin(now){
       const t = (now - t0)/1000;
       Voxel.draw(model, "squid", COL, t*.7, -.3 + Math.sin(t*.6)*.1, SCENE);
+      renderMine(done ? t*2.4 : t);            // tour d'honneur une fois la pièce finie
       raf = requestAnimationFrame(spin);
     })(performance.now());
   }
@@ -7585,6 +7608,10 @@ MiniGames["LV_01"] = function(box, api){
   const bar = document.createElement("div");
   bar.className = "bar"; bar.innerHTML = "<i></i>";
   box.appendChild(bar);
+  const barLab = document.createElement("div");
+  barLab.className = "pix";
+  barLab.style.cssText = "font-size:12px; color:var(--ink-soft); text-align:center; margin-top:3px;";
+  box.appendChild(barLab);
 
   /* le plateau incliné */
   const board = document.createElement("div"); board.className = "board3d";
@@ -7593,18 +7620,20 @@ MiniGames["LV_01"] = function(box, api){
   grid.style.setProperty("--cc", COL);
   board.appendChild(grid); box.appendChild(board);
 
-  const state = target.map(r=>[...r].map(()=>false));
-  let combo = 0, errors = 0, done = false, playing = false;
-
   target.forEach((row,y)=>[...row].forEach((ch,x)=>{
     const cell = document.createElement("div");
     cell.className = "cube";
     cell.style.cssText = "width:30px;height:30px;";
+    cellRef[y][x] = cell;
     cell.addEventListener("pointerdown", ()=>{
       if(done || !playing) return;
-      state[y][x] = !state[y][x];
-      cell.classList.toggle("on", state[y][x]);
-      const correct = (ch === "X") === state[y][x];
+      const nv = !state[y][x];
+      const affected = [{ x, y }];
+      if(sym){ const mx = cols - 1 - x; if(mx !== x) affected.push({ x:mx, y }); }
+      const prev = affected.map(a=>state[a.y][a.x]);
+      affected.forEach(a=>{ state[a.y][a.x] = nv; cellRef[a.y][a.x].classList.toggle("on", nv); });
+      history.push({ cells:affected, prev }); moves++;
+      const correct = (ch === "X") === nv;     // note sur la case touchée
       if(correct){
         combo++; AudioFX.combo(combo);
         if(combo % 8 === 0) Juice.pop(box, "COMBO ×" + combo, "var(--cyan)");
@@ -7619,6 +7648,47 @@ MiniGames["LV_01"] = function(box, api){
     grid.appendChild(cell);
   }));
 
+  /* boutons Annuler / Recommencer */
+  const tools = document.createElement("div");
+  tools.style.cssText = "display:flex;gap:10px;justify-content:center;margin-top:2px;";
+  const undoBt = document.createElement("button"); undoBt.className = "b3"; undoBt.textContent = "↶ Annuler";
+  undoBt.style.cssText = "font-size:14px;padding:8px 14px;";
+  const resetBt = document.createElement("button"); resetBt.className = "b3"; resetBt.textContent = "↻ Recommencer";
+  resetBt.style.cssText = "font-size:14px;padding:8px 14px;";
+  const peekBt = document.createElement("button"); peekBt.className = "b3";
+  peekBt.style.cssText = "font-size:14px;padding:8px 14px;";
+  const updatePeek = ()=>{ peekBt.textContent = "👁 Aperçu (" + (2-peeksUsed) + ")"; peekBt.disabled = peeksUsed >= 2; };
+  updatePeek();
+  tools.appendChild(undoBt); tools.appendChild(peekBt); tools.appendChild(resetBt);
+  box.appendChild(tools);
+  /* aperçu : les cases à allumer clignotent sur le plateau (limité, coûte le 3★) */
+  peekBt.addEventListener("click", ()=>{
+    if(done || !playing || peeksUsed >= 2) return;
+    peeksUsed++; updatePeek(); AudioFX.select();
+    target.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(ch === "X"){
+      const el = cellRef[y][x]; el.style.outline = "3px solid " + COL; el.style.outlineOffset = "-2px";
+      setTimeout(()=>{ el.style.outline = ""; }, 1500); } }));
+  });
+  undoBt.addEventListener("click", ()=>{
+    if(done || !playing || !history.length) return;
+    const e = history.pop();
+    e.cells.forEach((a, i)=>{ state[a.y][a.x] = e.prev[i]; cellRef[a.y][a.x].classList.toggle("on", e.prev[i]); });
+    combo = 0; AudioFX.back(); refresh();
+  });
+  /* interrupteur « Miroir » : chaque pose se duplique en symétrie horizontale */
+  const symBt = document.createElement("button"); symBt.className = "b3";
+  symBt.style.cssText = "font-size:14px;padding:8px 14px;";
+  const updateSym = ()=>{ symBt.textContent = (sym ? "⇄ Miroir : ON" : "⇄ Miroir");
+    symBt.style.outline = sym ? "3px solid var(--spray-cyan)" : ""; symBt.style.outlineOffset = "-1px"; };
+  updateSym();
+  symBt.addEventListener("click", ()=>{ if(done || !playing) return; sym = !sym; AudioFX.select(); updateSym(); });
+  tools.appendChild(symBt);
+  resetBt.addEventListener("click", ()=>{
+    if(done || !playing || !history.length) return;
+    state.forEach((row,y)=>row.forEach((_,x)=>{ state[y][x] = false; cellRef[y][x].classList.remove("on"); }));
+    history.length = 0; combo = 0; AudioFX.back(); refresh();
+  });
+
   function refresh(){
     let good = 0, wrong = 0;
     target.forEach((row,y)=>[...row].forEach((ch,x)=>{
@@ -7626,10 +7696,15 @@ MiniGames["LV_01"] = function(box, api){
       if(ch !== "X" && state[y][x]) wrong++;
     }));
     bar.firstElementChild.style.width = Math.round(good/totalOn*100) + "%";
+    barLab.textContent = good + "/" + totalOn + " blocs" + (wrong ? " · " + wrong + " en trop" : "");
     if(good === totalOn && wrong === 0 && !done){
       done = true;
+      mine.style.transition = "transform .4s, filter .4s";
+      mine.style.transform = "scale(1.1)"; mine.style.filter = "drop-shadow(0 0 16px " + COL + ")";
       AudioFX.fanfare(); Juice.confetti(box, 26);
-      const stars = errors <= 2 ? 3 : errors <= 6 ? 2 : 1;
+      /* 3★ = pièce propre du premier coup (peu d'erreurs, peu de gâchis, sans aperçu) */
+      const clean = errors <= 2 && moves <= totalOn + 3 && peeksUsed === 0;
+      const stars = clean ? 3 : errors <= 6 ? 2 : 1;
       setTimeout(()=>api.win({ stars,
         label: stars === 3 ? "PERFECT !" : "PIÈCE RECONSTRUITE !" }), 700);
     }
@@ -7648,7 +7723,16 @@ MiniGames["LV_02"] = function(box, api){
   let t0 = Date.now(), started = false;
 
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Lève les blocs pour atteindre la cible, <b>ligne par ligne</b>.<br>Un bloc levé vaut son chiffre.</p>`);
+    `<p class="sub">Lève les blocs pour atteindre la cible, <b>ligne par ligne</b>.<br>Un bloc levé vaut son chiffre — additionne-les.</p>`);
+
+  /* petit pense-bête : la valeur de chaque colonne, toujours visible */
+  box.insertAdjacentHTML("beforeend",
+    `<div class="pix" style="display:flex;gap:10px;justify-content:center;font-size:12px;color:var(--ink-soft);margin:2px 0 6px;">
+       <span>💡 valeurs :</span>
+       <span style="color:#4db8ff">8</span><span>·</span><span style="color:#4db8ff">4</span>
+       <span>·</span><span style="color:#4db8ff">2</span><span>·</span><span style="color:#4db8ff">1</span>
+       <span style="opacity:.7">(ex. 4+2 = 6)</span>
+     </div>`);
 
   /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
   const starRow = document.createElement("div");
@@ -7665,10 +7749,46 @@ MiniGames["LV_02"] = function(box, api){
   starRow.appendChild(starLab); starRow.appendChild(starBar);
   box.appendChild(starRow);
 
+  /* coup de pouce : montre brièvement les blocs à lever sur la ligne active
+     (utile si le binaire n'est pas une évidence) — limité, et coûte l'étoile parfaite */
+  let hintsUsed = 0;
+  const hintBt = document.createElement("button"); hintBt.className = "b3";
+  hintBt.style.cssText = "font-size:13px;padding:7px 12px;margin:6px auto 0;display:block;";
+  const updateHintBtn = ()=>{ hintBt.textContent = "💡 Montrer les blocs (" + (2-hintsUsed) + ")";
+    hintBt.disabled = hintsUsed >= 2; };
+  hintBt.addEventListener("click", ()=>{
+    if(hintsUsed >= 2 || !started) return;
+    if(active >= TARGETS.length || locked[active]) return;
+    hintsUsed++; updateHintBtn(); AudioFX.select();
+    const tgt = TARGETS[active];
+    cellEls[active].forEach((c, b)=>{ if(tgt & VAL[b]){
+      c.style.outline = "3px solid var(--jaune)"; c.style.outlineOffset = "-2px";
+      setTimeout(()=>{ c.style.outline = ""; }, 1600); } });
+  });
+  box.appendChild(hintBt);
+
   const rows = TARGETS.map(()=>[0,0,0,0]);
   const locked = TARGETS.map(()=>false);
   const cellEls = [], labels = [];
   let active = 0;
+
+  /* aide visuelle 3D : la CIBLE (bleue, translucide) et TON TOTAL (or)
+     en tours de cubes — tu dois monter à la même hauteur */
+  const twr = document.createElement("canvas");
+  twr.width = 210; twr.height = 150; twr.className = "model3d"; twr.style.cssText = "width:118px;height:84px;";
+  box.appendChild(twr);
+  box.insertAdjacentHTML("beforeend", `<div class="model-lab">CIBLE ▮ vs TOI ▮</div>`);
+  const stack = (v, col)=>{ const out = []; for(let k=0;k<v;k++) out.push({ x:0, y:-k, col }); return out; };
+  let twraf = null;
+  function renderTwr(t){
+    const done2 = active >= TARGETS.length;
+    const tgt = done2 ? 0 : TARGETS[active];
+    const cur = done2 ? 0 : rows[active].reduce((a,b,i)=>a + (b ? [8,4,2,1][i] : 0), 0);
+    Voxel.renderScene(twr, [
+      { cells:stack(tgt, "#4db8ff"), cols:1, rows:15, pos:[-.8,0,0], size:.5, yaw:t*.5, pitch:-.18, alpha:.32 },
+      { cells:stack(cur, cur > tgt ? "#ff6b6b" : "#ffd23f"), cols:1, rows:15, pos:[.8,0,0], size:.5, yaw:t*.5, pitch:-.18 },
+    ], { cam:{ scale:10 } });
+  }
   const val = r => rows[r].reduce((a,b,i)=>a + (b ? VAL[i] : 0), 0);
 
   const board = document.createElement("div"); board.className = "board3d";
@@ -7735,9 +7855,12 @@ MiniGames["LV_02"] = function(box, api){
         while(active < TARGETS.length && locked[active]) active++;
         focusRows();
       }else{
-        /* dépassé = rouge, sinon valeur courante / cible */
+        /* dépassé = rouge, sinon valeur courante / cible + coup de pouce sur la ligne active */
         const col = v > tgt ? "var(--rouge)" : "var(--ink)";
-        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>`;
+        const hint = r !== active ? ""
+          : v > tgt ? ` <span style="color:var(--rouge);font-size:13px">trop !</span>`
+          : v < tgt ? ` <span class="dim" style="font-size:13px">(+${tgt-v})</span>` : "";
+        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>${hint}`;
       }
     });
     if(locked.every(Boolean) && !done){
@@ -7745,7 +7868,8 @@ MiniGames["LV_02"] = function(box, api){
       clearInterval(starIv);
       AudioFX.fanfare(); Juice.confetti(box, 22);
       const s = (Date.now() - t0)/1000;
-      const stars = s < 45 ? 3 : s < 90 ? 2 : 1;
+      let stars = s < 45 ? 3 : s < 90 ? 2 : 1;
+      if(hintsUsed > 0) stars = Math.min(stars, 2);        // le coup de pouce coûte l'étoile parfaite
       setTimeout(()=>api.win({ stars,
         label: stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }), 700);
     }
@@ -7763,9 +7887,12 @@ MiniGames["LV_02"] = function(box, api){
       : stars === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
   }, 250);
   starLab.textContent = "★★★";
-  focusRows(); refresh();
+  updateHintBtn(); focusRows(); refresh();
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){ renderTwr(.4); }
+  else{ const tw0 = performance.now();
+    (function twloop(now){ renderTwr((now-tw0)/1000); twraf = requestAnimationFrame(twloop); })(performance.now()); }
   Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); });
-  return ()=>clearInterval(starIv);
+  return ()=>{ clearInterval(starIv); if(twraf) cancelAnimationFrame(twraf); };
 };
 
 /* ── LV_05 : LE SIMON 3D ────────────────────────────────────
@@ -7783,13 +7910,49 @@ MiniGames["LV_05"] = function(box, api){
   const tempo = ()=>Math.max(340, 600 - (seq.length - 1)*52);
 
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Écoute la séquence, puis rejoue-la.<br>Ça accélère à chaque niveau.</p>`);
+    `<p class="sub">Écoute la séquence, puis rejoue-la.<br>Ça accélère à chaque niveau — « Revoir » si tu doutes.</p>`);
   const pips = document.createElement("div"); pips.className = "pips";
   for(let i=0;i<TARGET_LEN;i++) pips.insertAdjacentHTML("beforeend", '<div class="pip"></div>');
   box.appendChild(pips);
   const status = document.createElement("div");
   status.style.cssText = "font-size:21px;min-height:32px;color:var(--jaune);text-align:center;font-weight:800;";
   box.appendChild(status);
+
+  /* meilleur niveau atteint (persistant, tous jeux confondus) */
+  const SBKEY = "invasionLesVans:simonBest";
+  const bestLvl = ()=>+localStorage.getItem(SBKEY) || 0;
+  /* barre d'infos : niveau, série d'erreurs, bouton « Revoir » (limité) */
+  let replaysLeft = 2, usedReplay = false;
+  const infoRow = document.createElement("div");
+  infoRow.style.cssText = "display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:4px;font-size:14px;";
+  const lvlLab = document.createElement("span"); lvlLab.className = "pix"; lvlLab.style.color = "var(--spray-cyan)";
+  const errLab = document.createElement("span"); errLab.className = "pix"; errLab.style.color = "var(--ink-soft)";
+  const replayBt = document.createElement("button"); replayBt.className = "b3";
+  replayBt.style.cssText = "font-size:13px;padding:7px 12px;";
+  infoRow.appendChild(lvlLab); infoRow.appendChild(replayBt); infoRow.appendChild(errLab);
+  box.appendChild(infoRow);
+
+  /* barre de lecture : remplit pendant « ÉCOUTE », puis suit ta saisie */
+  const playBar = document.createElement("div"); playBar.className = "bar";
+  playBar.style.cssText = "width:min(60vw,220px);height:7px;overflow:hidden;margin:0 auto 8px;";
+  const playFill = document.createElement("i");
+  playFill.style.cssText = "display:block;height:100%;width:0;background:linear-gradient(90deg,var(--spray-cyan),var(--jaune));";
+  playBar.appendChild(playFill); box.appendChild(playBar);
+  function fillOver(ms){ playFill.style.transition = "none"; playFill.style.width = "0";
+    requestAnimationFrame(()=>{ playFill.style.transition = `width ${ms}ms linear`; playFill.style.width = "100%"; }); }
+  function fillTo(frac){ playFill.style.transition = "width .12s"; playFill.style.width = (frac*100) + "%"; }
+  function updateInfo(){
+    const rec = bestLvl();
+    lvlLab.textContent = "NIV " + Math.max(1, seq.length) + "/" + TARGET_LEN + (rec ? " · ✦" + rec : "");
+    errLab.textContent = "✗ " + errors;
+    replayBt.textContent = "👁 Revoir (" + replaysLeft + ")";
+    replayBt.disabled = replaysLeft <= 0;
+  }
+  replayBt.addEventListener("click", ()=>{
+    if(!accepting || replaysLeft <= 0 || !seq.length) return;
+    usedReplay = true; replaysLeft--; updateInfo();
+    playSeq();                                   // ré-illumine la séquence, remet l'entrée à zéro
+  });
 
   const wrap = document.createElement("div"); wrap.className = "pad3d-wrap";
   const grid = document.createElement("div"); grid.className = "pad3d-grid";
@@ -7817,14 +7980,22 @@ MiniGames["LV_05"] = function(box, api){
     el.classList.add("lit");
     el.style.boxShadow = lit(p.c);
     AudioFX.tone(p.f);
+    if(el.animate && !matchMedia("(prefers-reduced-motion: reduce)").matches){
+      const rp = document.createElement("span");     // onde qui pulse depuis le pad
+      rp.style.cssText = "position:absolute;inset:0;border-radius:20px;pointer-events:none;border:2.5px solid " + p.c + ";";
+      el.appendChild(rp);
+      rp.animate([{ transform:"scale(.72)", opacity:.85 }, { transform:"scale(1.45)", opacity:0 }],
+        { duration:420, easing:"ease-out" }).onfinish = ()=>rp.remove();
+    }
     T(()=>{ el.classList.remove("lit"); el.style.boxShadow = rest(p.c); }, ms);
   }
   function playSeq(){
     accepting = false; idx = 0;
-    status.textContent = "ÉCOUTE…";
+    status.textContent = "ÉCOUTE…"; updateInfo();
     [...pips.children].forEach((p, k)=>p.classList.toggle("on", k < seq.length - 1));
     seq.forEach((p, k)=>T(()=>light(p, tempo()*.55), tempo()*k + 500));
-    T(()=>{ accepting = true; status.textContent = "À TOI !"; }, tempo()*seq.length + 550);
+    fillOver(tempo()*seq.length + 400);        // la barre suit la lecture
+    T(()=>{ accepting = true; status.textContent = "À TOI ! 0/" + seq.length; fillTo(0); }, tempo()*seq.length + 550);
   }
   function next(){
     seq.push(Math.floor(Math.random()*4));
@@ -7835,7 +8006,7 @@ MiniGames["LV_05"] = function(box, api){
     if(!accepting) return;
     light(i, 170);
     if(i !== seq[idx]){
-      accepting = false; errors++;
+      accepting = false; errors++; updateInfo();
       AudioFX.err(); Juice.shake(box);
       try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
       status.textContent = "RATÉ ! RÉÉCOUTE…";
@@ -7844,13 +8015,17 @@ MiniGames["LV_05"] = function(box, api){
     }
     try{ navigator.vibrate && navigator.vibrate(10); }catch(e){}
     idx++;
+    status.textContent = "À TOI ! " + idx + "/" + seq.length;
+    fillTo(idx / seq.length);
     if(idx >= seq.length){
       accepting = false;
+      if(seq.length > bestLvl()){ try{ localStorage.setItem(SBKEY, seq.length); }catch(e){} }
       if(seq.length >= TARGET_LEN){
         [...pips.children].forEach(p=>p.classList.add("on"));
         status.textContent = "SÉQUENCE COMPLÈTE !";
         AudioFX.fanfare(); Juice.confetti(box, 24);
-        const stars = errors === 0 ? 3 : errors <= 2 ? 2 : 1;
+        /* 3★ = zéro faute ET sans utiliser « Revoir » */
+        const stars = (errors === 0 && !usedReplay) ? 3 : errors <= 2 ? 2 : 1;
         T(()=>api.win({ stars,
           label: stars === 3 ? "MÉMOIRE PARFAITE !" : "SÉQUENCE MAÎTRISÉE !" }), 800);
       }else{
@@ -7858,6 +8033,7 @@ MiniGames["LV_05"] = function(box, api){
       }
     }
   }
+  updateInfo();
   Juice.readyGo(box, next);
   return ()=>timers.forEach(clearTimeout);
 };
@@ -9246,6 +9422,7 @@ MiniGames["LV_04"] = function(box, api){
   const PAR = 8;
   let g = TARGET.map(r=>r.slice());
   let moves = 0, playing = false, solved = false;
+  const history = []; let usedUndo = false, hintsUsed = 0;
 
   const shiftRow = (r,d)=>{ g[r] = d>0 ? [g[r][2],g[r][0],g[r][1]] : [g[r][1],g[r][2],g[r][0]]; };
   const shiftCol = (cc,d)=>{
@@ -9338,53 +9515,89 @@ MiniGames["LV_04"] = function(box, api){
     const dx = px - down.px, dy = py - down.py;
     const TH = 30;                            // seuil généreux
     if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > TH){
-      doMove(()=>shiftRow(down.cell.y, dx > 0 ? 1 : -1), "row", down.cell.y);
+      doMove("row", down.cell.y, dx > 0 ? 1 : -1);
     }else if(Math.abs(dy) > TH){
-      doMove(()=>shiftCol(down.cell.x, dy > 0 ? 1 : -1), "col", down.cell.x);
+      doMove("col", down.cell.x, dy > 0 ? 1 : -1);
     }
     down = null;
   });
   cv.addEventListener("pointercancel", ()=>{ down = null; });
 
-  function doMove(fn, kind, index){
-    fn(); moves++;
+  function apply(kind, index, dir){ if(kind === "row") shiftRow(index, dir); else shiftCol(index, dir); }
+  function doMove(kind, index, dir, silent){
+    apply(kind, index, dir); moves++;
+    if(!silent) history.push({ kind, index, dir });
     AudioFX.combo(Math.min(moves, 10));
     try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
     pulse = .12;                              // petit « pop » du cube
-    if(kind != null) hl = { kind, index, until: performance.now() + 260 };
+    hl = { kind, index, until: performance.now() + 260 };
     hud(); render(); check();
     if(reduced) setTimeout(render, 300);      // efface le flash sans boucle rAF
   }
+  function undo(){
+    if(!playing || solved || !history.length) return;
+    const m = history.pop();
+    apply(m.kind, m.index, -m.dir);           // coup inverse
+    moves = Math.max(0, moves - 1); usedUndo = true;
+    pulse = .1; AudioFX.back(); hl = { kind:m.kind, index:m.index, until:performance.now()+260 };
+    hud(); render();
+    if(reduced) setTimeout(render, 300);
+  }
 
   /* ── flèches de secours tout autour ── */
-  const arrow = (txt, area, fn, kind, idx2)=>{
+  const arrow = (txt, area, kind, index, dir)=>{
     const b = document.createElement("button");
     b.className = "b3";
     b.textContent = txt;
     b.style.cssText = `grid-area:${area}; font-size:13px; padding:0; width:34px; height:34px; border-radius:10px;`;
-    b.addEventListener("click", ()=>{ if(playing && !solved) doMove(fn, kind, idx2); });
+    b.addEventListener("click", ()=>{ if(playing && !solved) doMove(kind, index, dir); });
     board.appendChild(b);
     return b;
   };
   board.appendChild(cv);
   for(let i=0;i<3;i++){
-    arrow("▲", `1/${i+2}/2/${i+3}`, ()=>shiftCol(i, -1), "col", i);
-    arrow("▼", `5/${i+2}/6/${i+3}`, ()=>shiftCol(i,  1), "col", i);
-    arrow("◀", `${i+2}/1/${i+3}/2`, ()=>shiftRow(i, -1), "row", i);
-    arrow("▶", `${i+2}/5/${i+3}/6`, ()=>shiftRow(i,  1), "row", i);
+    arrow("▲", `1/${i+2}/2/${i+3}`, "col", i, -1);
+    arrow("▼", `5/${i+2}/6/${i+3}`, "col", i,  1);
+    arrow("◀", `${i+2}/1/${i+3}/2`, "row", i, -1);
+    arrow("▶", `${i+2}/5/${i+3}/6`, "row", i,  1);
   }
+  /* boutons Annuler + Conseil (reprise en main — coûtent l'étoile parfaite) */
+  const toolRow = document.createElement("div");
+  toolRow.style.cssText = "display:flex; gap:10px; justify-content:center; margin-top:8px;";
+  const undoBt = document.createElement("button"); undoBt.className = "b3";
+  undoBt.textContent = "↶ Annuler le coup"; undoBt.style.cssText = "font-size:14px; padding:8px 14px;";
+  undoBt.addEventListener("click", undo);
+  const hintBt = document.createElement("button"); hintBt.className = "b3";
+  hintBt.style.cssText = "font-size:14px; padding:8px 14px;";
+  const updateHint = ()=>{ hintBt.textContent = "💡 Conseil (" + (2-hintsUsed) + ")"; hintBt.disabled = hintsUsed >= 2; };
+  updateHint();
+  hintBt.addEventListener("click", ()=>{
+    if(!playing || solved || hintsUsed >= 2) return;
+    /* fait briller une ligne (ou une colonne) encore mal placée */
+    let wr = -1; for(let r=0;r<3;r++){ if(g[r].join() !== TARGET[r].join()){ wr = r; break; } }
+    let wc = -1; for(let x=0;x<3;x++){ if(g[0][x]!==TARGET[0][x] || g[1][x]!==TARGET[1][x] || g[2][x]!==TARGET[2][x]){ wc = x; break; } }
+    hintsUsed++; updateHint(); AudioFX.select();
+    hl = (wr>=0) ? { kind:"row", index:wr, until:performance.now()+1500 }
+                 : (wc>=0) ? { kind:"col", index:wc, until:performance.now()+1500 } : hl;
+    render(); if(reduced) setTimeout(render, 1600);
+  });
+  toolRow.appendChild(undoBt); toolRow.appendChild(hintBt);
+  box.appendChild(toolRow);
 
   /* prévision d'étoiles en direct : on sait ce qu'on joue */
   function hud(){
-    const would = moves <= PAR ? "★★★" : moves <= 14 ? "★★" : "★";
-    hudLine.innerHTML = `COUPS : ${moves} · PAR : ${PAR} · <span style="color:var(--jaune)">${would}</span>`;
+    let would = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
+    if(usedUndo || hintsUsed > 0) would = Math.min(would, 2);
+    let ok = 0; for(let r=0;r<3;r++) for(let x=0;x<3;x++) if(g[r][x]===TARGET[r][x]) ok++;
+    hudLine.innerHTML = `COUPS : ${moves} · ${ok}/9 en place · <span style="color:var(--jaune)">${"★".repeat(would)}</span>`;
   }
   function check(){
     if(JSON.stringify(g) === JSON.stringify(TARGET)){
       solved = true;
       try{ navigator.vibrate && navigator.vibrate([50,40,50,40,130]); }catch(e){}
       AudioFX.fanfare(); Juice.confetti(box, 26);
-      const stars = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
+      let stars = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
+      if(usedUndo || hintsUsed > 0) stars = Math.min(stars, 2);
       setTimeout(()=>api.win({ stars,
         label: stars === 3 ? `PAR EN ${moves} COUPS !` : `RÉSOLU EN ${moves} COUPS !` }), 800);
     }
@@ -11893,7 +12106,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v76</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v77</p>`);
     wire();
   }
   function wire(){
