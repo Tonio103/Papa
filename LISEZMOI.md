@@ -54,6 +54,25 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v82) — LV_02 : la ruelle prend vie
+
+Le décor du binaire devient une **vraie scène de nuit animée**, dessinée image
+par image sur le canvas :
+
+- **Un ciel étoilé** avec une **lune** et son halo, des **étoiles qui scintillent**.
+- Une **skyline de ville** en deux plans, avec des **fenêtres allumées qui
+  clignotent** (jaune + néon cyan) et des **nuages qui dérivent**.
+- Un **projecteur de la ville** qui balaie le ciel, et un **projecteur qui glisse**
+  lentement sur le mur.
+- Le **mur de briques** gagne un rebord, des **fissures**, une vignette, et se
+  **réchauffe** à mesure que l'invader s'allume (la lumière **déborde sur les
+  briques**).
+- De la **brume** qui rampe au sol, des **escarbilles** qui montent, des **coulures
+  de peinture** sous les cases allumées, et le vieux **tag néon qui grésille**.
+
+Toujours le même geste simple (composer chaque nombre en binaire), mais dans un
+décor qui respire. Testé de bout en bout, **zéro erreur** console. sw v81→v82.
+
 ## Nouveautés (v81) — LV_02 : « L'INVADER BINAIRE », un vrai décor
 
 Le binaire est **entièrement remis en scène**. Fini l'exercice à cases posé sur

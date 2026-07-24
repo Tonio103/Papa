@@ -7767,10 +7767,10 @@ MiniGames["LV_02"] = function(box, api){
   box.insertAdjacentHTML("beforeend",
     `<p class="sub">Un invader dort, éteint, sur le mur.<br><b>Rallume-le</b> : compose le nombre affiché avec les blocs — ils dessinent l'invader.</p>`);
 
-  /* ═══ LA SCÈNE : le mur (canvas) ═══ */
+  /* ═══ LA SCÈNE : une ruelle des Vans, la nuit (canvas vivant) ═══ */
   const DPR = Math.min(2, window.devicePixelRatio || 1);
   const W = Math.max(320, Math.min(460, Math.floor(innerWidth - 40)));
-  const H = Math.max(280, Math.min(400, Math.floor(innerHeight - 380)));
+  const H = Math.max(300, Math.min(440, Math.floor(innerHeight - 360)));
   const cv = document.createElement("canvas");
   cv.width = W*DPR; cv.height = H*DPR;
   cv.style.cssText = "width:100%;border-radius:18px;touch-action:none;" +
@@ -7778,38 +7778,90 @@ MiniGames["LV_02"] = function(box, api){
   box.appendChild(cv);
   const c = cv.getContext("2d"); c.scale(DPR, DPR);
 
-  /* mur de briques pré-rendu (une fois) */
+  const skyH = Math.round(H * 0.30);               // bande de ciel au-dessus du mur
+
+  /* ── CIEL pré-rendu : dégradé nuit, étoiles, lune, skyline ── */
+  const stars = [], windows = [];                  // scintillements animés
+  const sky = document.createElement("canvas"); sky.width = W*DPR; sky.height = (skyH+44)*DPR;
+  (function(){
+    const g = sky.getContext("2d"); g.scale(DPR, DPR); const SH = skyH + 44;
+    const grd = g.createLinearGradient(0, 0, 0, SH);
+    grd.addColorStop(0, "#0b1030"); grd.addColorStop(.6, "#161435"); grd.addColorStop(1, "#201a3a");
+    g.fillStyle = grd; g.fillRect(0, 0, W, SH);
+    for(let i=0;i<40;i++){ const s = { x:Math.random()*W, y:Math.random()*(skyH-8), r:Math.random()*1.1+.3, ph:Math.random()*7 };
+      stars.push(s); g.globalAlpha=.5; g.fillStyle="#dfe6ff"; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 7); g.fill(); }
+    g.globalAlpha = 1;
+    /* lune + halo */
+    const mx = W - 50, my = 28;
+    const mg = g.createRadialGradient(mx, my, 2, mx, my, 48);
+    mg.addColorStop(0, "rgba(255,246,214,.5)"); mg.addColorStop(1, "rgba(255,246,214,0)");
+    g.fillStyle = mg; g.fillRect(mx-48, my-48, 96, 96);
+    g.fillStyle = "#fdf3d0"; g.beginPath(); g.arc(mx, my, 13, 0, 7); g.fill();
+    g.fillStyle = "#e6dab0"; g.globalAlpha=.5; g.beginPath(); g.arc(mx+4, my-3, 3, 0, 7); g.arc(mx-4, my+4, 2, 0, 7); g.fill(); g.globalAlpha=1;
+    /* skyline en deux couches (les fenêtres scintilleront) */
+    function buildings(baseY, hMin, hMax, col, winCol, lit){
+      let x = -12;
+      while(x < W + 12){
+        const bw = 22 + Math.random()*40, bh = hMin + Math.random()*(hMax - hMin);
+        g.fillStyle = col; g.fillRect(x, baseY - bh, bw, bh + 44);
+        if(Math.random() < .4) g.fillRect(x + bw/2 - 1, baseY - bh - 8, 2, 8);   // antenne
+        for(let wy = baseY - bh + 6; wy < baseY + 4; wy += 9)
+          for(let wx = x + 4; wx < x + bw - 5; wx += 8)
+            if(Math.random() < lit){ const wc = Math.random() < .15 ? "#2be4d0" : winCol;
+              g.fillStyle = wc; g.fillRect(wx, wy, 3, 4); windows.push({ x:wx, y:wy, col:wc, ph:Math.random()*7 }); }
+        x += bw + 2 + Math.random()*8;
+      }
+    }
+    buildings(skyH, skyH*.35, skyH*.72, "#0e1330", "rgba(255,214,150,.55)", .10);   // au loin
+    buildings(skyH, skyH*.20, skyH*.50, "#141a3e", "rgba(255,214,150,.85)", .16);   // au près
+  })();
+  const clouds = Array.from({length:3}, (_, i)=>({ x:Math.random()*W, y:8 + i*13 + Math.random()*8,
+    w:70 + Math.random()*60, sp:.05 + Math.random()*.10 }));
+
+  /* ── MUR de briques pré-rendu (sous le ciel) ── */
   const wall = document.createElement("canvas"); wall.width = W*DPR; wall.height = H*DPR;
   (function(){
     const g = wall.getContext("2d"); g.scale(DPR, DPR);
-    g.fillStyle = "#1c1930"; g.fillRect(0, 0, W, H);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "#2c2647"; g.fillRect(0, skyH - 6, W, 8);                         // rebord du mur
+    g.fillStyle = "rgba(255,255,255,.06)"; g.fillRect(0, skyH - 6, W, 2);
     const BH = 15, BW = 32;
-    for(let y=0;y<H;y+=BH){
+    for(let y=skyH+2;y<H;y+=BH){
       const off = ((y/BH)|0)%2 ? BW/2 : 0;
       for(let x=-BW;x<W;x+=BW){
         const v = (((x*7 + y*13)%9) - 4) * .012;
-        g.fillStyle = shade("#241f3a", v);
-        g.fillRect(x+off+1, y+1, BW-2, BH-2);
+        g.fillStyle = shade("#241f3a", v); g.fillRect(x+off+1, y+1, BW-2, BH-2);
         g.fillStyle = "rgba(255,255,255,.03)"; g.fillRect(x+off+1, y+1, BW-2, 2);
         g.fillStyle = "rgba(0,0,0,.16)";       g.fillRect(x+off+1, y+BH-2, BW-2, 1);
       }
     }
-    /* vieux tags fantômes : le mur a vécu */
+    /* fissures qui parcourent le mur */
+    g.strokeStyle = "rgba(0,0,0,.28)"; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(W*.17, skyH+10); g.lineTo(W*.21, skyH+40); g.lineTo(W*.18, skyH+66); g.lineTo(W*.23, skyH+96); g.stroke();
+    g.beginPath(); g.moveTo(W*.82, H-6); g.lineTo(W*.85, H-38); g.lineTo(W*.80, H-62); g.stroke();
+    /* vieux tags fantômes */
     g.save(); g.globalAlpha=.09; g.fillStyle=CC; g.font="italic bold 24px 'Baloo 2',sans-serif";
-    g.translate(38, H-22); g.rotate(-.06); g.fillText("0101", 0, 0); g.restore();
+    g.translate(38, H-20); g.rotate(-.06); g.fillText("0101", 0, 0); g.restore();
     g.save(); g.globalAlpha=.06; g.fillStyle=INK; g.font="italic bold 20px 'Baloo 2',sans-serif";
-    g.translate(W-118, 34); g.rotate(.05); g.fillText("LV ▦", 0, 0); g.restore();
+    g.translate(W-118, skyH+34); g.rotate(.05); g.fillText("LV ▦", 0, 0); g.restore();
+    /* vignette */
+    const vg = g.createRadialGradient(W/2, (skyH+H)/2, H*.28, W/2, (skyH+H)/2, H*.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.5)");
+    g.fillStyle = vg; g.fillRect(0, skyH - 8, W, H - skyH + 8);
   })();
 
-  /* géométrie de la grille invader (grosses cases lisibles, centrées) */
-  const cell = Math.floor(Math.min((W - 70)/COLS, (H - 66)/R));
+  /* géométrie de la grille invader (dans la zone du mur) */
+  const wallTop = skyH + 6, wallH = H - wallTop;
+  const cell = Math.floor(Math.min((W - 70)/COLS, (wallH - 34)/R));
   const gx = Math.round((W - cell*COLS)/2);
-  const gy = Math.round((H - cell*R)/2) - 2;
+  const gy = Math.round(wallTop + (wallH - cell*R)/2);
 
-  /* particules de bombe + poussière ambiante */
-  let parts = [];
-  const dust = Array.from({length:24}, ()=>({ x:Math.random()*W, y:Math.random()*H,
-    r:Math.random()*1.3+.4, ph:Math.random()*7, sp:.12+Math.random()*.22 }));
+  /* ── particules & ambiance animée ── */
+  let parts = [], drips = [];
+  const embers = Array.from({length:26}, ()=>({ x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*1.4+.5, ph:Math.random()*7, sp:.14+Math.random()*.30, hue:Math.random()<.5?INK:CC }));
+  const fog = Array.from({length:4}, (_, i)=>({ x:Math.random()*W, y:H - 16 - i*7,
+    r:70 + Math.random()*70, sp:.06 + Math.random()*.13, a:.05 + Math.random()*.05 }));
   function spray(cx, cy, col, n){
     for(let i=0;i<n;i++) parts.push({ x:cx, y:cy, vx:(Math.random()-.5)*3, vy:-(Math.random()*2.4+.4),
       life:16+Math.random()*14, g:.11+Math.random()*.07, col, sz:1.6+Math.random()*2.4 });
@@ -7969,18 +8021,64 @@ MiniGames["LV_02"] = function(box, api){
   }
   let raf = null;
   function draw(now){
-    c.drawImage(wall, 0, 0, W, H);
-    /* projecteur du haut */
-    const gl = c.createRadialGradient(W/2, gy - 12, 18, W/2, gy + cell*R/2, H*.85);
-    gl.addColorStop(0, "rgba(255,235,180,.11)"); gl.addColorStop(1, "rgba(255,235,180,0)");
-    c.fillStyle = gl; c.fillRect(0, 0, W, H);
-    /* poussière qui monte dans le faisceau */
-    c.fillStyle = "#fff";
-    dust.forEach(d=>{ d.y -= d.sp; if(d.y < -2){ d.y = H + 2; d.x = Math.random()*W; }
-      c.globalAlpha = .10 + Math.sin(now/900 + d.ph)*.06; c.beginPath(); c.arc(d.x, d.y, d.r, 0, 7); c.fill(); });
-    c.globalAlpha = 1;
+    const t = now / 1000;
 
-    /* la grille de l'invader */
+    /* ── 1. LE CIEL ── */
+    c.drawImage(sky, 0, 0, W, skyH + 44);
+    /* aurore : une lueur qui glisse et change de teinte au-dessus des toits */
+    c.save(); c.globalCompositeOperation = "lighter";
+    const au = .5 + Math.sin(t*.18)*.5;
+    const ag = c.createLinearGradient(0, 0, 0, skyH);
+    ag.addColorStop(0, `rgba(${70+au*40|0},${110+au*50|0},${175+au*50|0},.12)`);
+    ag.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = ag; c.fillRect(0, 0, W, skyH); c.restore();
+    /* étoiles qui scintillent */
+    c.fillStyle = "#fff";
+    stars.forEach(s=>{ c.globalAlpha = .3 + Math.sin(t*2 + s.ph)*.28; c.beginPath(); c.arc(s.x, s.y, s.r, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+    /* nuages qui dérivent */
+    clouds.forEach(cl=>{ cl.x += cl.sp; if(cl.x - cl.w > W) cl.x = -cl.w;
+      const cg = c.createRadialGradient(cl.x, cl.y, 4, cl.x, cl.y, cl.w);
+      cg.addColorStop(0, "rgba(120,120,165,.10)"); cg.addColorStop(1, "rgba(120,120,165,0)");
+      c.fillStyle = cg; c.fillRect(cl.x - cl.w, cl.y - cl.w/2, cl.w*2, cl.w); });
+    /* fenêtres de la ville qui clignotent */
+    windows.forEach(w=>{ c.globalAlpha = .4 + Math.sin(t*1.5 + w.ph)*.4; c.fillStyle = w.col; c.fillRect(w.x, w.y, 3, 4); });
+    c.globalAlpha = 1;
+    /* projecteur de la ville qui balaie le ciel */
+    { const bx = W*.30, ang = -Math.PI/2 + Math.sin(t*.25)*.5;
+      c.save(); c.globalCompositeOperation = "lighter"; c.translate(bx, skyH); c.rotate(ang);
+      const bg = c.createLinearGradient(0, 0, 0, -skyH*1.5);
+      bg.addColorStop(0, "rgba(120,200,255,.10)"); bg.addColorStop(1, "rgba(120,200,255,0)");
+      c.fillStyle = bg; c.beginPath(); c.moveTo(-4, 0); c.lineTo(-24, -skyH*1.5); c.lineTo(24, -skyH*1.5); c.lineTo(4, 0); c.closePath(); c.fill();
+      c.restore(); }
+
+    /* ── 2. LE MUR ── */
+    c.drawImage(wall, 0, 0, W, H);
+    /* projecteur qui balaie lentement le mur */
+    { const sxp = W*.5 + Math.sin(t*.35)*W*.26, syp = gy + cell*R*.42;
+      const sg = c.createRadialGradient(sxp, skyH, 10, sxp, syp, H*.7);
+      sg.addColorStop(0, "rgba(255,238,190,.10)"); sg.addColorStop(1, "rgba(255,238,190,0)");
+      c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = sg; c.fillRect(0, skyH, W, H - skyH); c.restore(); }
+    /* le mur se réchauffe à mesure que l'invader s'allume */
+    const prog = solved.filter(Boolean).length / R;
+    if(prog > 0 || over){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const rg = c.createRadialGradient(W/2, gy + cell*R/2, 10, W/2, gy + cell*R/2, cell*R*1.15);
+      rg.addColorStop(0, `rgba(255,210,90,${.04 + (over?.16:prog*.10)})`); rg.addColorStop(1, "rgba(255,210,90,0)");
+      c.fillStyle = rg; c.fillRect(0, skyH, W, H - skyH); c.restore();
+    }
+    /* néon du tag qui grésille */
+    { const fl = Math.sin(t*7) > .55 ? 1 : .25;
+      c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = .08 + fl*.12;
+      c.fillStyle = CC; c.font = "italic bold 24px 'Baloo 2',sans-serif";
+      c.translate(38, H-20); c.rotate(-.06); c.fillText("0101", 0, 0); c.restore(); }
+    /* brume qui rampe au pied du mur */
+    fog.forEach(f=>{ f.x += f.sp; if(f.x - f.r > W) f.x = -f.r;
+      const fg = c.createRadialGradient(f.x, f.y, 4, f.x, f.y, f.r);
+      fg.addColorStop(0, `rgba(150,140,195,${f.a})`); fg.addColorStop(1, "rgba(150,140,195,0)");
+      c.fillStyle = fg; c.fillRect(f.x - f.r, f.y - f.r, f.r*2, f.r*2); });
+
+    /* ── 3. L'INVADER ── */
     for(let r=0;r<R;r++){
       const isCur = r === rowIdx && !over;
       if(isCur){
@@ -7999,6 +8097,11 @@ MiniGames["LV_02"] = function(box, api){
         const p = cellProg[r][x];
         c.fillStyle = "rgba(255,255,255,.03)"; c.fillRect(cx+2, cy+2, cell-4, cell-4);
         if(p > .02){
+          /* halo qui déborde sur les briques (lumière dynamique) */
+          if(p > .4){ c.save(); c.globalCompositeOperation = "lighter";
+            const gr = c.createRadialGradient(cx+cell/2, cy+cell/2, 2, cx+cell/2, cy+cell/2, cell*.85);
+            gr.addColorStop(0, `rgba(255,210,63,${.16*p})`); gr.addColorStop(1, "rgba(255,210,63,0)");
+            c.fillStyle = gr; c.fillRect(cx - cell*.4, cy - cell*.4, cell*1.8, cell*1.8); c.restore(); }
           const s = cell - 6, sz = s*p, ox = cx + 3 + (s - sz)/2, oy = cy + 3 + (s - sz)/2;
           c.save();
           c.shadowColor = INK; c.shadowBlur = (r < rowIdx || solved[r] || over) ? 12 : (flashing ? 15 : 8);
@@ -8020,7 +8123,29 @@ MiniGames["LV_02"] = function(box, api){
       g2.addColorStop(0, `rgba(255,210,63,${.10 + p*.12})`); g2.addColorStop(1, "rgba(255,210,63,0)");
       c.fillStyle = g2; c.fillRect(0, 0, W, H); c.restore();
     }
-    /* particules de bombe */
+
+    /* ── 4. coulures de peinture sous les cases allumées ── */
+    if(!over && Math.random() < .016){
+      const lit = [];
+      for(let r=0;r<R;r++) if(r < rowIdx || solved[r]) for(let x=0;x<COLS;x++) if(CODE[r] & VAL[x]) lit.push([r, x]);
+      if(lit.length){ const [r, x] = lit[(Math.random()*lit.length)|0];
+        drips.push({ x:gx + x*cell + cell/2, y:gy + r*cell + cell - 4, vy:.35 + Math.random()*.5, len:0, max:8 + Math.random()*22 }); }
+    }
+    drips = drips.filter(d=>d.len < d.max);
+    drips.forEach(d=>{ d.y += d.vy; d.len += d.vy;
+      c.globalAlpha = Math.max(0, 1 - d.len/d.max)*.6; c.strokeStyle = INK; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(d.x, d.y - 6); c.lineTo(d.x, d.y); c.stroke();
+      c.fillStyle = INK; c.beginPath(); c.arc(d.x, d.y, 1.6, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+
+    /* ── 5. escarbilles qui montent (au premier plan) ── */
+    embers.forEach(e=>{ e.y -= e.sp; e.x += Math.sin(now/1200 + e.ph)*.15;
+      if(e.y < -2){ e.y = H + 2; e.x = Math.random()*W; }
+      c.globalAlpha = .22 + Math.sin(now/700 + e.ph)*.18; c.fillStyle = e.hue;
+      c.beginPath(); c.arc(e.x, e.y, e.r, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+
+    /* ── 6. gerbes de bombe ── */
     parts = parts.filter(pp=>pp.life > 0);
     parts.forEach(pp=>{ pp.x += pp.vx; pp.y += pp.vy; pp.vy += pp.g; pp.life--;
       c.globalAlpha = Math.max(0, pp.life/24); c.fillStyle = pp.col; c.fillRect(pp.x, pp.y, pp.sz, pp.sz); });
@@ -12336,7 +12461,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v81</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v82</p>`);
     wire();
   }
   function wire(){
