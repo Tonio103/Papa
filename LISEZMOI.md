@@ -54,6 +54,18 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v86) — MISE À JOUR AUTOMATIQUE + voiture plus lisible
+
+- **Fini le cache collant !** Le jeu se **met à jour tout seul** : dès qu'une
+  nouvelle version est en ligne, l'appli la détecte (vérif à l'ouverture puis
+  toutes les 60 s) et se recharge en quelques secondes. Plus besoin de vider le
+  cache ou de fermer/rouvrir à la main.
+  *(Il faut charger la v86 UNE dernière fois à la main ; ensuite tout est
+  automatique.)*
+- **La voiture** est plus **grande** et toujours **colorée** (rouge, bleu, teal,
+  or, violet) — jamais un carré noir. Carrosserie arrondie, vitre, roues à
+  jantes, faisceau de phares.
+
 ## Nouveautés (v85) — correctifs + mur & voiture illustrés
 
 - **Correctif « il marche à l'envers »** : au petit matin, l'artiste avançait à

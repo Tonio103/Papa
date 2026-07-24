@@ -5400,11 +5400,11 @@ const Cinematic = (()=>{
     if(cars.length === 0 && Math.random() < .01)
       cars.push({ x:-.22, dir:1, sp:.006 + Math.random()*.004,
         beam: Math.random()<.5 ? "#fff0c8" : "#e8f0ff",
-        body: ["#b32a44","#264a80","#1f2e3a","#7a1f3a","#2a6a5a"][Math.floor(Math.random()*5)] });
+        body: ["#d23a54","#3a72c0","#2a9a86","#e0a838","#9a46aa"][Math.floor(Math.random()*5)] });
     for(let i=cars.length-1;i>=0;i--){ const car=cars[i];
       car.x += car.sp*car.dir;
       if(car.x > 1.32){ cars.splice(i,1); continue; }
-      const cx = car.x*W, cy = base - 2, s = Math.min(W,H)*.05, d = car.dir;
+      const cx = car.x*W, cy = base - 2, s = Math.min(W,H)*.062, d = car.dir;
       c.save(); c.translate(cx, cy); c.scale(d, 1);
       /* faisceau des phares (cône vers l'avant) */
       c.save(); c.globalCompositeOperation = "lighter";
@@ -7609,7 +7609,22 @@ if(S.won){ renderHub(); victory(); }
    Ne s'active qu'en HTTPS (GitHub Pages / Netlify) ou localhost. */
 if("serviceWorker" in navigator &&
    (location.protocol==="https:" || location.hostname==="localhost")){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  /* ── MISE À JOUR AUTOMATIQUE ──────────────────────────────────
+     Si une version est DÉJÀ installée, on recharge la page dès qu'une
+     nouvelle prend le contrôle (le service worker fait skipWaiting).
+     Fini le « cache collant » : dès qu'une v_n+1 est en ligne, le jeu
+     se met à jour tout seul en quelques secondes. Le guard `controller`
+     évite tout rechargement au tout premier chargement. */
+  if(navigator.serviceWorker.controller){
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+      if(reloaded) return; reloaded = true; location.reload();
+    });
+  }
+  navigator.serviceWorker.register("sw.js").then(reg=>{
+    reg.update().catch(()=>{});                         // vérifie à l'ouverture
+    setInterval(()=>reg.update().catch(()=>{}), 60000); // …puis toutes les 60 s
+  }).catch(()=>{});
 }
 </script>
 <script>
@@ -13404,7 +13419,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v85</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v86</p>`);
     wire();
   }
   function wire(){
