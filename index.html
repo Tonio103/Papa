@@ -2620,8 +2620,9 @@ const CONFIG = {
   credits: "Conçu, codé et mosaïqué\nà la main, rien que pour toi.\n\n— A.",   // À PERSONNALISER
 
   // 8 stations. fragment = le chiffre révélé par le défi.
-  // Le code final = les 8 fragments dans l'ordre (ici : 1998 = début
-  // de l'invasion + 2026. À PERSONNALISER, par ex. avec une date à lui).
+  // Le code final = les 8 fragments dans l'ordre (ici : 2 7 0 7 1 9 7 5
+  // → 27/07/1975, une date qui lui parle. À PERSONNALISER : change les
+  // « fragment » ci-dessous pour composer le code que tu veux).
   stations: [
     { code:"LV_01", nom:"La Palette",    points:10,  fragment:"2", sprite:"squid",  couleur:"#2BE4D0",
       indice:"Compare ligne par ligne avec le modèle. Commence par les coins." },
@@ -7773,9 +7774,12 @@ MiniGames["LV_02"] = function(box, api){
     const sum = parts.reduce((a,b)=>a+b, 0);
     const col = sum > tgt ? "var(--rouge)" : sum === tgt ? "var(--jaune)" : "var(--spray-cyan)";
     const left = parts.length ? parts.join(" + ") : "0";
+    /* le petit nudge « reste / trop » vit ICI, en un seul endroit lisible */
+    const tail = sum < tgt ? `<span style="color:var(--ink-soft);font-size:13px"> · reste ${tgt-sum}</span>`
+      : sum > tgt ? `<span style="color:var(--rouge);font-size:13px"> · trop !</span>` : "";
     mathLine.innerHTML = `<span style="color:var(--ink-soft)">${left}</span>` +
       ` <span style="color:${col}">= ${sum}</span>` +
-      `<span style="color:var(--ink-soft);font-size:13px"> → ${tgt}</span>`;
+      `<span style="color:var(--ink-soft);font-size:13px"> → ${tgt}</span>` + tail;
   }
 
   /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
@@ -7901,12 +7905,10 @@ MiniGames["LV_02"] = function(box, api){
         while(active < TARGETS.length && locked[active]) active++;
         focusRows();
       }else{
-        /* dépassé = rouge, sinon valeur courante / cible + coup de pouce sur la ligne active */
+        /* dépassé = rouge, sinon valeur courante / cible. Le détail « reste/trop »
+           est porté par la ligne d'addition au-dessus — on garde ce label épuré. */
         const col = v > tgt ? "var(--rouge)" : "var(--ink)";
-        const hint = r !== active ? ""
-          : v > tgt ? ` <span style="color:var(--rouge);font-size:13px">trop !</span>`
-          : v < tgt ? ` <span class="dim" style="font-size:13px">(+${tgt-v})</span>` : "";
-        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>${hint}`;
+        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>`;
       }
     });
     updateMath();
@@ -12257,7 +12259,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v78</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v79</p>`);
     wire();
   }
   function wire(){

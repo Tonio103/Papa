@@ -54,6 +54,19 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v79) — passe « fin prêt » : relecture + finitions
+
+Grande relecture de tout le jeu pour qu'il soit prêt à offrir :
+
+- **Chasse aux bugs** : tous les écrans (accueil, cinématique, repaire, radar, carnet, tableau, réglages, scanner, victoire) et les 8 défis + les 6 jeux d'arcade passés au crible en automatique. **Zéro erreur** dans le code du jeu. (Les seules alertes viennent du chargement de jsQR/polices quand il n'y a pas de réseau — et le jeu bascule alors proprement sur la saisie manuelle du code : c'est prévu.)
+- **LV_02 · Le Binaire** : l'addition en direct porte maintenant seule le détail « reste 1 / trop ! », et l'étiquette de ligne est épurée (plus de chevauchement quand on dépasse la cible).
+- **Relecture des textes** : transmissions, victoire, succès, consignes des mini-jeux — tout est cohérent et sans faute.
+- **Commentaire du code final** remis à jour (les 8 chiffres composent une date qui lui parle).
+
+**Il reste 2 choses à faire SUR PLACE avant le jour J** (impossibles à faire d'ici) :
+1. **Enregistrer les positions GPS** des pièces : ouvre le jeu avec `?triche=1`, va dans **Radar**, place-toi à chaque cachette et « Enregistrer la pièce ici », puis « Copier les spots » → colle le résultat dans `CONFIG.map.spots`. Tant que c'est vide, le radar reste muet (le reste du jeu marche).
+2. **3 photos macro** pour le défi **Spotting (LV_03)** : remplace `LV03_IMGS` par tes gros plans des détails à retrouver.
+
 ## Nouveautés (v78) — les 4 énigmes gagnent une « prime de maîtrise »
 
 Deuxième passe sur les mêmes défis à réflexion : chacun récompense désormais la *manière* de gagner, sans jamais durcir la note. **Toutes ces primes sont du panache pur — les 3★ restent atteignables tranquillement, en tâtonnant, sans course.** C'est une carotte pour ceux qui foncent, jamais une contrainte pour Papa.
