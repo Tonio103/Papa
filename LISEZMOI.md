@@ -54,6 +54,73 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v82) — LV_02 : la ruelle prend vie
+
+Le décor du binaire devient une **vraie scène de nuit animée**, dessinée image
+par image sur le canvas :
+
+- **Un ciel étoilé** avec une **lune** et son halo, des **étoiles qui scintillent**.
+- Une **skyline de ville** en deux plans, avec des **fenêtres allumées qui
+  clignotent** (jaune + néon cyan) et des **nuages qui dérivent**.
+- Un **projecteur de la ville** qui balaie le ciel, et un **projecteur qui glisse**
+  lentement sur le mur.
+- Le **mur de briques** gagne un rebord, des **fissures**, une vignette, et se
+  **réchauffe** à mesure que l'invader s'allume (la lumière **déborde sur les
+  briques**).
+- De la **brume** qui rampe au sol, des **escarbilles** qui montent, des **coulures
+  de peinture** sous les cases allumées, et le vieux **tag néon qui grésille**.
+
+Toujours le même geste simple (composer chaque nombre en binaire), mais dans un
+décor qui respire. Testé de bout en bout, **zéro erreur** console. sw v81→v82.
+
+## Nouveautés (v81) — LV_02 : « L'INVADER BINAIRE », un vrai décor
+
+Le binaire est **entièrement remis en scène**. Fini l'exercice à cases posé sur
+fond gris : c'est maintenant **une œuvre à révéler sur un mur**.
+
+- **Le décor** : un mur de briques peint (canvas), un projecteur, de la poussière
+  dans le faisceau, de vieux tags fantômes. Au centre, un **invader éteint**.
+- **Le geste, unique et clair** : chaque **ligne** de l'invader est un **nombre**.
+  Tu allumes les blocs (16·8·4·2·1) pour composer ce nombre — et les blocs allumés
+  **s'allument sur le mur** et dessinent l'invader, pixel par pixel. *Le binaire
+  EST l'image.*
+- **La récompense** : à chaque ligne juste, la peinture **jaillit** (bombe +
+  particules). La dernière ligne posée, l'invader entier **s'embrase** en néon.
+- **Lisible d'un coup d'œil** : gros nombre-cible néon, ligne en cours encadrée et
+  fléchée sur le mur, somme affichée en direct, interrupteurs tactiles qui
+  s'illuminent. **Impossible de perdre** — les fautes ne coûtent que des étoiles.
+  Deux coups de pouce. 3★ = invader rallumé vite, sans aide et sans faute → flash
+  **« INVADER PARFAIT »**.
+
+Un seul mécanisme à comprendre, une seule image à faire renaître — beau,
+compréhensible, et quand même un vrai petit défi de calcul binaire. Testé de bout
+en bout (invader rallumé jusqu'à la victoire en automatique) : **zéro erreur**
+console. sw v80→v81, pied de page v81.
+
+## Nouveautés (v79) — passe « fin prêt » : relecture + finitions
+
+Grande relecture de tout le jeu pour qu'il soit prêt à offrir :
+
+- **Chasse aux bugs** : tous les écrans (accueil, cinématique, repaire, radar, carnet, tableau, réglages, scanner, victoire) et les 8 défis + les 6 jeux d'arcade passés au crible en automatique. **Zéro erreur** dans le code du jeu. (Les seules alertes viennent du chargement de jsQR/polices quand il n'y a pas de réseau — et le jeu bascule alors proprement sur la saisie manuelle du code : c'est prévu.)
+- **LV_02 · Le Binaire** : l'addition en direct porte maintenant seule le détail « reste 1 / trop ! », et l'étiquette de ligne est épurée (plus de chevauchement quand on dépasse la cible).
+- **Relecture des textes** : transmissions, victoire, succès, consignes des mini-jeux — tout est cohérent et sans faute.
+- **Commentaire du code final** remis à jour (les 8 chiffres composent une date qui lui parle).
+
+**Il reste 2 choses à faire SUR PLACE avant le jour J** (impossibles à faire d'ici) :
+1. **Enregistrer les positions GPS** des pièces : ouvre le jeu avec `?triche=1`, va dans **Radar**, place-toi à chaque cachette et « Enregistrer la pièce ici », puis « Copier les spots » → colle le résultat dans `CONFIG.map.spots`. Tant que c'est vide, le radar reste muet (le reste du jeu marche).
+2. **3 photos macro** pour le défi **Spotting (LV_03)** : remplace `LV03_IMGS` par tes gros plans des détails à retrouver.
+
+## Nouveautés (v78) — les 4 énigmes gagnent une « prime de maîtrise »
+
+Deuxième passe sur les mêmes défis à réflexion : chacun récompense désormais la *manière* de gagner, sans jamais durcir la note. **Toutes ces primes sont du panache pur — les 3★ restent atteignables tranquillement, en tâtonnant, sans course.** C'est une carotte pour ceux qui foncent, jamais une contrainte pour Papa.
+
+- **LV_01 · La Palette** — **« MAIN SÛRE »** : si chaque touche a fait mouche (autant de coups que de blocs, zéro erreur, zéro aperçu), une gerbe de confettis et un flash spécial saluent le sans-faute.
+- **LV_02 · Le Binaire** — **« SANS FAUTE »** : décoder les trois lignes en 3★, sans coup de pouce et **sans jamais dépasser la cible**, déclenche un flash bleu et une pluie de confettis en plus. Nouveau aussi : une **addition en direct** sous les valeurs (« 4 + 2 = 6 → 6 ») montre la somme se construire pendant qu'on lève les blocs — pile la consigne « additionne-les », rendue visible et pédagogique.
+- **LV_04 · Rubikcubisme** — **chrono + « ÉCLAIR »** : un chronomètre s'affiche dès la fin du mélange (⏱, et ⚡ vert tant qu'on reste dans les temps au PAR). Résoudre au PAR **sous 15 s** allume un éclair et double les confettis. Le chrono n'ajoute **aucune** étoile : les 3★ s'obtiennent au nombre de coups, à ton rythme.
+- **LV_05 · Le Simon** — **manche bonus « à l'envers »** : la séquence complète réussie, un bouton propose de la **rejouer à l'envers, de mémoire**. Réussie → 3★ « MÉMOIRE INVERSÉE ». Ratée → aucune punition, on garde les étoiles déjà acquises (ou on termine directement).
+
+Tout est testé (rendu, interaction, victoire, mode « à l'envers ») : zéro erreur console. Les défis physiques (Spotting, Coop) et les jeux d'action déjà riches (Cavale, Pochoir) restent inchangés.
+
 ## Nouveautés (v68) — les 4 défis « réflexion » approfondis
 
 Grosse passe sur les mini-jeux à énigme (~290 lignes), avec de vraies aides pour Papa et plus de feedback :

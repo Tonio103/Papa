@@ -2620,8 +2620,9 @@ const CONFIG = {
   credits: "Conçu, codé et mosaïqué\nà la main, rien que pour toi.\n\n— A.",   // À PERSONNALISER
 
   // 8 stations. fragment = le chiffre révélé par le défi.
-  // Le code final = les 8 fragments dans l'ordre (ici : 1998 = début
-  // de l'invasion + 2026. À PERSONNALISER, par ex. avec une date à lui).
+  // Le code final = les 8 fragments dans l'ordre (ici : 2 7 0 7 1 9 7 5
+  // → 27/07/1975, une date qui lui parle. À PERSONNALISER : change les
+  // « fragment » ci-dessous pour composer le code que tu veux).
   stations: [
     { code:"LV_01", nom:"La Palette",    points:10,  fragment:"2", sprite:"squid",  couleur:"#2BE4D0",
       indice:"Compare ligne par ligne avec le modèle. Commence par les coins." },
@@ -7701,198 +7702,471 @@ MiniGames["LV_01"] = function(box, api){
       done = true;
       mine.style.transition = "transform .4s, filter .4s";
       mine.style.transform = "scale(1.1)"; mine.style.filter = "drop-shadow(0 0 16px " + COL + ")";
-      AudioFX.fanfare(); Juice.confetti(box, 26);
       /* 3★ = pièce propre du premier coup (peu d'erreurs, peu de gâchis, sans aperçu) */
       const clean = errors <= 2 && moves <= totalOn + 3 && peeksUsed === 0;
       const stars = clean ? 3 : errors <= 6 ? 2 : 1;
+      /* MAIN SÛRE : chaque touche a fait mouche — autant de coups que de blocs,
+         zéro erreur, zéro aperçu. Panache pur, n'ajoute pas d'étoile (3★ déjà
+         atteint dès qu'on est propre) : la course ne frustre jamais Papa. */
+      const flawless = errors === 0 && peeksUsed === 0 && moves === totalOn;
+      AudioFX.fanfare();
+      Juice.confetti(box, flawless ? 46 : 26);
+      if(flawless){
+        AudioFX.star && AudioFX.star(2);
+        const flash = document.createElement("div");
+        flash.textContent = "✦ MAIN SÛRE ✦";
+        flash.style.cssText =
+          "position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);" +
+          "font-family:'Press Start 2P',monospace; font-size:16px; color:" + COL + ";" +
+          "text-shadow:0 0 12px " + COL + ", 0 3px 0 rgba(0,0,0,.5); pointer-events:none; z-index:40; opacity:0;";
+        box.style.position = box.style.position || "relative";
+        box.appendChild(flash);
+        flash.animate(
+          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-5deg)" },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1.14) rotate(3deg)", offset:.35 },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+          { duration:1350, easing:"cubic-bezier(.2,1.4,.4,1)" }
+        ).onfinish = ()=>flash.remove();
+      }
       setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? "PERFECT !" : "PIÈCE RECONSTRUITE !" }), 700);
+        label: flawless ? "MAIN SÛRE !" : stars === 3 ? "PERFECT !" : "PIÈCE RECONSTRUITE !" }),
+        flawless ? 1100 : 700);
     }
   }
   Juice.readyGo(box, ()=>{ playing = true; });
   return ()=>{ if(raf) cancelAnimationFrame(raf); };
 };
 
-/* ── LV_02 : LE BINAIRE 3D ──────────────────────────────────
-   Les bits sont des blocs qui se lèvent. Les lignes se décodent
-   DANS L'ORDRE (focus clair), le dépassement s'affiche en rouge,
-   et la jauge d'étoiles draine en direct. 3★ < 45 s. */
+/* ── LV_02 : L'INVADER BINAIRE ──────────────────────────────
+   Un mur du QG, un invader ÉTEINT dessus. Pour le rallumer, il
+   faut décoder son signal : chaque ligne de l'invader est un
+   NOMBRE. On allume les blocs (16·8·4·2·1) pour composer ce
+   nombre — et les blocs allumés dessinent, pixel par pixel, la
+   ligne de l'invader sur le mur. Le binaire EST l'image.
+   Un seul geste à comprendre, une seule œuvre à révéler.
+   3★ = invader rallumé vite, sans aide et sans faute. */
 MiniGames["LV_02"] = function(box, api){
-  const TARGETS = [3, 9, 6];                 // À PERSONNALISER
-  const VAL = [8, 4, 2, 1];
-  let t0 = Date.now(), started = false;
+  const INK = api.station.couleur || "#FFD23F";   // couleur de l'invader
+  const CC  = "#4db8ff";                           // bleu binaire
+  const VAL = [16, 8, 4, 2, 1];
+  /* chaque nombre = une ligne ; ses bits dessinent l'invader :
+       17=10001  14=01110  31=11111  27=11011  31=11111  17=10001 */
+  const CODE = [17, 14, 31, 27, 31, 17];
+  const R = CODE.length, COLS = 5;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  let started = false, over = false, t0 = Date.now();
+  let rowIdx = 0, mistakes = 0, hintsUsed = 0, wrongThisRow = false;
+  const bits = CODE.map(()=>[0,0,0,0,0]);          // ce que le joueur allume, par ligne
+  const solved = CODE.map(()=>false);
+  const timers = []; const later = (fn, ms)=>{ const id = setTimeout(fn, ms); timers.push(id); return id; };
+  const sumOf = r => bits[r].reduce((a,b,i)=>a + (b ? VAL[i] : 0), 0);
+
+  /* ── consigne courte ── */
   box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Lève les blocs pour atteindre la cible, <b>ligne par ligne</b>.<br>Un bloc levé vaut son chiffre — additionne-les.</p>`);
+    `<p class="sub">Un invader dort, éteint, sur le mur.<br><b>Rallume-le</b> : compose le nombre affiché avec les blocs — ils dessinent l'invader.</p>`);
 
-  /* petit pense-bête : la valeur de chaque colonne, toujours visible */
-  box.insertAdjacentHTML("beforeend",
-    `<div class="pix" style="display:flex;gap:10px;justify-content:center;font-size:12px;color:var(--ink-soft);margin:2px 0 6px;">
-       <span>💡 valeurs :</span>
-       <span style="color:#4db8ff">8</span><span>·</span><span style="color:#4db8ff">4</span>
-       <span>·</span><span style="color:#4db8ff">2</span><span>·</span><span style="color:#4db8ff">1</span>
-       <span style="opacity:.7">(ex. 4+2 = 6)</span>
-     </div>`);
+  /* ═══ LA SCÈNE : une ruelle des Vans, la nuit (canvas vivant) ═══ */
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(320, Math.min(460, Math.floor(innerWidth - 40)));
+  const H = Math.max(300, Math.min(440, Math.floor(innerHeight - 360)));
+  const cv = document.createElement("canvas");
+  cv.width = W*DPR; cv.height = H*DPR;
+  cv.style.cssText = "width:100%;border-radius:18px;touch-action:none;" +
+    "border:1.5px solid rgba(255,255,255,.12);box-shadow:0 16px 34px rgba(0,0,0,.55);cursor:pointer;";
+  box.appendChild(cv);
+  const c = cv.getContext("2d"); c.scale(DPR, DPR);
 
-  /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
+  const skyH = Math.round(H * 0.30);               // bande de ciel au-dessus du mur
+
+  /* ── CIEL pré-rendu : dégradé nuit, étoiles, lune, skyline ── */
+  const stars = [], windows = [];                  // scintillements animés
+  const sky = document.createElement("canvas"); sky.width = W*DPR; sky.height = (skyH+44)*DPR;
+  (function(){
+    const g = sky.getContext("2d"); g.scale(DPR, DPR); const SH = skyH + 44;
+    const grd = g.createLinearGradient(0, 0, 0, SH);
+    grd.addColorStop(0, "#0b1030"); grd.addColorStop(.6, "#161435"); grd.addColorStop(1, "#201a3a");
+    g.fillStyle = grd; g.fillRect(0, 0, W, SH);
+    for(let i=0;i<40;i++){ const s = { x:Math.random()*W, y:Math.random()*(skyH-8), r:Math.random()*1.1+.3, ph:Math.random()*7 };
+      stars.push(s); g.globalAlpha=.5; g.fillStyle="#dfe6ff"; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 7); g.fill(); }
+    g.globalAlpha = 1;
+    /* lune + halo */
+    const mx = W - 50, my = 28;
+    const mg = g.createRadialGradient(mx, my, 2, mx, my, 48);
+    mg.addColorStop(0, "rgba(255,246,214,.5)"); mg.addColorStop(1, "rgba(255,246,214,0)");
+    g.fillStyle = mg; g.fillRect(mx-48, my-48, 96, 96);
+    g.fillStyle = "#fdf3d0"; g.beginPath(); g.arc(mx, my, 13, 0, 7); g.fill();
+    g.fillStyle = "#e6dab0"; g.globalAlpha=.5; g.beginPath(); g.arc(mx+4, my-3, 3, 0, 7); g.arc(mx-4, my+4, 2, 0, 7); g.fill(); g.globalAlpha=1;
+    /* skyline en deux couches (les fenêtres scintilleront) */
+    function buildings(baseY, hMin, hMax, col, winCol, lit){
+      let x = -12;
+      while(x < W + 12){
+        const bw = 22 + Math.random()*40, bh = hMin + Math.random()*(hMax - hMin);
+        g.fillStyle = col; g.fillRect(x, baseY - bh, bw, bh + 44);
+        if(Math.random() < .4) g.fillRect(x + bw/2 - 1, baseY - bh - 8, 2, 8);   // antenne
+        for(let wy = baseY - bh + 6; wy < baseY + 4; wy += 9)
+          for(let wx = x + 4; wx < x + bw - 5; wx += 8)
+            if(Math.random() < lit){ const wc = Math.random() < .15 ? "#2be4d0" : winCol;
+              g.fillStyle = wc; g.fillRect(wx, wy, 3, 4); windows.push({ x:wx, y:wy, col:wc, ph:Math.random()*7 }); }
+        x += bw + 2 + Math.random()*8;
+      }
+    }
+    buildings(skyH, skyH*.35, skyH*.72, "#0e1330", "rgba(255,214,150,.55)", .10);   // au loin
+    buildings(skyH, skyH*.20, skyH*.50, "#141a3e", "rgba(255,214,150,.85)", .16);   // au près
+  })();
+  const clouds = Array.from({length:3}, (_, i)=>({ x:Math.random()*W, y:8 + i*13 + Math.random()*8,
+    w:70 + Math.random()*60, sp:.05 + Math.random()*.10 }));
+
+  /* ── MUR de briques pré-rendu (sous le ciel) ── */
+  const wall = document.createElement("canvas"); wall.width = W*DPR; wall.height = H*DPR;
+  (function(){
+    const g = wall.getContext("2d"); g.scale(DPR, DPR);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "#2c2647"; g.fillRect(0, skyH - 6, W, 8);                         // rebord du mur
+    g.fillStyle = "rgba(255,255,255,.06)"; g.fillRect(0, skyH - 6, W, 2);
+    const BH = 15, BW = 32;
+    for(let y=skyH+2;y<H;y+=BH){
+      const off = ((y/BH)|0)%2 ? BW/2 : 0;
+      for(let x=-BW;x<W;x+=BW){
+        const v = (((x*7 + y*13)%9) - 4) * .012;
+        g.fillStyle = shade("#241f3a", v); g.fillRect(x+off+1, y+1, BW-2, BH-2);
+        g.fillStyle = "rgba(255,255,255,.03)"; g.fillRect(x+off+1, y+1, BW-2, 2);
+        g.fillStyle = "rgba(0,0,0,.16)";       g.fillRect(x+off+1, y+BH-2, BW-2, 1);
+      }
+    }
+    /* fissures qui parcourent le mur */
+    g.strokeStyle = "rgba(0,0,0,.28)"; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(W*.17, skyH+10); g.lineTo(W*.21, skyH+40); g.lineTo(W*.18, skyH+66); g.lineTo(W*.23, skyH+96); g.stroke();
+    g.beginPath(); g.moveTo(W*.82, H-6); g.lineTo(W*.85, H-38); g.lineTo(W*.80, H-62); g.stroke();
+    /* vieux tags fantômes */
+    g.save(); g.globalAlpha=.09; g.fillStyle=CC; g.font="italic bold 24px 'Baloo 2',sans-serif";
+    g.translate(38, H-20); g.rotate(-.06); g.fillText("0101", 0, 0); g.restore();
+    g.save(); g.globalAlpha=.06; g.fillStyle=INK; g.font="italic bold 20px 'Baloo 2',sans-serif";
+    g.translate(W-118, skyH+34); g.rotate(.05); g.fillText("LV ▦", 0, 0); g.restore();
+    /* vignette */
+    const vg = g.createRadialGradient(W/2, (skyH+H)/2, H*.28, W/2, (skyH+H)/2, H*.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.5)");
+    g.fillStyle = vg; g.fillRect(0, skyH - 8, W, H - skyH + 8);
+  })();
+
+  /* géométrie de la grille invader (dans la zone du mur) */
+  const wallTop = skyH + 6, wallH = H - wallTop;
+  const cell = Math.floor(Math.min((W - 70)/COLS, (wallH - 34)/R));
+  const gx = Math.round((W - cell*COLS)/2);
+  const gy = Math.round(wallTop + (wallH - cell*R)/2);
+
+  /* ── particules & ambiance animée ── */
+  let parts = [], drips = [];
+  const embers = Array.from({length:26}, ()=>({ x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*1.4+.5, ph:Math.random()*7, sp:.14+Math.random()*.30, hue:Math.random()<.5?INK:CC }));
+  const fog = Array.from({length:4}, (_, i)=>({ x:Math.random()*W, y:H - 16 - i*7,
+    r:70 + Math.random()*70, sp:.06 + Math.random()*.13, a:.05 + Math.random()*.05 }));
+  function spray(cx, cy, col, n){
+    for(let i=0;i<n;i++) parts.push({ x:cx, y:cy, vx:(Math.random()-.5)*3, vy:-(Math.random()*2.4+.4),
+      life:16+Math.random()*14, g:.11+Math.random()*.07, col, sz:1.6+Math.random()*2.4 });
+  }
+  const cellProg = CODE.map(()=>[0,0,0,0,0]);      // anim d'apparition par case
+  let flashRow = null;                             // ligne mise en avant par l'aide
+
+  /* ═══ afficheur néon : ligne courante + cible + somme en direct ═══ */
+  const readout = document.createElement("div");
+  readout.className = "pix";
+  readout.style.cssText = "text-align:center;margin:8px 0 2px;line-height:1.22;";
+  box.appendChild(readout);
+  function paintReadout(){
+    if(over){ readout.innerHTML =
+      `<div style="font-size:19px;font-weight:800;color:${INK};text-shadow:0 0 14px ${INK}">✦ INVADER RALLUMÉ ✦</div>`; return; }
+    const tgt = CODE[rowIdx], s = sumOf(rowIdx);
+    const col = s > tgt ? "var(--rouge)" : s === tgt ? INK : CC;
+    const on = []; bits[rowIdx].forEach((b,i)=>{ if(b) on.push(VAL[i]); });
+    const left = on.length ? on.join(" + ") : "0";
+    const tail = s < tgt ? `<span style="color:var(--ink-soft);font-size:12px"> · reste ${tgt-s}</span>`
+      : s > tgt ? `<span style="color:var(--rouge);font-size:12px"> · trop&nbsp;!</span>` : "";
+    readout.innerHTML =
+      `<div style="font-size:11px;color:var(--ink-soft);letter-spacing:2px">LIGNE ${rowIdx+1} / ${R} — CIBLE</div>` +
+      `<div style="font-size:30px;font-weight:800;color:${INK};text-shadow:0 0 14px ${INK};line-height:1.05">${tgt}</div>` +
+      `<div style="font-size:15px;font-weight:800;min-height:20px">` +
+        `<span style="color:var(--ink-soft)">${left}</span> <span style="color:${col}">= ${s}</span>${tail}</div>`;
+  }
+
+  /* ═══ les 5 interrupteurs (bits) — tubes néon tactiles ═══ */
+  const swRow = document.createElement("div");
+  swRow.style.cssText = "display:flex;gap:8px;justify-content:center;margin:4px 0 2px;";
+  box.appendChild(swRow);
+  const switches = VAL.map((v, i)=>{
+    const b = document.createElement("button");
+    b.style.cssText =
+      "width:56px;height:62px;border-radius:14px;border:2px solid rgba(255,255,255,.14);" +
+      "background:linear-gradient(180deg,#2a2647,#1a1730);color:var(--ink-soft);" +
+      "font-family:'Baloo 2',sans-serif;font-weight:800;font-size:21px;" +
+      "transition:transform .1s,box-shadow .15s,background .15s,color .15s,border-color .15s;cursor:pointer;";
+    b.textContent = v;
+    b.addEventListener("pointerdown", e=>{ e.preventDefault(); toggle(i); });
+    swRow.appendChild(b);
+    return b;
+  });
+  function paintSwitches(){
+    bits[rowIdx].forEach((on, i)=>{
+      const b = switches[i];
+      if(on){
+        b.style.background = `linear-gradient(180deg,${shade(INK,.35)},${INK})`;
+        b.style.color = "#20160a";
+        b.style.boxShadow = `0 0 18px ${INK}, inset 0 2px 0 rgba(255,255,255,.55)`;
+        b.style.borderColor = INK; b.style.transform = "translateY(-2px)";
+      }else{
+        b.style.background = "linear-gradient(180deg,#2a2647,#1a1730)";
+        b.style.color = "var(--ink-soft)"; b.style.boxShadow = "none";
+        b.style.borderColor = "rgba(255,255,255,.14)"; b.style.transform = "none";
+      }
+    });
+  }
+  function toggle(i){
+    if(!started || over || solved[rowIdx]) return;
+    const before = sumOf(rowIdx);
+    bits[rowIdx][i] ^= 1;
+    AudioFX.tick(); try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+    paintSwitches(); paintReadout();
+    const s = sumOf(rowIdx), tgt = CODE[rowIdx];
+    if(s > tgt && before <= tgt){
+      if(!wrongThisRow){ wrongThisRow = true; mistakes++; }
+      AudioFX.err(); Juice.shake(cv);
+    }else if(s <= tgt){ wrongThisRow = false; }
+    if(s === tgt) solveRow();
+  }
+
+  function solveRow(){
+    solved[rowIdx] = true;
+    AudioFX.lock(); if(AudioFX.spray) AudioFX.spray();
+    try{ navigator.vibrate && navigator.vibrate([20,30,50]); }catch(e){}
+    bits[rowIdx].forEach((b, i)=>{ if(b) spray(gx + i*cell + cell/2, gy + rowIdx*cell + cell/2, INK, 8); });
+    Juice.pop(box, "LIGNE " + (rowIdx+1) + " ✔", INK, 50, 30);
+    const next = rowIdx + 1;
+    later(()=>{
+      if(next >= R){ finish(); return; }
+      rowIdx = next; wrongThisRow = false;
+      paintSwitches(); paintReadout(); updateHint();
+    }, reduced ? 200 : 520);
+  }
+
+  function sansFaute(){ return mistakes === 0 && hintsUsed === 0; }
+  function finish(){
+    if(over) return; over = true;
+    clearInterval(starIv);
+    switches.forEach(b=>{ b.disabled = true; b.style.opacity = ".6"; });
+    hintBt.disabled = true;
+    paintReadout();
+    AudioFX.fanfare();
+    for(let r=0;r<R;r++) bits[r].forEach((b,i)=>{ if(b) spray(gx + i*cell + cell/2, gy + r*cell + cell/2, INK, 4); });
+    const clean = sansFaute();
+    Juice.confetti(box, clean ? 46 : 28);
+    if(clean && AudioFX.star) AudioFX.star(2);
+    const stars = liveStars();
+    later(()=>api.win({ stars,
+      label: clean ? "INVADER PARFAIT !" : stars === 3 ? "INVADER RALLUMÉ !" : "DÉCODÉ !" }),
+      clean ? 1200 : 800);
+  }
+
+  /* ═══ étoiles : temps + fautes (les aides coûtent le 3★) ═══ */
+  const T3 = 70, T2 = 140;
   const starRow = document.createElement("div");
-  starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;";
-  const starLab = document.createElement("span");
-  starLab.className = "pix";
+  starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;margin-top:2px;";
+  const starLab = document.createElement("span"); starLab.className = "pix";
   starLab.style.cssText = "font-size:13px;color:var(--jaune);min-width:52px;text-align:right;";
-  const starBar = document.createElement("div");
-  starBar.className = "bar";
-  starBar.style.cssText = "width:min(50vw,190px);height:9px;overflow:hidden;";
+  const starBar = document.createElement("div"); starBar.className = "bar";
+  starBar.style.cssText = "width:min(56vw,210px);height:9px;overflow:hidden;";
   const starFill = document.createElement("i");
   starFill.style.cssText = "display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--jaune),#ff9760);";
-  starBar.appendChild(starFill);
-  starRow.appendChild(starLab); starRow.appendChild(starBar);
+  starBar.appendChild(starFill); starRow.appendChild(starLab); starRow.appendChild(starBar);
   box.appendChild(starRow);
+  function liveStars(){
+    const s = (Date.now() - t0)/1000; let st = s < T3 ? 3 : s < T2 ? 2 : 1;
+    if(hintsUsed > 0 || mistakes > 2) st = Math.min(st, 2);
+    if(mistakes > 6) st = 1; return st;
+  }
+  const starIv = setInterval(()=>{
+    if(!started || over) return;
+    const s = (Date.now() - t0)/1000, st = liveStars();
+    starLab.textContent = "★".repeat(st) + "☆".repeat(3 - st);
+    const frac = s < T3 ? 1 - s/T3 : s < T2 ? 1 - (s-T3)/(T2-T3) : 0;
+    starFill.style.width = (Math.max(0, frac)*100).toFixed(1) + "%";
+    starFill.style.background = st === 3 ? "linear-gradient(90deg,var(--jaune),#ff9760)"
+      : st === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
+  }, 250);
+  starLab.textContent = "★★★";
 
-  /* coup de pouce : montre brièvement les blocs à lever sur la ligne active
-     (utile si le binaire n'est pas une évidence) — limité, et coûte l'étoile parfaite */
-  let hintsUsed = 0;
+  /* ═══ coup de pouce : fait clignoter les bons blocs + la ligne ═══ */
+  const HINTS_MAX = 2;
   const hintBt = document.createElement("button"); hintBt.className = "b3";
   hintBt.style.cssText = "font-size:13px;padding:7px 12px;margin:6px auto 0;display:block;";
-  const updateHintBtn = ()=>{ hintBt.textContent = "💡 Montrer les blocs (" + (2-hintsUsed) + ")";
-    hintBt.disabled = hintsUsed >= 2; };
+  function updateHint(){ hintBt.textContent = "💡 Montrer les blocs (" + (HINTS_MAX - hintsUsed) + ")";
+    hintBt.disabled = hintsUsed >= HINTS_MAX || over || !started; }
   hintBt.addEventListener("click", ()=>{
-    if(hintsUsed >= 2 || !started) return;
-    if(active >= TARGETS.length || locked[active]) return;
-    hintsUsed++; updateHintBtn(); AudioFX.select();
-    const tgt = TARGETS[active];
-    cellEls[active].forEach((c, b)=>{ if(tgt & VAL[b]){
-      c.style.outline = "3px solid var(--jaune)"; c.style.outlineOffset = "-2px";
-      setTimeout(()=>{ c.style.outline = ""; }, 1600); } });
+    if(hintsUsed >= HINTS_MAX || over || !started) return;
+    hintsUsed++; updateHint(); AudioFX.select();
+    const tgt = CODE[rowIdx];
+    VAL.forEach((v, i)=>{ if(((tgt & v) ? 1 : 0) !== bits[rowIdx][i] && switches[i].animate){
+      switches[i].animate(
+        [ { boxShadow:`0 0 0 ${INK}` }, { boxShadow:`0 0 22px ${INK}` }, { boxShadow:`0 0 0 ${INK}` } ],
+        { duration:1400, iterations:1 }); } });
+    flashRow = { r:rowIdx, until: performance.now() + 1400 };
   });
   box.appendChild(hintBt);
 
-  const rows = TARGETS.map(()=>[0,0,0,0]);
-  const locked = TARGETS.map(()=>false);
-  const cellEls = [], labels = [];
-  let active = 0;
-
-  /* aide visuelle 3D : la CIBLE (bleue, translucide) et TON TOTAL (or)
-     en tours de cubes — tu dois monter à la même hauteur */
-  const twr = document.createElement("canvas");
-  twr.width = 210; twr.height = 150; twr.className = "model3d"; twr.style.cssText = "width:118px;height:84px;";
-  box.appendChild(twr);
-  box.insertAdjacentHTML("beforeend", `<div class="model-lab">CIBLE ▮ vs TOI ▮</div>`);
-  const stack = (v, col)=>{ const out = []; for(let k=0;k<v;k++) out.push({ x:0, y:-k, col }); return out; };
-  let twraf = null;
-  function renderTwr(t){
-    const done2 = active >= TARGETS.length;
-    const tgt = done2 ? 0 : TARGETS[active];
-    const cur = done2 ? 0 : rows[active].reduce((a,b,i)=>a + (b ? [8,4,2,1][i] : 0), 0);
-    Voxel.renderScene(twr, [
-      { cells:stack(tgt, "#4db8ff"), cols:1, rows:15, pos:[-.8,0,0], size:.5, yaw:t*.5, pitch:-.18, alpha:.32 },
-      { cells:stack(cur, cur > tgt ? "#ff6b6b" : "#ffd23f"), cols:1, rows:15, pos:[.8,0,0], size:.5, yaw:t*.5, pitch:-.18 },
-    ], { cam:{ scale:10 } });
+  /* ═══ boucle de rendu du mur ═══ */
+  function roundRectFill(ctx, x, y, w, h, r){
+    r = Math.min(r, w/2, h/2); ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); ctx.fill();
   }
-  const val = r => rows[r].reduce((a,b,i)=>a + (b ? VAL[i] : 0), 0);
+  let raf = null;
+  function draw(now){
+    const t = now / 1000;
 
-  const board = document.createElement("div"); board.className = "board3d";
-  const grid = document.createElement("div"); grid.className = "board3d-in";
-  grid.style.gridTemplateColumns = "repeat(4, 46px) 70px";
-  grid.style.setProperty("--cc", "#4db8ff");
-  board.appendChild(grid); box.appendChild(board);
+    /* ── 1. LE CIEL ── */
+    c.drawImage(sky, 0, 0, W, skyH + 44);
+    /* aurore : une lueur qui glisse et change de teinte au-dessus des toits */
+    c.save(); c.globalCompositeOperation = "lighter";
+    const au = .5 + Math.sin(t*.18)*.5;
+    const ag = c.createLinearGradient(0, 0, 0, skyH);
+    ag.addColorStop(0, `rgba(${70+au*40|0},${110+au*50|0},${175+au*50|0},.12)`);
+    ag.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = ag; c.fillRect(0, 0, W, skyH); c.restore();
+    /* étoiles qui scintillent */
+    c.fillStyle = "#fff";
+    stars.forEach(s=>{ c.globalAlpha = .3 + Math.sin(t*2 + s.ph)*.28; c.beginPath(); c.arc(s.x, s.y, s.r, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+    /* nuages qui dérivent */
+    clouds.forEach(cl=>{ cl.x += cl.sp; if(cl.x - cl.w > W) cl.x = -cl.w;
+      const cg = c.createRadialGradient(cl.x, cl.y, 4, cl.x, cl.y, cl.w);
+      cg.addColorStop(0, "rgba(120,120,165,.10)"); cg.addColorStop(1, "rgba(120,120,165,0)");
+      c.fillStyle = cg; c.fillRect(cl.x - cl.w, cl.y - cl.w/2, cl.w*2, cl.w); });
+    /* fenêtres de la ville qui clignotent */
+    windows.forEach(w=>{ c.globalAlpha = .4 + Math.sin(t*1.5 + w.ph)*.4; c.fillStyle = w.col; c.fillRect(w.x, w.y, 3, 4); });
+    c.globalAlpha = 1;
+    /* projecteur de la ville qui balaie le ciel */
+    { const bx = W*.30, ang = -Math.PI/2 + Math.sin(t*.25)*.5;
+      c.save(); c.globalCompositeOperation = "lighter"; c.translate(bx, skyH); c.rotate(ang);
+      const bg = c.createLinearGradient(0, 0, 0, -skyH*1.5);
+      bg.addColorStop(0, "rgba(120,200,255,.10)"); bg.addColorStop(1, "rgba(120,200,255,0)");
+      c.fillStyle = bg; c.beginPath(); c.moveTo(-4, 0); c.lineTo(-24, -skyH*1.5); c.lineTo(24, -skyH*1.5); c.lineTo(4, 0); c.closePath(); c.fill();
+      c.restore(); }
 
-  TARGETS.forEach((tgt, r)=>{
-    const cells = [];
-    VAL.forEach((v, b)=>{
-      const cell = document.createElement("div");
-      cell.className = "cube";
-      cell.style.cssText = "width:46px;height:46px;transition:opacity .3s,filter .3s;";
-      cell.innerHTML = `<span class="val">${v}</span>`;
-      cell.addEventListener("pointerdown", ()=>{
-        if(locked[r] || r !== active) return;
-        const before = val(r);
-        rows[r][b] ^= 1;
-        cell.classList.toggle("on", !!rows[r][b]);
-        /* franchit la cible vers le haut → alerte ; sinon tic normal */
-        if(val(r) > tgt && before <= tgt){
-          AudioFX.err(); Juice.shake(board);
-          try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
-        }else AudioFX.tick();
-        refresh();
-      });
-      grid.appendChild(cell); cells.push(cell);
-    });
-    cellEls.push(cells);
-    const lab = document.createElement("div");
-    lab.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;";
-    grid.appendChild(lab); labels.push(lab);
-  });
-
-  /* seule la ligne active est éclairée — les suivantes attendent */
-  function focusRows(){
-    cellEls.forEach((cells, r)=>{
-      const dim = !locked[r] && r !== active;
-      cells.forEach(c=>{
-        c.style.opacity = dim ? ".32" : "1";
-        c.style.filter = dim ? "saturate(.4)" : "";
-        c.style.pointerEvents = (locked[r] || dim) ? "none" : "";
-      });
-      if(dim) labels[r].innerHTML = `<span class="dim">· / ${TARGETS[r]}</span>`;
-    });
-  }
-
-  let done = false;
-  function refresh(){
-    TARGETS.forEach((tgt, r)=>{
-      if(locked[r] || r !== active) return;
-      const v = val(r);
-      if(v === tgt){
-        locked[r] = true;
-        AudioFX.lock();
-        try{ navigator.vibrate && navigator.vibrate([25,30,45]); }catch(e){}
-        cellEls[r].forEach(c=>{
-          c.style.pointerEvents = "none";
-          if(c.classList.contains("on")){ c.classList.remove("on"); c.classList.add("lock"); }
-        });
-        labels[r].innerHTML = `<span style="color:var(--jaune)">${v} ✔</span>`;
-        Juice.pop(box, "LIGNE " + (r+1) + " !", "var(--jaune)", 50, 34 + r*16);
-        while(active < TARGETS.length && locked[active]) active++;
-        focusRows();
-      }else{
-        /* dépassé = rouge, sinon valeur courante / cible + coup de pouce sur la ligne active */
-        const col = v > tgt ? "var(--rouge)" : "var(--ink)";
-        const hint = r !== active ? ""
-          : v > tgt ? ` <span style="color:var(--rouge);font-size:13px">trop !</span>`
-          : v < tgt ? ` <span class="dim" style="font-size:13px">(+${tgt-v})</span>` : "";
-        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>${hint}`;
-      }
-    });
-    if(locked.every(Boolean) && !done){
-      done = true;
-      clearInterval(starIv);
-      AudioFX.fanfare(); Juice.confetti(box, 22);
-      const s = (Date.now() - t0)/1000;
-      let stars = s < 45 ? 3 : s < 90 ? 2 : 1;
-      if(hintsUsed > 0) stars = Math.min(stars, 2);        // le coup de pouce coûte l'étoile parfaite
-      setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }), 700);
+    /* ── 2. LE MUR ── */
+    c.drawImage(wall, 0, 0, W, H);
+    /* projecteur qui balaie lentement le mur */
+    { const sxp = W*.5 + Math.sin(t*.35)*W*.26, syp = gy + cell*R*.42;
+      const sg = c.createRadialGradient(sxp, skyH, 10, sxp, syp, H*.7);
+      sg.addColorStop(0, "rgba(255,238,190,.10)"); sg.addColorStop(1, "rgba(255,238,190,0)");
+      c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = sg; c.fillRect(0, skyH, W, H - skyH); c.restore(); }
+    /* le mur se réchauffe à mesure que l'invader s'allume */
+    const prog = solved.filter(Boolean).length / R;
+    if(prog > 0 || over){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const rg = c.createRadialGradient(W/2, gy + cell*R/2, 10, W/2, gy + cell*R/2, cell*R*1.15);
+      rg.addColorStop(0, `rgba(255,210,90,${.04 + (over?.16:prog*.10)})`); rg.addColorStop(1, "rgba(255,210,90,0)");
+      c.fillStyle = rg; c.fillRect(0, skyH, W, H - skyH); c.restore();
     }
+    /* néon du tag qui grésille */
+    { const fl = Math.sin(t*7) > .55 ? 1 : .25;
+      c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = .08 + fl*.12;
+      c.fillStyle = CC; c.font = "italic bold 24px 'Baloo 2',sans-serif";
+      c.translate(38, H-20); c.rotate(-.06); c.fillText("0101", 0, 0); c.restore(); }
+    /* brume qui rampe au pied du mur */
+    fog.forEach(f=>{ f.x += f.sp; if(f.x - f.r > W) f.x = -f.r;
+      const fg = c.createRadialGradient(f.x, f.y, 4, f.x, f.y, f.r);
+      fg.addColorStop(0, `rgba(150,140,195,${f.a})`); fg.addColorStop(1, "rgba(150,140,195,0)");
+      c.fillStyle = fg; c.fillRect(f.x - f.r, f.y - f.r, f.r*2, f.r*2); });
+
+    /* ── 3. L'INVADER ── */
+    for(let r=0;r<R;r++){
+      const isCur = r === rowIdx && !over;
+      if(isCur){
+        const p = .5 + Math.sin(now/240)*.5;
+        c.strokeStyle = `rgba(77,184,255,${.45 + p*.4})`; c.lineWidth = 2;
+        c.strokeRect(gx - 4, gy + r*cell - 3, cell*COLS + 8, cell + 6);
+        c.fillStyle = CC; c.font = "bold 15px 'Baloo 2',sans-serif"; c.textAlign = "right";
+        c.fillText("▶", gx - 8, gy + r*cell + cell/2 + 5); c.textAlign = "left";
+      }
+      const flashing = flashRow && flashRow.r === r && performance.now() < flashRow.until;
+      for(let x=0;x<COLS;x++){
+        const cx = gx + x*cell, cy = gy + r*cell;
+        const litNow = (r < rowIdx || solved[r]) ? ((CODE[r] & VAL[x]) ? 1 : 0)
+                      : isCur ? bits[r][x] : 0;
+        cellProg[r][x] += ((litNow ? 1 : 0) - cellProg[r][x]) * .25;
+        const p = cellProg[r][x];
+        c.fillStyle = "rgba(255,255,255,.03)"; c.fillRect(cx+2, cy+2, cell-4, cell-4);
+        if(p > .02){
+          /* halo qui déborde sur les briques (lumière dynamique) */
+          if(p > .4){ c.save(); c.globalCompositeOperation = "lighter";
+            const gr = c.createRadialGradient(cx+cell/2, cy+cell/2, 2, cx+cell/2, cy+cell/2, cell*.85);
+            gr.addColorStop(0, `rgba(255,210,63,${.16*p})`); gr.addColorStop(1, "rgba(255,210,63,0)");
+            c.fillStyle = gr; c.fillRect(cx - cell*.4, cy - cell*.4, cell*1.8, cell*1.8); c.restore(); }
+          const s = cell - 6, sz = s*p, ox = cx + 3 + (s - sz)/2, oy = cy + 3 + (s - sz)/2;
+          c.save();
+          c.shadowColor = INK; c.shadowBlur = (r < rowIdx || solved[r] || over) ? 12 : (flashing ? 15 : 8);
+          c.globalAlpha = Math.min(1, p); c.fillStyle = INK;
+          roundRectFill(c, ox, oy, sz, sz, 4);
+          c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(ox, oy, sz, Math.max(1, sz*.16));
+          c.restore(); c.globalAlpha = 1;
+        }else{
+          c.fillStyle = "rgba(255,255,255,.06)";
+          c.beginPath(); c.arc(cx + cell/2, cy + cell/2, 2, 0, 7); c.fill();
+        }
+      }
+    }
+    /* victoire : halo doré pulsant */
+    if(over){
+      const p = .5 + Math.sin(now/300)*.5;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const g2 = c.createRadialGradient(W/2, gy + cell*R/2, 10, W/2, gy + cell*R/2, cell*R);
+      g2.addColorStop(0, `rgba(255,210,63,${.10 + p*.12})`); g2.addColorStop(1, "rgba(255,210,63,0)");
+      c.fillStyle = g2; c.fillRect(0, 0, W, H); c.restore();
+    }
+
+    /* ── 4. coulures de peinture sous les cases allumées ── */
+    if(!over && Math.random() < .016){
+      const lit = [];
+      for(let r=0;r<R;r++) if(r < rowIdx || solved[r]) for(let x=0;x<COLS;x++) if(CODE[r] & VAL[x]) lit.push([r, x]);
+      if(lit.length){ const [r, x] = lit[(Math.random()*lit.length)|0];
+        drips.push({ x:gx + x*cell + cell/2, y:gy + r*cell + cell - 4, vy:.35 + Math.random()*.5, len:0, max:8 + Math.random()*22 }); }
+    }
+    drips = drips.filter(d=>d.len < d.max);
+    drips.forEach(d=>{ d.y += d.vy; d.len += d.vy;
+      c.globalAlpha = Math.max(0, 1 - d.len/d.max)*.6; c.strokeStyle = INK; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(d.x, d.y - 6); c.lineTo(d.x, d.y); c.stroke();
+      c.fillStyle = INK; c.beginPath(); c.arc(d.x, d.y, 1.6, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+
+    /* ── 5. escarbilles qui montent (au premier plan) ── */
+    embers.forEach(e=>{ e.y -= e.sp; e.x += Math.sin(now/1200 + e.ph)*.15;
+      if(e.y < -2){ e.y = H + 2; e.x = Math.random()*W; }
+      c.globalAlpha = .22 + Math.sin(now/700 + e.ph)*.18; c.fillStyle = e.hue;
+      c.beginPath(); c.arc(e.x, e.y, e.r, 0, 7); c.fill(); });
+    c.globalAlpha = 1;
+
+    /* ── 6. gerbes de bombe ── */
+    parts = parts.filter(pp=>pp.life > 0);
+    parts.forEach(pp=>{ pp.x += pp.vx; pp.y += pp.vy; pp.vy += pp.g; pp.life--;
+      c.globalAlpha = Math.max(0, pp.life/24); c.fillStyle = pp.col; c.fillRect(pp.x, pp.y, pp.sz, pp.sz); });
+    c.globalAlpha = 1;
+    raf = requestAnimationFrame(draw);
   }
-  /* jauge : plein → vide sur la fenêtre 3★, puis fenêtre 2★ */
-  const starIv = setInterval(()=>{
-    if(!started) return;
-    const s = (Date.now() - t0)/1000;
-    const stars = s < 45 ? 3 : s < 90 ? 2 : 1;
-    starLab.textContent = "★".repeat(stars);
-    const frac = s < 45 ? 1 - s/45 : s < 90 ? 1 - (s-45)/45 : 1;
-    starFill.style.width = (frac*100).toFixed(1) + "%";
-    starFill.style.background = stars === 3
-      ? "linear-gradient(90deg,var(--jaune),#ff9760)"
-      : stars === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
-  }, 250);
-  starLab.textContent = "★★★";
-  updateHintBtn(); focusRows(); refresh();
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches){ renderTwr(.4); }
-  else{ const tw0 = performance.now();
-    (function twloop(now){ renderTwr((now-tw0)/1000); twraf = requestAnimationFrame(twloop); })(performance.now()); }
-  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); });
-  return ()=>{ clearInterval(starIv); if(twraf) cancelAnimationFrame(twraf); };
+
+  /* init */
+  paintSwitches(); paintReadout(); updateHint();
+  draw(performance.now());
+
+  /* crochet d'auto-test (inoffensif, retiré au démontage) */
+  window.__lv02auto = ()=>{ if(over || !started) return false;
+    const tgt = CODE[rowIdx];
+    VAL.forEach((v, i)=>{ if(((tgt & v) ? 1 : 0) !== bits[rowIdx][i]) toggle(i); });
+    return true; };
+
+  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); paintReadout(); updateHint(); });
+  return ()=>{ timers.forEach(clearTimeout); clearInterval(starIv);
+    if(raf) cancelAnimationFrame(raf);
+    try{ delete window.__lv02auto; }catch(e){ window.__lv02auto = null; } };
 };
 
 /* ── LV_05 : LE SIMON 3D ────────────────────────────────────
@@ -7923,6 +8197,7 @@ MiniGames["LV_05"] = function(box, api){
   const bestLvl = ()=>+localStorage.getItem(SBKEY) || 0;
   /* barre d'infos : niveau, série d'erreurs, bouton « Revoir » (limité) */
   let replaysLeft = 2, usedReplay = false;
+  let reverseMode = false, revSeq = [], revIdx = 0, bonusStars = 0;   // manche bonus « à l'envers »
   const infoRow = document.createElement("div");
   infoRow.style.cssText = "display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:4px;font-size:14px;";
   const lvlLab = document.createElement("span"); lvlLab.className = "pix"; lvlLab.style.color = "var(--spray-cyan)";
@@ -8003,6 +8278,7 @@ MiniGames["LV_05"] = function(box, api){
     playSeq();
   }
   function press(i){
+    if(reverseMode) return pressReverse(i);
     if(!accepting) return;
     light(i, 170);
     if(i !== seq[idx]){
@@ -8025,12 +8301,52 @@ MiniGames["LV_05"] = function(box, api){
         status.textContent = "SÉQUENCE COMPLÈTE !";
         AudioFX.fanfare(); Juice.confetti(box, 24);
         /* 3★ = zéro faute ET sans utiliser « Revoir » */
-        const stars = (errors === 0 && !usedReplay) ? 3 : errors <= 2 ? 2 : 1;
-        T(()=>api.win({ stars,
-          label: stars === 3 ? "MÉMOIRE PARFAITE !" : "SÉQUENCE MAÎTRISÉE !" }), 800);
+        bonusStars = (errors === 0 && !usedReplay) ? 3 : errors <= 2 ? 2 : 1;
+        offerBonus();
       }else{
         AudioFX.ok(); status.textContent = "BIEN !"; T(next, 850);
       }
+    }
+  }
+  /* manche BONUS : rejouer la séquence complète À L'ENVERS, de mémoire.
+     Réussie → 3★ « MÉMOIRE INVERSÉE ». Ratée → aucune punition, on garde
+     les étoiles déjà acquises. On peut aussi terminer directement. */
+  function offerBonus(){
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px;";
+    const finish = document.createElement("button"); finish.className = "b2";
+    finish.textContent = "✓ Terminer (" + "★".repeat(bonusStars) + ")";
+    finish.style.cssText = "font-size:15px;padding:10px 16px;";
+    const rev = document.createElement("button"); rev.className = "b3";
+    rev.textContent = "🔁 Défi bonus : à l'envers";
+    rev.style.cssText = "font-size:15px;padding:10px 16px;";
+    row.appendChild(finish); row.appendChild(rev); box.appendChild(row);
+    finish.addEventListener("click", ()=>{ row.remove();
+      api.win({ stars:bonusStars, label: bonusStars === 3 ? "MÉMOIRE PARFAITE !" : "SÉQUENCE MAÎTRISÉE !" }); });
+    rev.addEventListener("click", ()=>{ row.remove();
+      revSeq = seq.slice().reverse(); revIdx = 0; reverseMode = true;
+      [...pips.children].forEach(p=>p.classList.remove("on"));
+      status.textContent = "REJOUE-LA À L'ENVERS !"; AudioFX.select(); fillTo(0);
+    });
+  }
+  function pressReverse(i){
+    light(i, 170);
+    if(i !== revSeq[revIdx]){
+      reverseMode = false;
+      AudioFX.err(); Juice.shake(box); status.textContent = "presque ! bonus manqué";
+      try{ navigator.vibrate && navigator.vibrate([70,50,70]); }catch(e){}
+      T(()=>api.win({ stars:bonusStars, label:"SÉQUENCE MAÎTRISÉE !" }), 1000);
+      return;
+    }
+    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
+    revIdx++; status.textContent = "À L'ENVERS ! " + revIdx + "/" + revSeq.length; fillTo(revIdx/revSeq.length);
+    if(revIdx >= revSeq.length){
+      reverseMode = false;
+      [...pips.children].forEach(p=>p.classList.add("on"));
+      status.textContent = "MÉMOIRE INVERSÉE !";
+      AudioFX.fanfare(); Juice.confetti(box, 30);
+      try{ navigator.vibrate && navigator.vibrate([40,30,40,30,120]); }catch(e){}
+      T(()=>api.win({ stars:3, label:"MÉMOIRE INVERSÉE !" }), 900);
     }
   }
   updateInfo();
@@ -9423,6 +9739,8 @@ MiniGames["LV_04"] = function(box, api){
   let g = TARGET.map(r=>r.slice());
   let moves = 0, playing = false, solved = false;
   const history = []; let usedUndo = false, hintsUsed = 0;
+  let solveT0 = 0, solveEnd = 0;              // chrono : départ (fin du mélange) → arrivée
+  const ECLAIR = 15;                          // sous 15 s au PAR = « ÉCLAIR ! »
 
   const shiftRow = (r,d)=>{ g[r] = d>0 ? [g[r][2],g[r][0],g[r][1]] : [g[r][1],g[r][2],g[r][0]]; };
   const shiftCol = (cc,d)=>{
@@ -9589,17 +9907,51 @@ MiniGames["LV_04"] = function(box, api){
     let would = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
     if(usedUndo || hintsUsed > 0) would = Math.min(would, 2);
     let ok = 0; for(let r=0;r<3;r++) for(let x=0;x<3;x++) if(g[r][x]===TARGET[r][x]) ok++;
-    hudLine.innerHTML = `COUPS : ${moves} · ${ok}/9 en place · <span style="color:var(--jaune)">${"★".repeat(would)}</span>`;
+    /* chrono : il tourne dès la fin du mélange, s'arrête à la victoire */
+    const secs = solveT0 ? (( (solved ? solveEnd : performance.now()) - solveT0)/1000) : 0;
+    /* l'éclair s'allume tant qu'on est dans les temps ET au PAR : on VOIT la cible bonus */
+    const onFire = playing && !solved && solveT0 && secs <= ECLAIR && moves <= PAR;
+    const chrono = solveT0
+      ? ` · <span style="color:${onFire?'#8effc0':'#9aa'}">${onFire?'⚡':'⏱'} ${secs.toFixed(1)}s</span>`
+      : "";
+    hudLine.innerHTML = `COUPS : ${moves} · ${ok}/9 en place${chrono} · <span style="color:var(--jaune)">${"★".repeat(would)}</span>`;
   }
   function check(){
     if(JSON.stringify(g) === JSON.stringify(TARGET)){
-      solved = true;
-      try{ navigator.vibrate && navigator.vibrate([50,40,50,40,130]); }catch(e){}
-      AudioFX.fanfare(); Juice.confetti(box, 26);
+      solved = true; solveEnd = performance.now();
+      const secs = (solveEnd - solveT0)/1000;
       let stars = moves <= PAR ? 3 : moves <= 14 ? 2 : 1;
       if(usedUndo || hintsUsed > 0) stars = Math.min(stars, 2);
+      /* ÉCLAIR : résolu au PAR, à mains nues, sous le temps → gerbe spéciale.
+         N'AJOUTE PAS d'étoile (3★ reste atteignable sans course) : c'est un
+         panache pour ceux qui foncent, jamais une contrainte pour Papa. */
+      const eclair = stars === 3 && secs <= ECLAIR;
+      try{ navigator.vibrate && navigator.vibrate(eclair ? [40,30,40,30,40,30,150] : [50,40,50,40,130]); }catch(e){}
+      AudioFX.fanfare();
+      Juice.confetti(box, eclair ? 44 : 26);
+      hud();                                   // fige le chrono à l'écran
+      if(eclair){
+        AudioFX.star && AudioFX.star(2);
+        const flash = document.createElement("div");
+        flash.textContent = "⚡ ÉCLAIR ! ⚡";
+        flash.style.cssText =
+          "position:absolute; left:50%; top:44%; transform:translate(-50%,-50%) scale(.4);" +
+          "font-family:'Press Start 2P',monospace; font-size:20px; color:#8effc0;" +
+          "text-shadow:0 0 12px #3affa0, 0 3px 0 #067; pointer-events:none; z-index:40; opacity:0;";
+        box.style.position = box.style.position || "relative";
+        box.appendChild(flash);
+        flash.animate(
+          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-6deg)" },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1.15) rotate(3deg)", offset:.35 },
+            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+          { duration:1400, easing:"cubic-bezier(.2,1.4,.4,1)" }
+        ).onfinish = ()=>flash.remove();
+      }
       setTimeout(()=>api.win({ stars,
-        label: stars === 3 ? `PAR EN ${moves} COUPS !` : `RÉSOLU EN ${moves} COUPS !` }), 800);
+        label: eclair ? `ÉCLAIR ! PAR EN ${secs.toFixed(1)}s`
+             : stars === 3 ? `PAR EN ${moves} COUPS !`
+             : `RÉSOLU EN ${moves} COUPS !` }), eclair ? 1150 : 800);
     }
   }
 
@@ -9609,6 +9961,7 @@ MiniGames["LV_04"] = function(box, api){
   const t0 = performance.now();
   const miniCells = [];
   TARGET.forEach((row,y)=>row.forEach((v,x)=>miniCells.push({ x, y, col:COLS[v] })));
+  let hudTick = 0;
   function frame(now){
     const t = (now - t0)/1000;
     yaw = .42 + Math.sin(t*.45)*.10;          // léger balancement (le cube « vit »)
@@ -9616,6 +9969,8 @@ MiniGames["LV_04"] = function(box, api){
     pulse *= .88;
     render();
     Voxel.renderCells(mini, miniCells, 3, 3, Math.sin(t*.5)*.7, -.3 + Math.sin(t*.35)*.12);
+    /* le chrono s'écoule à l'écran ~10 fois/s tant que la partie court */
+    if(playing && !solved && solveT0 && (++hudTick % 6 === 0)) hud();
     raf = requestAnimationFrame(frame);
   }
   hud();
@@ -9637,7 +9992,7 @@ MiniGames["LV_04"] = function(box, api){
       isRow ? shiftRow(i,d) : shiftCol(i,d);
       AudioFX.tick(); pulse = .10;
       render();
-      if(++k >= scramble.length){ clearInterval(iv); playing = true; moves = 0; hud(); }
+      if(++k >= scramble.length){ clearInterval(iv); playing = true; moves = 0; solveT0 = performance.now(); hud(); }
     }, 240);
   });
   return ()=>{ if(raf) cancelAnimationFrame(raf); };
@@ -12106,7 +12461,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v77</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v82</p>`);
     wire();
   }
   function wire(){
