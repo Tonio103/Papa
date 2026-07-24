@@ -54,6 +54,27 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v83) — la cinématique d'intro, version « cinéma »
+
+Grosse refonte de l'intro pour qu'elle soit digne d'un film :
+
+- **CORRECTIF majeur** : le tout premier plan (Les Vans, 3h du matin) se rendait
+  quasi **noir** — un fondu d'ouverture bogué rabotait l'alpha de tout l'écran.
+  C'est ce qui donnait l'impression d'une cinématique « vide ». Corrigé : on voit
+  enfin la lune, la ville, la pluie, les décors.
+- **4 nouveaux plans** tissés dans le récit (sans l'allonger) : gros plan sur la
+  bombe, la **cavale** sur les toits sous les projecteurs, un **souvenir** chaud
+  (deux têtes en l'air à chasser les étoiles), et la **constellation** des 8
+  invaders à l'aube.
+- **Décors vivants** : lune + halo, skyline aux fenêtres allumées, fils
+  électriques, panneaux, néons animés, train lointain, avion de nuit, flaques qui
+  reflètent, rat, vapeur d'égout, escaliers de secours, tags graffiti, pigeons…
+- **Étage « pellicule »** appliqué à chaque image : **bloom** (les lumières
+  rayonnent), **étalonnage** chaud/froid par plan, **fuite de lumière**, **bokeh**
+  de premier plan. Les plans passent de « dessin » à « photogramme ».
+
+Testé de bout en bout (10 plans), zéro erreur. sw v82→v83.
+
 ## Nouveautés (v82) — LV_02 : la ruelle prend vie
 
 Le décor du binaire devient une **vraie scène de nuit animée**, dessinée image
