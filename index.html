@@ -7738,233 +7738,543 @@ MiniGames["LV_01"] = function(box, api){
   return ()=>{ if(raf) cancelAnimationFrame(raf); };
 };
 
-/* ── LV_02 : LE BINAIRE 3D ──────────────────────────────────
-   Les bits sont des blocs qui se lèvent. Les lignes se décodent
-   DANS L'ORDRE (focus clair), le dépassement s'affiche en rouge,
-   et la jauge d'étoiles draine en direct. 3★ < 45 s. */
+/* ── LV_02 : LE TERMINAL DE DÉCODAGE BINAIRE ────────────────
+   Fini le petit exercice à 4 bits. C'est maintenant un TERMINAL
+   à décrypter en QUATRE manches qui montent en difficulté :
+     1. COMPOSER   — reconstituer des nombres sur 5 bits (0–31)
+     2. LIRE       — la machine allume un code, tu le LIS et tu
+                     tapes le nombre (sens inverse : bien plus dur)
+     3. INCRÉMENTER— repartir d'un nombre et faire « +1 » en binaire
+                     (on apprend la retenue : 0111 → 1000)
+     4. ADDITION   — additionner deux nombres binaires et écrire la
+                     somme (6 bits, 0–63)
+   Aucune manière de PERDRE : les erreurs coûtent des étoiles et du
+   temps, jamais la partie — Papa finira toujours. Aides limitées.
+   3★ = terminal bouclé vite, sans aide et sans faute. */
 MiniGames["LV_02"] = function(box, api){
-  const TARGETS = [3, 9, 6];                 // À PERSONNALISER
-  const VAL = [8, 4, 2, 1];
-  let t0 = Date.now(), started = false;
+  const CC = "#4db8ff";                      // bleu binaire
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let t0 = Date.now(), started = false, gameOver = false;
+  let hintsUsed = 0, mistakes = 0;           // pour le calcul d'étoiles
+  let currentSolver = null;                  // résout la manche courante (auto-test)
+  const timers = [];
+  const later = (fn, ms)=>{ const id = setTimeout(fn, ms); timers.push(id); return id; };
 
-  box.insertAdjacentHTML("beforeend",
-    `<p class="sub">Lève les blocs pour atteindre la cible, <b>ligne par ligne</b>.<br>Un bloc levé vaut son chiffre — additionne-les.</p>`);
+  /* place-values d'un mot de n bits : 5 → [16,8,4,2,1] */
+  const placeVals = n => Array.from({length:n}, (_, i)=>1 << (n - 1 - i));
+  const toBinStr = (v, n)=>v.toString(2).padStart(n, "0");
 
-  /* petit pense-bête : la valeur de chaque colonne, toujours visible */
-  box.insertAdjacentHTML("beforeend",
-    `<div class="pix" style="display:flex;gap:10px;justify-content:center;font-size:12px;color:var(--ink-soft);margin:2px 0 6px;">
-       <span>💡 valeurs :</span>
-       <span style="color:#4db8ff">8</span><span>·</span><span style="color:#4db8ff">4</span>
-       <span>·</span><span style="color:#4db8ff">2</span><span>·</span><span style="color:#4db8ff">1</span>
-       <span style="opacity:.7">(ex. 4+2 = 6)</span>
-     </div>`);
+  /* ═══ en-tête : consigne + fil des manches ═══ */
+  const sub = document.createElement("p"); sub.className = "sub";
+  box.appendChild(sub);
 
-  /* addition en direct : on VOIT la somme se construire sur la ligne active
-     (« 4 + 2 = 6 »), pile ce que demande la consigne « additionne-les » */
-  const mathLine = document.createElement("div");
-  mathLine.className = "pix";
-  mathLine.style.cssText = "text-align:center;font-size:17px;font-weight:800;min-height:24px;" +
-    "letter-spacing:.5px;margin:0 0 4px;transition:color .15s;";
-  box.appendChild(mathLine);
-  function updateMath(){
-    if(!started || active >= TARGETS.length){ mathLine.innerHTML = "&nbsp;"; return; }
-    const tgt = TARGETS[active];
-    const parts = [];
-    rows[active].forEach((on, i)=>{ if(on) parts.push(VAL[i]); });
-    const sum = parts.reduce((a,b)=>a+b, 0);
-    const col = sum > tgt ? "var(--rouge)" : sum === tgt ? "var(--jaune)" : "var(--spray-cyan)";
-    const left = parts.length ? parts.join(" + ") : "0";
-    /* le petit nudge « reste / trop » vit ICI, en un seul endroit lisible */
-    const tail = sum < tgt ? `<span style="color:var(--ink-soft);font-size:13px"> · reste ${tgt-sum}</span>`
-      : sum > tgt ? `<span style="color:var(--rouge);font-size:13px"> · trop !</span>` : "";
-    mathLine.innerHTML = `<span style="color:var(--ink-soft)">${left}</span>` +
-      ` <span style="color:${col}">= ${sum}</span>` +
-      `<span style="color:var(--ink-soft);font-size:13px"> → ${tgt}</span>` + tail;
+  const stageRow = document.createElement("div");
+  stageRow.className = "pix";
+  stageRow.style.cssText = "display:flex;gap:6px;justify-content:center;align-items:center;" +
+    "font-size:12px;margin:2px 0 6px;flex-wrap:wrap;";
+  box.appendChild(stageRow);
+  const STAGE_NAMES = ["COMPOSER", "LIRE", "INCRÉMENTER", "ADDITION", "CODE D'ACCÈS"];
+  function paintStages(idx){
+    stageRow.innerHTML = "";
+    STAGE_NAMES.forEach((nm, i)=>{
+      const chip = document.createElement("span");
+      const st = i < idx ? "done" : i === idx ? "cur" : "todo";
+      chip.textContent = (i < idx ? "✔ " : (i + 1) + ". ") + nm;
+      chip.style.cssText =
+        "padding:3px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.16);" +
+        (st === "done" ? "color:#0c1220;background:var(--jaune);font-weight:800;"
+         : st === "cur" ? `color:${CC};border-color:${CC};box-shadow:0 0 10px ${CC}66;font-weight:800;`
+         : "color:var(--ink-soft);opacity:.55;");
+      stageRow.appendChild(chip);
+    });
   }
 
-  /* jauge d'étoiles : draine de ★★★ (45 s) vers ★ (90 s) */
+  /* pense-bête des valeurs (se redessine selon le nombre de bits) */
+  const legend = document.createElement("div");
+  legend.className = "pix";
+  legend.style.cssText = "display:flex;gap:8px;justify-content:center;flex-wrap:wrap;" +
+    "font-size:12px;color:var(--ink-soft);margin:0 0 6px;";
+  box.appendChild(legend);
+  function paintLegend(n){
+    const pv = placeVals(n);
+    legend.innerHTML = `<span>💡 valeurs :</span>` +
+      pv.map((v, i)=>`<span style="color:${CC};font-weight:800">${v}</span>` +
+        (i < pv.length - 1 ? `<span style="opacity:.5">·</span>` : "")).join("") +
+      `<span style="opacity:.7">(on additionne les blocs levés)</span>`;
+  }
+
+  /* tour 3D : CIBLE (translucide) vs TOI — hauteur à égaler */
+  const twr = document.createElement("canvas");
+  twr.width = 220; twr.height = 150; twr.className = "model3d";
+  twr.style.cssText = "width:120px;height:82px;";
+  box.appendChild(twr);
+  const twrLab = document.createElement("div"); twrLab.className = "model-lab";
+  twrLab.textContent = "CIBLE ▮ vs TOI ▮";
+  box.appendChild(twrLab);
+  const TW = { cur:0, tgt:0, max:31 };
+  const stack = (v, col, max)=>{ const out = []; const h = Math.min(v, max);
+    for(let k=0;k<h;k++) out.push({ x:0, y:-k, col }); return out; };
+  let twraf = null;
+  function renderTwr(t){
+    Voxel.renderScene(twr, [
+      { cells:stack(TW.tgt, CC, TW.max), cols:1, rows:TW.max + 2, pos:[-.8,0,0], size:.5,
+        yaw:t*.5, pitch:-.18, alpha:.30 },
+      { cells:stack(TW.cur, TW.cur > TW.tgt ? "#ff6b6b" : "#ffd23f", TW.max), cols:1, rows:TW.max + 2,
+        pos:[.8,0,0], size:.5, yaw:t*.5, pitch:-.18 },
+    ], { cam:{ scale: TW.max > 40 ? 6.4 : 9 } });
+  }
+
+  /* ligne de feedback (l'addition en direct, la lecture, la retenue…) */
+  const feed = document.createElement("div");
+  feed.className = "pix";
+  feed.style.cssText = "text-align:center;font-size:16px;font-weight:800;min-height:24px;" +
+    "letter-spacing:.4px;margin:2px 0 4px;";
+  box.appendChild(feed);
+  function say(html){ feed.innerHTML = html || "&nbsp;"; }
+
+  /* zone de manche : reconstruite à chaque manche */
+  const host = document.createElement("div");
+  host.style.cssText = "width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;";
+  box.appendChild(host);
+  function clearHost(){ host.innerHTML = ""; currentSolver = null; }
+
+  /* jauge d'étoiles : draine sur toute la durée du terminal */
+  const T3 = 120, T2 = 220;                  // fenêtres 3★ / 2★ (secondes)
   const starRow = document.createElement("div");
-  starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;";
-  const starLab = document.createElement("span");
-  starLab.className = "pix";
+  starRow.style.cssText = "display:flex;align-items:center;gap:9px;justify-content:center;margin-top:2px;";
+  const starLab = document.createElement("span"); starLab.className = "pix";
   starLab.style.cssText = "font-size:13px;color:var(--jaune);min-width:52px;text-align:right;";
-  const starBar = document.createElement("div");
-  starBar.className = "bar";
-  starBar.style.cssText = "width:min(50vw,190px);height:9px;overflow:hidden;";
+  const starBar = document.createElement("div"); starBar.className = "bar";
+  starBar.style.cssText = "width:min(56vw,210px);height:9px;overflow:hidden;";
   const starFill = document.createElement("i");
   starFill.style.cssText = "display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--jaune),#ff9760);";
-  starBar.appendChild(starFill);
-  starRow.appendChild(starLab); starRow.appendChild(starBar);
+  starBar.appendChild(starFill); starRow.appendChild(starLab); starRow.appendChild(starBar);
   box.appendChild(starRow);
+  function liveStars(){
+    const s = (Date.now() - t0) / 1000;
+    let st = s < T3 ? 3 : s < T2 ? 2 : 1;
+    if(hintsUsed > 0 || mistakes > 2) st = Math.min(st, 2);
+    if(mistakes > 7) st = 1;
+    return st;
+  }
+  const starIv = setInterval(()=>{
+    if(!started || gameOver) return;
+    const s = (Date.now() - t0) / 1000;
+    const st = liveStars();
+    starLab.textContent = "★".repeat(st) + "☆".repeat(3 - st);
+    const frac = s < T3 ? 1 - s/T3 : s < T2 ? 1 - (s-T3)/(T2-T3) : 0;
+    starFill.style.width = (Math.max(0, frac)*100).toFixed(1) + "%";
+    starFill.style.background = st === 3 ? "linear-gradient(90deg,var(--jaune),#ff9760)"
+      : st === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
+  }, 250);
+  starLab.textContent = "★★★";
 
-  /* coup de pouce : montre brièvement les blocs à lever sur la ligne active
-     (utile si le binaire n'est pas une évidence) — limité, et coûte l'étoile parfaite */
-  let hintsUsed = 0;
+  /* bouton d'aide — le sens dépend de la manche (fourni par chaque manche) */
+  let hintFn = null;
   const hintBt = document.createElement("button"); hintBt.className = "b3";
-  hintBt.style.cssText = "font-size:13px;padding:7px 12px;margin:6px auto 0;display:block;";
-  const updateHintBtn = ()=>{ hintBt.textContent = "💡 Montrer les blocs (" + (2-hintsUsed) + ")";
-    hintBt.disabled = hintsUsed >= 2; };
+  hintBt.style.cssText = "font-size:13px;padding:7px 12px;margin:4px auto 0;display:block;";
+  const MAX_HINTS = 3;
+  function updateHintBtn(){
+    hintBt.textContent = "💡 Coup de pouce (" + (MAX_HINTS - hintsUsed) + ")";
+    hintBt.disabled = hintsUsed >= MAX_HINTS || !hintFn;
+  }
   hintBt.addEventListener("click", ()=>{
-    if(hintsUsed >= 2 || !started) return;
-    if(active >= TARGETS.length || locked[active]) return;
+    if(hintsUsed >= MAX_HINTS || !hintFn || gameOver) return;
     hintsUsed++; updateHintBtn(); AudioFX.select();
-    const tgt = TARGETS[active];
-    cellEls[active].forEach((c, b)=>{ if(tgt & VAL[b]){
-      c.style.outline = "3px solid var(--jaune)"; c.style.outlineOffset = "-2px";
-      setTimeout(()=>{ c.style.outline = ""; }, 1600); } });
+    hintFn();
   });
   box.appendChild(hintBt);
 
-  const rows = TARGETS.map(()=>[0,0,0,0]);
-  const locked = TARGETS.map(()=>false);
-  const cellEls = [], labels = [];
-  let active = 0;
-  let overshoots = 0;                        // nombre de fois où l'on a dépassé la cible
-
-  /* aide visuelle 3D : la CIBLE (bleue, translucide) et TON TOTAL (or)
-     en tours de cubes — tu dois monter à la même hauteur */
-  const twr = document.createElement("canvas");
-  twr.width = 210; twr.height = 150; twr.className = "model3d"; twr.style.cssText = "width:118px;height:84px;";
-  box.appendChild(twr);
-  box.insertAdjacentHTML("beforeend", `<div class="model-lab">CIBLE ▮ vs TOI ▮</div>`);
-  const stack = (v, col)=>{ const out = []; for(let k=0;k<v;k++) out.push({ x:0, y:-k, col }); return out; };
-  let twraf = null;
-  function renderTwr(t){
-    const done2 = active >= TARGETS.length;
-    const tgt = done2 ? 0 : TARGETS[active];
-    const cur = done2 ? 0 : rows[active].reduce((a,b,i)=>a + (b ? [8,4,2,1][i] : 0), 0);
-    Voxel.renderScene(twr, [
-      { cells:stack(tgt, "#4db8ff"), cols:1, rows:15, pos:[-.8,0,0], size:.5, yaw:t*.5, pitch:-.18, alpha:.32 },
-      { cells:stack(cur, cur > tgt ? "#ff6b6b" : "#ffd23f"), cols:1, rows:15, pos:[.8,0,0], size:.5, yaw:t*.5, pitch:-.18 },
-    ], { cam:{ scale:10 } });
-  }
-  const val = r => rows[r].reduce((a,b,i)=>a + (b ? VAL[i] : 0), 0);
-
-  const board = document.createElement("div"); board.className = "board3d";
-  const grid = document.createElement("div"); grid.className = "board3d-in";
-  grid.style.gridTemplateColumns = "repeat(4, 46px) 70px";
-  grid.style.setProperty("--cc", "#4db8ff");
-  board.appendChild(grid); box.appendChild(board);
-
-  TARGETS.forEach((tgt, r)=>{
-    const cells = [];
-    VAL.forEach((v, b)=>{
-      const cell = document.createElement("div");
-      cell.className = "cube";
-      cell.style.cssText = "width:46px;height:46px;transition:opacity .3s,filter .3s;";
-      cell.innerHTML = `<span class="val">${v}</span>`;
-      cell.addEventListener("pointerdown", ()=>{
-        if(locked[r] || r !== active) return;
-        const before = val(r);
-        rows[r][b] ^= 1;
-        cell.classList.toggle("on", !!rows[r][b]);
-        /* franchit la cible vers le haut → alerte ; sinon tic normal */
-        if(val(r) > tgt && before <= tgt){
-          overshoots++;
-          AudioFX.err(); Juice.shake(board);
-          try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
-        }else AudioFX.tick();
-        refresh();
-      });
-      grid.appendChild(cell); cells.push(cell);
+  /* ═══════════════════════════════════════════════════════════
+     COMPOSANT : une rangée de bits (blocs .cube qui se lèvent)
+     ─────────────────────────────────────────────────────────── */
+  function makeBitRow(n, opts){
+    opts = opts || {};
+    const pv = placeVals(n);
+    const state = pv.map(()=>0);
+    const el = document.createElement("div");
+    el.style.cssText = "display:flex;gap:5px;justify-content:center;align-items:center;flex-wrap:nowrap;";
+    const sz = n >= 6 ? 40 : 44;
+    const cells = pv.map((v, i)=>{
+      const c = document.createElement("div");
+      c.className = "cube";
+      c.style.cssText = `width:${sz}px;height:${sz}px;transition:transform .12s,opacity .2s,filter .2s;`;
+      c.innerHTML = `<span class="val" style="font-size:${v >= 10 ? 15 : 18}px">${v}</span>`;
+      if(!opts.readonly){
+        c.style.cursor = "pointer";
+        c.addEventListener("pointerdown", ()=>{
+          if(opts.isLocked && opts.isLocked()) return;
+          state[i] ^= 1; c.classList.toggle("on", !!state[i]);
+          AudioFX.tick();
+          try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+          opts.onChange && opts.onChange(api2.get());
+        });
+      }else{
+        c.style.cursor = "default"; c.style.opacity = ".96";
+      }
+      return c;
     });
-    cellEls.push(cells);
-    const lab = document.createElement("div");
-    lab.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;";
-    grid.appendChild(lab); labels.push(lab);
-  });
-
-  /* seule la ligne active est éclairée — les suivantes attendent */
-  function focusRows(){
-    cellEls.forEach((cells, r)=>{
-      const dim = !locked[r] && r !== active;
-      cells.forEach(c=>{
-        c.style.opacity = dim ? ".32" : "1";
-        c.style.filter = dim ? "saturate(.4)" : "";
-        c.style.pointerEvents = (locked[r] || dim) ? "none" : "";
-      });
-      if(dim) labels[r].innerHTML = `<span class="dim">· / ${TARGETS[r]}</span>`;
-    });
+    cells.forEach(c=>el.appendChild(c));
+    const api2 = {
+      el, cells, bits:pv, n,
+      get(){ return state.reduce((a, b, i)=>a + (b ? pv[i] : 0), 0); },
+      bitArray(){ return state.slice(); },
+      setVal(v){ pv.forEach((p, i)=>{ state[i] = (v & p) ? 1 : 0;
+        cells[i].classList.toggle("on", !!state[i]); }); },
+      lock(){ cells.forEach(c=>{ c.style.pointerEvents = "none";
+        if(c.classList.contains("on")){ c.classList.remove("on"); c.classList.add("lock"); } }); },
+      pulseWrong(){ Juice.shake(el);
+        cells.forEach(c=>{ c.classList.add("bad"); later(()=>c.classList.remove("bad"), 340); }); },
+      glowTargetBits(v){ pv.forEach((p, i)=>{ if(((v & p) ? 1 : 0) !== state[i]){
+        cells[i].style.outline = "3px solid var(--jaune)"; cells[i].style.outlineOffset = "-2px";
+        later(()=>{ cells[i].style.outline = ""; }, 1700); } }); },
+    };
+    return api2;
   }
 
-  let done = false;
-  function refresh(){
-    TARGETS.forEach((tgt, r)=>{
-      if(locked[r] || r !== active) return;
-      const v = val(r);
-      if(v === tgt){
-        locked[r] = true;
+  /* petit afficheur d'un mot binaire lu par la machine (chiffres 0/1) */
+  function binReadout(v, n, litCol){
+    const wrap = document.createElement("div");
+    wrap.className = "pix";
+    wrap.style.cssText = "display:flex;gap:5px;justify-content:center;font-size:22px;font-weight:800;";
+    toBinStr(v, n).split("").forEach(ch=>{
+      const d = document.createElement("span");
+      d.textContent = ch;
+      d.style.cssText = "width:26px;text-align:center;border-radius:6px;padding:2px 0;" +
+        (ch === "1" ? `color:#0c1220;background:${litCol || CC};box-shadow:0 0 10px ${litCol || CC}88;`
+                    : "color:var(--ink-soft);background:rgba(255,255,255,.05);");
+      wrap.appendChild(d);
+    });
+    return wrap;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     BRIQUE DE BASE : « amène une rangée éditable jusqu'à VALUE ».
+     framing(cur, val) → HTML de feedback. onDone() à la réussite.
+     C'est le cœur commun de COMPOSER / INCRÉMENTER / ADDITION.
+     ─────────────────────────────────────────────────────────── */
+  function roundToValue(cfg){
+    const { n, target, framing, onDone, presetVal, before } = cfg;
+    let solved = false;
+    if(before) before();
+    const row = makeBitRow(n, {
+      isLocked: ()=>solved,
+      onChange: cur => check(cur, false),
+    });
+    if(presetVal != null) row.setVal(presetVal);
+    host.appendChild(row.el);
+    TW.max = (1 << n) - 1; TW.tgt = target; TW.cur = row.get();
+
+    hintFn = ()=>{ row.glowTargetBits(target); };
+    updateHintBtn();
+    currentSolver = ()=>{ row.setVal(target); check(target, true); };
+
+    function check(cur, forced){
+      TW.cur = cur;
+      say(framing(cur, target));
+      if(cur === target && !solved){
+        solved = true;
         AudioFX.lock();
         try{ navigator.vibrate && navigator.vibrate([25,30,45]); }catch(e){}
-        cellEls[r].forEach(c=>{
-          c.style.pointerEvents = "none";
-          if(c.classList.contains("on")){ c.classList.remove("on"); c.classList.add("lock"); }
-        });
-        labels[r].innerHTML = `<span style="color:var(--jaune)">${v} ✔</span>`;
-        Juice.pop(box, "LIGNE " + (r+1) + " !", "var(--jaune)", 50, 34 + r*16);
-        while(active < TARGETS.length && locked[active]) active++;
-        focusRows();
-      }else{
-        /* dépassé = rouge, sinon valeur courante / cible. Le détail « reste/trop »
-           est porté par la ligne d'addition au-dessus — on garde ce label épuré. */
-        const col = v > tgt ? "var(--rouge)" : "var(--ink)";
-        labels[r].innerHTML = `<span style="color:${col}">${v}</span><span class="dim"> / ${tgt}</span>`;
+        row.lock();
+        later(onDone, 480);
+      }else if(cur > target && !forced){
+        /* dépassement : petite alerte, on compte la faute une seule fois par franchissement */
+        if(!row._over){ row._over = true; mistakes++; AudioFX.err(); row.pulseWrong(); }
+      }else if(cur <= target){
+        row._over = false;
+        if(!forced) AudioFX.tick();
       }
-    });
-    updateMath();
-    if(locked.every(Boolean) && !done){
-      done = true;
-      clearInterval(starIv);
-      const s = (Date.now() - t0)/1000;
-      let stars = s < 45 ? 3 : s < 90 ? 2 : 1;
-      if(hintsUsed > 0) stars = Math.min(stars, 2);        // le coup de pouce coûte l'étoile parfaite
-      /* SANS FAUTE : 3★, aucun coup de pouce, jamais dépassé la cible.
-         Panache pur — n'ajoute pas d'étoile, 3★ reste atteignable en tâtonnant. */
-      const sansFaute = stars === 3 && hintsUsed === 0 && overshoots === 0;
-      AudioFX.fanfare();
-      Juice.confetti(box, sansFaute ? 40 : 22);
-      if(sansFaute){
-        AudioFX.star && AudioFX.star(2);
-        const flash = document.createElement("div");
-        flash.textContent = "✦ SANS FAUTE ✦";
-        flash.style.cssText =
-          "position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);" +
-          "font-family:'Press Start 2P',monospace; font-size:17px; color:#4db8ff;" +
-          "text-shadow:0 0 12px #2a8fff, 0 3px 0 #04386e; pointer-events:none; z-index:40; opacity:0;";
-        box.style.position = box.style.position || "relative";
-        box.appendChild(flash);
-        flash.animate(
-          [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-5deg)" },
-            { opacity:1, transform:"translate(-50%,-50%) scale(1.14) rotate(3deg)", offset:.35 },
-            { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
-            { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
-          { duration:1350, easing:"cubic-bezier(.2,1.4,.4,1)" }
-        ).onfinish = ()=>flash.remove();
-      }
-      setTimeout(()=>api.win({ stars,
-        label: sansFaute ? "SANS FAUTE !" : stars === 3 ? "CERVEAU BINAIRE !" : "DÉCODÉ !" }),
-        sansFaute ? 1100 : 700);
     }
+    check(row.get(), true);
+    return row;
   }
-  /* jauge : plein → vide sur la fenêtre 3★, puis fenêtre 2★ */
-  const starIv = setInterval(()=>{
-    if(!started) return;
-    const s = (Date.now() - t0)/1000;
-    const stars = s < 45 ? 3 : s < 90 ? 2 : 1;
-    starLab.textContent = "★".repeat(stars);
-    const frac = s < 45 ? 1 - s/45 : s < 90 ? 1 - (s-45)/45 : 1;
-    starFill.style.width = (frac*100).toFixed(1) + "%";
-    starFill.style.background = stars === 3
-      ? "linear-gradient(90deg,var(--jaune),#ff9760)"
-      : stars === 2 ? "linear-gradient(90deg,#ff9760,#ff5da2)" : "var(--rouge)";
-  }, 250);
-  starLab.textContent = "★★★";
-  updateHintBtn(); focusRows(); refresh();
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches){ renderTwr(.4); }
+
+  /* framings réutilisables ---------------------------------- */
+  function framingSum(cur, tgt){
+    const col = cur > tgt ? "var(--rouge)" : cur === tgt ? "var(--jaune)" : CC;
+    const tail = cur < tgt ? `<span style="color:var(--ink-soft);font-size:13px"> · reste ${tgt-cur}</span>`
+      : cur > tgt ? `<span style="color:var(--rouge);font-size:13px"> · trop !</span>` : "";
+    return `<span style="color:${col}">${cur}</span>` +
+      `<span style="color:var(--ink-soft);font-size:13px"> → cible ${tgt}</span>` + tail;
+  }
+
+  /* ═══ MANCHE 1 — COMPOSER (5 bits) ═══ */
+  function stageCompose(done){
+    paintStages(0); paintLegend(5); twrLab.textContent = "CIBLE ▮ vs TOI ▮";
+    const TARGETS = pick(5, [13, 22, 7]);    // 0–31, pas juste 4 bits
+    sub.innerHTML = `<b>Manche 1 · Composer.</b> Lève les blocs pour fabriquer le nombre demandé.<br>Chaque bloc vaut son chiffre — additionne-les.`;
+    let i = 0;
+    (function nextNum(){
+      if(i >= TARGETS.length){ stageWin("COMPOSER BOUCLÉ", done); return; }
+      clearHost();
+      const tag = document.createElement("div"); tag.className = "pix";
+      tag.style.cssText = `font-size:15px;color:${CC};font-weight:800;`;
+      tag.innerHTML = `Fabrique <b style="font-size:20px">${TARGETS[i]}</b> &nbsp;(${i+1}/${TARGETS.length})`;
+      host.appendChild(tag);
+      roundToValue({ n:5, target:TARGETS[i],
+        framing: framingSum,
+        onDone: ()=>{ Juice.pop(box, "✔ " + TARGETS[i], "var(--jaune)"); i++; nextNum(); } });
+    })();
+  }
+
+  /* ═══ MANCHE 2 — LIRE (machine allume, tu tapes) ═══ */
+  function stageRead(done){
+    paintStages(1); paintLegend(5); twrLab.textContent = "CE QUE TU TAPES ▮";
+    const VALUES = pick(5, [11, 25, 6]);
+    sub.innerHTML = `<b>Manche 2 · Lire.</b> La machine allume un code binaire.<br>Lis-le, additionne les blocs allumés, puis <b>tape le nombre</b>.`;
+    let i = 0;
+    (function nextRead(){
+      if(i >= VALUES.length){ stageWin("CODE LU", done); return; }
+      clearHost();
+      const value = VALUES[i];
+      TW.max = 31; TW.tgt = value; TW.cur = 0;
+
+      const tag = document.createElement("div"); tag.className = "pix";
+      tag.style.cssText = "font-size:13px;color:var(--ink-soft);";
+      tag.textContent = `CODE MACHINE (${i+1}/${VALUES.length})`;
+      host.appendChild(tag);
+      /* rangée allumée en lecture seule + valeurs sous chaque bloc allumé */
+      const litRow = makeBitRow(5, { readonly:true });
+      litRow.setVal(value); host.appendChild(litRow.el);
+      host.appendChild(binReadout(value, 5, CC));
+
+      /* écran de saisie + pavé numérique */
+      let typed = "";
+      const disp = document.createElement("div"); disp.className = "pix";
+      disp.style.cssText = "font-size:26px;font-weight:800;min-height:34px;letter-spacing:2px;" +
+        "color:var(--jaune);margin-top:4px;";
+      const paint = ()=>{ disp.textContent = typed === "" ? "— tape le nombre —" : typed;
+        disp.style.color = typed === "" ? "var(--ink-soft)" : "var(--jaune)"; };
+      paint(); host.appendChild(disp);
+
+      const pad = document.createElement("div");
+      pad.style.cssText = "display:grid;grid-template-columns:repeat(3,54px);gap:7px;justify-content:center;margin-top:2px;";
+      const mkKey = (label, fn, cls)=>{
+        const k = document.createElement("button"); k.className = cls || "b3";
+        k.textContent = label; k.style.cssText = "font-size:19px;padding:11px 0;";
+        k.addEventListener("pointerdown", e=>{ e.preventDefault(); fn(); }); return k;
+      };
+      const press = d =>{ if(typed.length < 2){ typed += d; AudioFX.tick(); paint();
+        TW.cur = Math.min(31, +typed || 0); } };
+      for(let d = 1; d <= 9; d++) pad.appendChild(mkKey(""+d, ()=>press(""+d)));
+      pad.appendChild(mkKey("⌫", ()=>{ typed = typed.slice(0, -1); AudioFX.back(); paint();
+        TW.cur = +typed || 0; }));
+      pad.appendChild(mkKey("0", ()=>press("0")));
+      const okKey = mkKey("OK", ()=>submit(false), "b2");
+      pad.appendChild(okKey);
+      host.appendChild(pad);
+
+      hintFn = ()=>{ say(`Compte les blocs allumés : ${binStrSum(value)}`); };
+      updateHintBtn();
+      currentSolver = ()=>{ typed = "" + value; submit(true); };
+
+      function submit(forced){
+        const guess = +typed;
+        if(typed === "") return;
+        if(guess === value){
+          AudioFX.lock(); Juice.pop(box, "✔ " + value, "var(--jaune)");
+          litRow.lock(); i++; nextRead();
+        }else{
+          mistakes++; AudioFX.err(); Juice.shake(disp);
+          say(guess > value ? `<span style="color:var(--rouge)">Trop grand — relis les blocs allumés.</span>`
+                            : `<span style="color:var(--rouge)">Trop petit — un bloc t'a échappé.</span>`);
+          typed = ""; paint(); TW.cur = 0;
+        }
+      }
+      say(`Additionne les blocs allumés du code.`);
+    })();
+  }
+
+  /* décompose une valeur en « 8 + 2 + 1 » pour l'aide de lecture */
+  function binStrSum(v){
+    const pv = [16, 8, 4, 2, 1].filter(p => v & p);
+    return pv.length ? pv.join(" + ") + " = " + v : "0";
+  }
+
+  /* ═══ MANCHE 3 — INCRÉMENTER (+1, la retenue) ═══ */
+  function stageIncrement(done){
+    paintStages(2); paintLegend(5); twrLab.textContent = "CIBLE ▮ vs TOI ▮";
+    const STARTS = pick(5, [7, 15, 11]);     // +1 = retenue en cascade (7→8, 15→16, 11→12)
+    sub.innerHTML = `<b>Manche 3 · Incrémenter.</b> Le nombre est déjà posé.<br>Fais <b>+1</b> en binaire — attention à la <b>retenue</b> !`;
+    let i = 0;
+    (function nextInc(){
+      if(i >= STARTS.length){ stageWin("RETENUES MAÎTRISÉES", done); return; }
+      clearHost();
+      const from = STARTS[i], target = from + 1;
+      const tag = document.createElement("div"); tag.className = "pix";
+      tag.style.cssText = `font-size:15px;color:${CC};font-weight:800;text-align:center;`;
+      tag.innerHTML = `Passe de <b style="font-size:20px">${from}</b> à <b style="font-size:20px;color:var(--jaune)">${target}</b>` +
+        `<br><span style="font-size:12px;color:var(--ink-soft)">(${toBinStr(from,5)} → ${toBinStr(target,5)})</span> &nbsp;(${i+1}/${STARTS.length})`;
+      host.appendChild(tag);
+      roundToValue({ n:5, target, presetVal:from,
+        framing: (cur)=>{
+          const col = cur === target ? "var(--jaune)" : cur > target ? "var(--rouge)" : CC;
+          return `<span style="color:${col}">${cur}</span>` +
+            `<span style="color:var(--ink-soft);font-size:13px"> → il faut ${target}</span>`;
+        },
+        onDone: ()=>{ Juice.pop(box, "✔ +1", "var(--jaune)"); i++; nextInc(); } });
+    })();
+  }
+
+  /* ═══ MANCHE 4 — ADDITION binaire (6 bits) ═══ */
+  function stageAdd(done){
+    paintStages(3); paintLegend(6); twrLab.textContent = "SOMME ▮ vs TOI ▮";
+    const PAIRS = pickPairs([[13, 10], [25, 19], [21, 22]]);
+    sub.innerHTML = `<b>Manche 4 · Addition.</b> Additionne les deux nombres…<br>puis <b>écris la somme</b> en binaire (jusqu'à 63).`;
+    let i = 0;
+    (function nextAdd(){
+      if(i >= PAIRS.length){ stageWin("TERMINAL DÉCRYPTÉ", done); return; }
+      clearHost();
+      const [a, b] = PAIRS[i], target = a + b;
+      TW.max = 63;
+
+      const op = document.createElement("div"); op.className = "pix";
+      op.style.cssText = "display:flex;flex-direction:column;gap:7px;align-items:center;";
+      const rowA = makeBitRow(6, { readonly:true }); rowA.setVal(a);
+      const rowB = makeBitRow(6, { readonly:true }); rowB.setVal(b);
+      const lblA = document.createElement("div"); lblA.className = "pix";
+      lblA.style.cssText = `font-size:13px;color:${CC};font-weight:800;`; lblA.textContent = "A = " + a;
+      const lblB = document.createElement("div"); lblB.className = "pix";
+      lblB.style.cssText = `font-size:13px;color:${CC};font-weight:800;margin-top:4px;`; lblB.textContent = "+ B = " + b;
+      op.appendChild(lblA); op.appendChild(rowA.el);
+      op.appendChild(lblB); op.appendChild(rowB.el);
+      const bar = document.createElement("div");
+      bar.style.cssText = "width:80%;height:2px;background:rgba(255,255,255,.25);margin:3px 0;";
+      op.appendChild(bar);
+      host.appendChild(op);
+
+      const tag = document.createElement("div"); tag.className = "pix";
+      tag.style.cssText = "font-size:14px;color:var(--jaune);font-weight:800;";
+      tag.innerHTML = `Écris la somme &nbsp;(${i+1}/${PAIRS.length})`;
+      host.appendChild(tag);
+
+      roundToValue({ n:6, target,
+        framing: (cur)=>{
+          const col = cur > target ? "var(--rouge)" : cur === target ? "var(--jaune)" : CC;
+          const tail = cur < target ? ` · reste ${target-cur}` : cur > target ? " · trop !" : "";
+          return `${a} + ${b} = <span style="color:${col}">${cur}</span>` +
+            `<span style="color:var(--ink-soft);font-size:13px"> → ${target}${tail}</span>`;
+        },
+        onDone: ()=>{ Juice.pop(box, "✔ " + target, "var(--jaune)"); i++; nextAdd(); } });
+    })();
+  }
+
+  /* ═══ MANCHE 5 — LE CODE D'ACCÈS (capstone thématique) ═══
+     L'invader a verrouillé le fragment derrière SON matricule. On le
+     recompose sur 6 bits, deux nombres d'affilée. Rien de plus dur que
+     COMPOSER, mais c'est le palier « boss » : plus large (0–63) et
+     habillé comme un vrai déverrouillage. Les deux valeurs (27 puis 7)
+     sont un clin d'œil discret — à personnaliser au besoin. */
+  function stageFinale(done){
+    paintStages(4); paintLegend(6); twrLab.textContent = "MATRICULE ▮ vs TOI ▮";
+    const CODE = pickPairs([[27], [7]]).map(p=>p[0]);   // le « matricule » de l'invader
+    sub.innerHTML = `<b>Manche 5 · Code d'accès.</b> Le fragment est verrouillé.<br>Recompose le <b>matricule de l'invader</b> en binaire pour l'ouvrir.`;
+    let i = 0;
+    (function nextCode(){
+      if(i >= CODE.length){
+        /* déverrouillage : petite mise en scène avant la victoire */
+        clearHost(); hintFn = null; updateHintBtn();
+        TW.cur = TW.tgt = 0;
+        say(`<span style="color:var(--jaune)">🔓 CODE D'ACCÈS ACCEPTÉ</span>`);
+        AudioFX.fanfare(); Juice.confetti(box, 22);
+        try{ navigator.vibrate && navigator.vibrate([30,40,30,40,120]); }catch(e){}
+        const lock = document.createElement("div");
+        lock.className = "pix";
+        lock.style.cssText = "font-size:40px;text-align:center;margin:8px 0;";
+        lock.textContent = "🔓";
+        host.appendChild(lock);
+        if(!reduced && lock.animate) lock.animate(
+          [ { transform:"scale(.3) rotate(-12deg)", opacity:0 },
+            { transform:"scale(1.25) rotate(6deg)", opacity:1, offset:.5 },
+            { transform:"scale(1) rotate(0)", opacity:1 } ],
+          { duration:700, easing:"cubic-bezier(.2,1.5,.4,1)" });
+        later(done, reduced ? 350 : 950);
+        return;
+      }
+      clearHost();
+      const tag = document.createElement("div"); tag.className = "pix";
+      tag.style.cssText = `font-size:15px;color:${CC};font-weight:800;text-align:center;`;
+      tag.innerHTML = `Chiffre du matricule : <b style="font-size:20px;color:var(--jaune)">${CODE[i]}</b>` +
+        `<br><span style="font-size:12px;color:var(--ink-soft)">(compose-le sur 6 bits — jusqu'à 63)</span>` +
+        ` &nbsp;(${i+1}/${CODE.length})`;
+      host.appendChild(tag);
+      roundToValue({ n:6, target:CODE[i],
+        framing: framingSum,
+        onDone: ()=>{ Juice.pop(box, "🔒 " + CODE[i], "var(--jaune)"); i++; nextCode(); } });
+    })();
+  }
+
+  /* petite fanfare de fin de manche */
+  function stageWin(label, done){
+    clearHost(); hintFn = null; updateHintBtn();
+    say(`<span style="color:var(--jaune)">✦ ${label} ✦</span>`);
+    AudioFX.fanfare(); Juice.confetti(box, 16);
+    try{ navigator.vibrate && navigator.vibrate([30,40,30]); }catch(e){}
+    later(done, reduced ? 350 : 800);
+  }
+
+  /* ═══ enchaînement des 4 manches puis victoire ═══ */
+  const STAGES = [stageCompose, stageRead, stageIncrement, stageAdd, stageFinale];
+  function runStage(k){
+    if(k >= STAGES.length){ finish(); return; }
+    STAGES[k](()=>runStage(k + 1));
+  }
+
+  function finish(){
+    if(gameOver) return;
+    gameOver = true;
+    clearInterval(starIv);
+    clearHost(); hintFn = null; updateHintBtn();
+    TW.cur = TW.tgt = 0;
+    paintStages(STAGE_NAMES.length);
+    let stars = liveStars();
+    const sansFaute = stars === 3 && hintsUsed === 0 && mistakes === 0;
+    AudioFX.fanfare(); Juice.confetti(box, sansFaute ? 46 : 26);
+    say(`<span style="color:var(--jaune)">TERMINAL DÉCRYPTÉ</span>`);
+    if(sansFaute){
+      AudioFX.star && AudioFX.star(2);
+      const flash = document.createElement("div");
+      flash.textContent = "✦ CERVEAU BINAIRE ✦";
+      flash.style.cssText =
+        "position:absolute; left:50%; top:40%; transform:translate(-50%,-50%);" +
+        `font-family:'Press Start 2P',monospace; font-size:15px; color:${CC};` +
+        "text-shadow:0 0 12px #2a8fff, 0 3px 0 #04386e; pointer-events:none; z-index:40; opacity:0;";
+      box.style.position = box.style.position || "relative";
+      box.appendChild(flash);
+      flash.animate(
+        [ { opacity:0, transform:"translate(-50%,-50%) scale(.4) rotate(-5deg)" },
+          { opacity:1, transform:"translate(-50%,-50%) scale(1.14) rotate(3deg)", offset:.35 },
+          { opacity:1, transform:"translate(-50%,-50%) scale(1) rotate(0deg)", offset:.7 },
+          { opacity:0, transform:"translate(-50%,-64%) scale(1.05)" } ],
+        { duration:1400, easing:"cubic-bezier(.2,1.4,.4,1)" }
+      ).onfinish = ()=>flash.remove();
+    }
+    later(()=>api.win({ stars,
+      label: sansFaute ? "CERVEAU BINAIRE !"
+           : stars === 3 ? "DÉCRYPTAGE PARFAIT !"
+           : "TERMINAL DÉCRYPTÉ !" }), sansFaute ? 1200 : 750);
+  }
+
+  /* ── petits utilitaires ── */
+  /* renvoie la liste demandée (l'ordre exact du cadeau) ; l'argument
+     `n` est là pour rappeler le nombre de bits attendu à l'appel */
+  function pick(n, list){ return list.slice(); }
+  function pickPairs(list){ return list.map(p=>p.slice()); }
+
+  /* boucle de rendu de la tour 3D (cible translucide vs ta tour) */
+  if(reduced){ renderTwr(.4); }
   else{ const tw0 = performance.now();
-    (function twloop(now){ renderTwr((now-tw0)/1000); twraf = requestAnimationFrame(twloop); })(performance.now()); }
-  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); updateMath(); });
-  return ()=>{ clearInterval(starIv); if(twraf) cancelAnimationFrame(twraf); };
+    (function loop(now){ renderTwr((now - tw0) / 1000); twraf = requestAnimationFrame(loop); })(performance.now()); }
+
+  paintStages(0); paintLegend(5); say("");
+  /* crochet d'auto-test : joue la manche courante correctement (inoffensif) */
+  window.__lv02auto = ()=>{ if(currentSolver && !gameOver){ currentSolver(); return true; } return false; };
+
+  Juice.readyGo(box, ()=>{ started = true; t0 = Date.now(); runStage(0); });
+  return ()=>{ timers.forEach(clearTimeout); clearInterval(starIv);
+    if(twraf) cancelAnimationFrame(twraf);
+    try{ delete window.__lv02auto; }catch(e){ window.__lv02auto = null; } };
 };
 
 /* ── LV_05 : LE SIMON 3D ────────────────────────────────────
@@ -12259,7 +12569,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v79</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v80</p>`);
     wire();
   }
   function wire(){

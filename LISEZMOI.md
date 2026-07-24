@@ -54,6 +54,22 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v80) — LV_02 devient un vrai TERMINAL DE DÉCODAGE
+
+Le défi du binaire était trop facile (3 petits nombres sur 4 bits). Il est
+**entièrement refait** en un terminal à décrypter en **5 manches** qui montent
+en difficulté (~510 lignes) :
+
+1. **COMPOSER** — reconstituer des nombres sur **5 bits** (0–31), plus seulement 4.
+2. **LIRE** — la machine **allume un code** binaire ; tu le lis, tu additionnes les blocs allumés et tu **tapes le nombre** sur un pavé (sens inverse : bien plus dur).
+3. **INCRÉMENTER** — repartir d'un nombre et faire **+1** en binaire, en gérant la **retenue** (0111 → 1000).
+4. **ADDITION** — **additionner** deux nombres binaires et écrire la somme sur **6 bits** (0–63).
+5. **CODE D'ACCÈS** — palier « boss » : recomposer le **matricule de l'invader** pour déverrouiller le fragment (petite mise en scène 🔓).
+
+Garde-fous pensés pour Papa : **impossible de perdre** (les erreurs coûtent des étoiles et du temps, jamais la partie), fil des manches visible, tour 3D « cible vs toi », addition/lecture affichées en direct, et **3 coups de pouce** (qui coûtent l'étoile parfaite). 3★ = terminal bouclé vite, sans aide et sans faute → flash **« CERVEAU BINAIRE »**.
+
+Testé de bout en bout (les 5 manches jouées jusqu'à la victoire en automatique) : **zéro erreur** console. sw v79→v80, pied de page v80.
+
 ## Nouveautés (v79) — passe « fin prêt » : relecture + finitions
 
 Grande relecture de tout le jeu pour qu'il soit prêt à offrir :
