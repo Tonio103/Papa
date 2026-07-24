@@ -54,6 +54,38 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v88) — LA CINÉMATIQUE DE FIN (13 plans)
+
+Quand ton père scelle son selfie doré, il ne tombe plus directement sur l'écran
+de victoire : **une deuxième cinématique se lance**, celle qui raconte enfin
+qui se cachait derrière l'invader. Treize plans, du soir à l'aube :
+
+1. **Les huit pièces** s'allument une à une sur la ville, puis montent en constellation.
+2. **La carte des Vans** punaisée au mur : ton itinéraire complet se trace, repère par repère, avec le nom de chaque défi.
+3. **Le guetteur** : sur un toit, quelqu'un l'a regardé chercher tout du long.
+4. **L'atelier** : le repaire secret — pochoir en cours de découpe, croquis punaisés, les huit bombes alignées sur l'établi.
+5. **La révélation** : à contre-jour dans l'aube, la silhouette abaisse sa capuche.
+6. **La signature** : « POUR PAPA » écrit à la bombe, trait par trait, sur le dernier mur.
+7. **Le souvenir** : un toit, une nuit d'été, deux silhouettes et le tout premier invader peint.
+8. **Les années** : une pellicule qui défile et trois polaroids qui se posent.
+9. **Les retrouvailles** : les deux, épaule contre épaule, au-dessus de la ville illuminée.
+10. **Les lampions** : huit lumières qui montent, une par endroit où il est allé chercher.
+11. **Joyeux anniversaire** : les huit pièces en cœur, feux d'artifice, guirlande, confettis, message au pochoir.
+12. **Le cadeau** : une boîte qui s'ouvre et déborde de lumière.
+13. **La dernière image** : « avec tout mon amour », puis fondu sur l'écran de victoire.
+
+Côté technique : deux personnages entièrement redessinés (l'artiste de dos qui
+abaisse sa capuche — nuque, mèches, liseré de contre-jour, bras qui montent
+puis redescendent ; et Papa, plus large d'épaules, casquette et veste), plus une
+boîte à outils dédiée (carte parchemin, polaroids, pellicule, lampions, boîte
+cadeau, guirlande, confettis, rivière qui reflète l'aube, pochoir qui se découpe,
+signature à la bombe, cœur d'invaders, feux d'artifice, rais de soleil). Tout est
+peint au canevas : **zéro image, ça marche toujours hors-ligne**. La cinématique
+passe par le même étage « pellicule » que l'intro (bloom, étalonnage par plan,
+fuite de lumière, grain, vignette) et le bouton **Passer** reste disponible.
+
+Testé de bout en bout (13 plans capturés), zéro erreur console. sw v87→v88.
+
 ## Nouveautés (v86) — MISE À JOUR AUTOMATIQUE + voiture plus lisible
 
 - **Fini le cache collant !** Le jeu se **met à jour tout seul** : dès qu'une
