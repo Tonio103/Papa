@@ -5145,50 +5145,105 @@ const Cinematic = (()=>{
     c.restore(); c.globalAlpha = 1;
   }
 
-  /* ── petits acteurs ── */
+  /* ── LA VILLE (rendu illustré : façades dégradées, fenêtres qui
+     brillent, arêtes éclairées par la lune, toits habités) ── */
   function buildCity(n, hMin, hMax){
     const out = []; let x = 0;
-    while(x < 1.4){                                   // en fractions d'écran
-      const bw = .06 + Math.random()*.09, bh = hMin + Math.random()*(hMax - hMin);
+    while(x < 1.55){                                   // en fractions d'écran
+      const bw = .055 + Math.random()*.10, bh = hMin + Math.random()*(hMax - hMin);
+      const cols = Math.max(2, Math.round(bw/.024));
+      const rows = Math.max(2, Math.round(bh/.05));
       const wins = [];
-      for(let wy=.06; wy<bh-.03; wy+=.05) for(let wx=.012; wx<bw-.02; wx+=.022)
-        if(Math.random()<.14) wins.push([wx, wy]);
-      out.push({ x, w:bw, h:bh, wins, ant: Math.random()<.4 });
-      x += bw + .008;
+      for(let r=0;r<rows;r++) for(let ci=0;ci<cols;ci++){
+        const wx = .016 + ci*(bw-.032)/Math.max(1,cols-1);
+        const wy = .05 + r*(bh-.08)/Math.max(1,rows-1);
+        wins.push([wx, wy, Math.random()<.24, Math.random()<.16]);   // x,y,allumée,cyan
+      }
+      out.push({ x, w:bw, h:bh, wins, ant: Math.random()<.35, tank: Math.random()<.3,
+        ac: Math.random()<.4, tone: (Math.random()-.5)*.05 });
+      x += bw + .005 + Math.random()*.012;
     }
     return out;
   }
-  function drawCity(list, base, k, col, winA, pan){
+  function drawCity(list, base, k, col, winA, pan, haze){
+    haze = haze || 0;
     list.forEach(b=>{
       const bx = (b.x - pan)*W, bw = b.w*W, bh = b.h*H*k;
-      c.fillStyle = col;
-      c.fillRect(bx, base - bh, bw, bh);
-      if(b.ant) c.fillRect(bx + bw/2 - 2, base - bh - H*.02, 3, H*.02);
-      c.fillStyle = `rgba(255,216,138,${winA})`;
-      b.wins.forEach(([wx,wy])=>{
-        if(wy < b.h*k) c.fillRect(bx + wx*W, base - bh + wy*H, 4, 6);
+      if(bx > W + 50 || bx + bw < -50) return;
+      const top = base - bh, facade = shade(col, b.tone);
+      /* façade dégradée : bord droit éclairé par la lune, bord gauche à l'ombre */
+      const g = c.createLinearGradient(bx, 0, bx + bw, 0);
+      g.addColorStop(0, shade(facade, -.14)); g.addColorStop(.72, facade); g.addColorStop(1, shade(facade, .12));
+      c.fillStyle = g; c.fillRect(bx, top, bw, bh);
+      c.fillStyle = "rgba(255,240,220,.06)"; c.fillRect(bx + bw - 2, top, 2, bh);   // liseré éclairé
+      c.fillStyle = "rgba(0,0,0,.28)"; c.fillRect(bx, top, 2, bh);                  // arête ombrée
+      /* parapet du toit */
+      c.fillStyle = shade(facade, -.22); c.fillRect(bx, top, bw, 3);
+      c.fillStyle = "rgba(255,255,255,.06)"; c.fillRect(bx, top, bw, 1);
+      /* accessoires de toit (silhouette + petit relief) */
+      if(b.tank){ c.fillStyle = shade(facade, .05); c.fillRect(bx + bw*.18, top - H*.03, 15, H*.03);
+        c.fillStyle = shade(facade, -.25); c.fillRect(bx + bw*.18, top - H*.03, 15, 2); }
+      if(b.ac){ c.fillStyle = shade(facade, -.1); c.fillRect(bx + bw*.6, top - 6, 12, 6);
+        c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(bx + bw*.6 + 2, top - 4, 8, 2); }
+      if(b.ant){ c.fillStyle = shade(facade, -.35); c.fillRect(bx + bw*.5 - 1, top - H*.028, 2, H*.028);
+        c.fillStyle = "#ff5b5b"; c.fillRect(bx + bw*.5 - 1.5, top - H*.028 - 2, 3, 2); }   // feu d'obstacle
+      /* fenêtres : allumées = pixels vifs (le bloom les fait rayonner) ;
+         éteintes = léger reflet froid du ciel */
+      const lim = b.h * k;
+      b.wins.forEach(([wx, wy, lit, cyan])=>{
+        if(wy >= lim) return;
+        const wX = bx + wx*W, wY = top + wy*H;
+        if(lit && winA > .04){ c.fillStyle = cyan ? "#9fd6ff" : "#ffd28c"; c.fillRect(wX, wY, 4, 5);
+          c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(wX, wY, 4, 1); }
+        else { c.fillStyle = "rgba(130,150,200,.09)"; c.fillRect(wX, wY, 4, 5); }
       });
+      if(haze > 0){ c.fillStyle = `rgba(34,38,78,${haze})`; c.fillRect(bx, top, bw, bh + 1); }
     });
   }
   function drawSky(top, bottom, moonA, moonY){
+    /* dégradé de ciel enrichi : voûte sombre → lueur d'horizon */
     const g = c.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, top); g.addColorStop(1, bottom);
+    g.addColorStop(0, top); g.addColorStop(.55, shade(bottom, .04)); g.addColorStop(1, bottom);
     c.fillStyle = g; c.fillRect(0, 0, W, H);
+    /* voile de la Voie lactée, oblique et diffus */
+    c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = moonA;
+    const mw = c.createLinearGradient(0, 0, W, H*.5);
+    mw.addColorStop(0, "rgba(80,90,160,0)"); mw.addColorStop(.5, "rgba(120,130,200,.05)"); mw.addColorStop(1, "rgba(80,90,160,0)");
+    c.fillStyle = mw; c.fillRect(0, 0, W, H*.6); c.restore();
+    /* étoiles de tailles variées qui scintillent */
     stars.forEach(s=>{
-      c.globalAlpha = (.3 + Math.sin(performance.now()/700 + s[3])*.25)*moonA;
-      c.fillStyle = "#dfe6ff"; c.fillRect(s[0]*W, s[1]*H, s[2], s[2]);
+      c.globalAlpha = (.25 + Math.sin(performance.now()/700 + s[3])*.28) * moonA;
+      c.fillStyle = s[2] > 1.6 ? "#fff" : "#cfe0ff";
+      c.fillRect(s[0]*W, s[1]*H, s[2], s[2]);
     });
     c.globalAlpha = moonA;
+    /* la lune : disque nacré + mers + halo (le bloom ajoute l'auréole) */
+    const mx = W*.74, my = H*(moonY != null ? moonY : .16), mr = Math.min(W,H)*.05;
     c.save();
-    c.shadowColor = "rgba(244,240,214,.9)"; c.shadowBlur = 30;
-    c.fillStyle = "#f4f0d6";
-    c.beginPath(); c.arc(W*.74, H*(moonY != null ? moonY : .16), Math.min(W,H)*.05, 0, 7); c.fill();
-    c.restore();
+    const halo = c.createRadialGradient(mx, my, mr*.4, mx, my, mr*4);
+    halo.addColorStop(0, "rgba(244,240,214,.35)"); halo.addColorStop(1, "rgba(244,240,214,0)");
+    c.globalCompositeOperation = "lighter"; c.fillStyle = halo;
+    c.beginPath(); c.arc(mx, my, mr*4, 0, 7); c.fill(); c.restore();
+    const mg = c.createRadialGradient(mx - mr*.3, my - mr*.3, mr*.2, mx, my, mr);
+    mg.addColorStop(0, "#fdfbe8"); mg.addColorStop(1, "#d9d3a8");
+    c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, 7); c.fill();
+    c.fillStyle = "rgba(180,175,140,.35)";
+    c.beginPath(); c.arc(mx + mr*.3, my - mr*.2, mr*.18, 0, 7); c.arc(mx - mr*.25, my + mr*.3, mr*.13, 0, 7);
+    c.arc(mx + mr*.1, my + mr*.35, mr*.1, 0, 7); c.fill();
     c.globalAlpha = 1;
   }
-  /* le personnage à capuche, vue de côté (face=1 → vers la droite) */
+  /* rectangle arrondi (tracé seul ; le caller remplit ou trace) */
+  function rrect(x, y, w, h, r){
+    r = Math.min(r, Math.abs(w)/2, Math.abs(h)/2);
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  /* le personnage à capuche, vue de côté — illustré : formes courbes,
+     dégradés, ombrage, plis, liseré. (face=1 → vers la droite) */
   function perso(x, y, s, pose, t, face){
     c.save(); c.translate(x, y); c.scale(s*(face||1), s);
+    c.lineJoin = "round"; c.lineCap = "round";
     /* index de la frame de marche : TOUJOURS 0–3 (t peut être négatif
        quand on dessine une traînée « t - décalage » — sinon l'index
        négatif renvoie une pose undefined et tout le rendu plante) */
@@ -5198,49 +5253,81 @@ const Cinematic = (()=>{
       walk: [ [[-5,13],[2,12]], [[-2,14],[0,14]], [[1,12],[-4,13]], [[-1,14],[-1,14]] ][P4],
       stand:[[-4,14],[2,14]], spray:[[-4,14],[2,14]],
     }[pose];
-    LEGS.forEach(([lx,lh])=>{
-      c.fillStyle = "#20204a"; c.fillRect(lx, -lh, 5, lh);
-      c.fillStyle = "#EDEDF7"; c.fillRect(lx-1, -3, 7, 3);
+    /* ── JAMBES : capsules ombrées + baskets à semelle blanche ── */
+    LEGS.forEach(([lx, lh], i)=>{
+      const lg = c.createLinearGradient(lx, 0, lx + 5, 0);
+      lg.addColorStop(0, "#191938"); lg.addColorStop(1, "#2e2e60");
+      c.fillStyle = lg; rrect(lx, -lh, 5, lh, 2.2); c.fill();
+      c.fillStyle = "#f2f2fa"; rrect(lx - 2, -3.5, 8, 4, 2); c.fill();       // basket
+      c.fillStyle = i % 2 ? "#2BE4D0" : "#ff3f8f"; c.fillRect(lx - 1, -3.2, 6, 1.4);
+      c.fillStyle = "rgba(0,0,0,.28)"; c.fillRect(lx - 2, -.2, 8, 1);        // ombre au sol
     });
-    for(let i=0;i<4;i++){                              // écharpe
-      c.fillStyle = `rgba(43,228,208,${.8 - i*.18})`;
-      c.fillRect(-11 - i*4, -34 + Math.sin(t*12 + i)*2.4, 4, 3);
-    }
-    c.fillStyle = "#d5155f"; c.fillRect(-13, -28, 6, 13);   // sac
-    c.fillStyle = "#2c2c5c"; c.fillRect(-8, -31, 16, 19);   // torse
-    c.fillStyle = "#2BE4D0"; c.fillRect(-1, -30, 2, 17);
-    if(pose === "spray"){                              // bras levé + bombe
+    /* ── ÉCHARPE qui flotte (ruban courbe + reflet) ── */
+    c.strokeStyle = "#2BE4D0"; c.lineWidth = 3.2;
+    c.beginPath(); c.moveTo(-6, -33);
+    for(let i=1;i<=4;i++) c.lineTo(-6 - i*4, -33 + Math.sin(t*10 + i)*3 + i*.5);
+    c.stroke();
+    c.strokeStyle = "rgba(255,255,255,.3)"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-6, -34); for(let i=1;i<=4;i++) c.lineTo(-6 - i*4, -34 + Math.sin(t*10 + i)*3 + i*.5); c.stroke();
+    /* ── SAC À DOS ── */
+    { const bg = c.createLinearGradient(-14, 0, -6, 0);
+      bg.addColorStop(0, "#9c0f4e"); bg.addColorStop(1, "#d5155f");
+      c.fillStyle = bg; rrect(-14, -30, 8, 16, 3); c.fill();
+      c.fillStyle = "rgba(255,255,255,.15)"; rrect(-13, -29, 2.4, 14, 1.5); c.fill();
+      c.fillStyle = "#141428"; rrect(-12, -33, 3, 7, 1); c.fill();          // bombe de rechange
+      c.fillStyle = "#FF2E88"; c.fillRect(-12, -31, 3, 1.6); }
+    /* ── TORSE / HOODIE : forme arrondie, dégradé, poche, zip, plis ── */
+    { const tg = c.createLinearGradient(0, -32, 0, -11);
+      tg.addColorStop(0, "#3c3c74"); tg.addColorStop(1, "#212148");
+      c.fillStyle = tg; rrect(-8, -32, 16, 21, 5); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.16)"; c.lineWidth = 1;                    // pli
+      c.beginPath(); c.moveTo(-4, -28); c.quadraticCurveTo(-1, -22, -3, -14); c.stroke();
+      c.fillStyle = "rgba(0,0,0,.2)"; rrect(-6, -20, 12, 7, 3); c.fill();    // poche kangourou
+      c.strokeStyle = "#2BE4D0"; c.lineWidth = 1.3;                          // zip
+      c.beginPath(); c.moveTo(0, -31); c.lineTo(0, -13); c.stroke();
+      c.strokeStyle = "rgba(180,220,255,.3)"; c.lineWidth = 1.4;             // liseré éclairé (rim)
+      c.beginPath(); c.moveTo(7, -30); c.quadraticCurveTo(9, -22, 7, -13); c.stroke(); }
+    /* ── BRAS / BOMBE ── */
+    if(pose === "spray"){
       const sh = Math.sin(t*9)*2;
-      c.fillStyle = "#252550"; c.fillRect(4, -34 + sh, 11, 4);
-      c.fillStyle = "#FFD23F"; c.fillRect(14, -38 + sh, 6, 9);
-      c.fillStyle = "#EDEDF7"; c.fillRect(15, -41 + sh, 4, 3);
-    }else{
+      c.strokeStyle = "#2a2a58"; c.lineWidth = 4.6;
+      c.beginPath(); c.moveTo(4, -28); c.lineTo(14, -34 + sh); c.stroke();
+      const cg = c.createLinearGradient(13, 0, 20, 0);
+      cg.addColorStop(0, "#5a5f7c"); cg.addColorStop(.5, "#c9cee6"); cg.addColorStop(1, "#5a5f7c");
+      c.fillStyle = cg; rrect(13, -40 + sh, 7, 11, 2); c.fill();
+      c.fillStyle = "#FFD23F"; c.fillRect(13, -33 + sh, 7, 3);
+      c.fillStyle = "#141428"; c.fillRect(15, -43 + sh, 3, 4);              // buse
+    } else {
       const ax = pose === "stand" ? 0 : [2,0,-2,0][P4];
-      c.fillStyle = "#252550"; c.fillRect(ax, -27, 4, 11);
-      c.fillStyle = "#FFD23F"; c.fillRect(ax+1, -17, 5, 7);
+      c.strokeStyle = "#2a2a58"; c.lineWidth = 4.6;
+      c.beginPath(); c.moveTo(2, -28); c.lineTo(ax + 3, -16); c.stroke();
+      c.fillStyle = "#e8b98a"; c.beginPath(); c.arc(ax + 3, -15, 2.3, 0, 7); c.fill();
     }
-    /* cordons de la capuche qui pendent et se balancent à la foulée */
+    /* ── TÊTE : capuche bézier + bonnet + visage ombré ── */
+    { const hg = c.createLinearGradient(0, -47, 0, -30);
+      hg.addColorStop(0, "#3c3c74"); hg.addColorStop(1, "#25254c");
+      c.fillStyle = hg; c.beginPath();
+      c.moveTo(-7, -30); c.quadraticCurveTo(-9, -47, 2, -48);
+      c.quadraticCurveTo(11, -47, 9, -33); c.quadraticCurveTo(4, -30, -7, -30); c.closePath(); c.fill();
+      c.fillStyle = "rgba(0,0,0,.32)"; c.beginPath(); c.ellipse(3.5, -38, 4.6, 6, 0, 0, 7); c.fill(); }  // ombre interne
+    { const fg = c.createLinearGradient(0, -42, 0, -32);
+      fg.addColorStop(0, "#eabb8c"); fg.addColorStop(1, "#b9895f");
+      c.fillStyle = fg; c.beginPath(); c.ellipse(4.2, -37, 3, 4.2, 0, 0, 7); c.fill(); }
+    c.fillStyle = "#0B0B1E"; c.beginPath(); c.arc(5.6, -38, 1.1, 0, 7); c.fill();     // œil
+    c.fillStyle = "rgba(255,255,255,.5)"; c.fillRect(5.4, -38.6, .7, .7);             // étincelle de l'œil
+    /* bonnet + pompon */
+    c.fillStyle = "#1c3f5a"; rrect(-4, -47, 11, 5, 2); c.fill();
+    c.fillStyle = "#2f6a8a"; c.fillRect(-4, -43.5, 11, 1.4);
+    c.fillStyle = "#8fd0ff"; c.beginPath(); c.arc(2, -49, 2, 0, 7); c.fill();
+    /* cordons de capuche */
     { const sw = Math.sin(t*(pose==="run"?9:5))*1.5;
-      c.strokeStyle = "#1a1a3a"; c.lineWidth = 1.2;
-      c.beginPath(); c.moveTo(-2, -30); c.lineTo(-3 + sw, -22); c.moveTo(1, -30); c.lineTo(2 + sw, -22); c.stroke();
-      c.fillStyle = "#EDEDF7"; c.fillRect(-4 + sw, -22, 2, 2); c.fillRect(1 + sw, -22, 2, 2); }
-    /* une bombe de rechange glissée dans le sac */
-    c.fillStyle = "#141428"; c.fillRect(-12, -33, 3, 7);
-    c.fillStyle = "#FF2E88"; c.fillRect(-12, -30, 3, 2);
-    c.fillStyle = "#2c2c5c"; c.fillRect(-6, -43, 14, 13);   // capuche
-    c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(-6, -43, 14, 2);
-    /* bonnet sous la capuche + pompon */
-    c.fillStyle = "#1c3f5a"; c.fillRect(-5, -45, 12, 4);
-    c.fillStyle = "#8fd0ff"; c.fillRect(0, -48, 3, 3);
-    c.fillStyle = "#e8b98a"; c.fillRect(3, -40, 5, 8);      // visage
-    c.fillStyle = "#0B0B1E"; c.fillRect(6, -38, 2, 2);      // œil
-    /* buée de la respiration dans le froid, par bouffées */
+      c.strokeStyle = "#e8f0ff"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(-1, -31); c.lineTo(-2 + sw, -23); c.moveTo(2, -31); c.lineTo(3 + sw, -23); c.stroke();
+      c.fillStyle = "#EDEDF7"; c.beginPath(); c.arc(-2 + sw, -23, 1, 0, 7); c.arc(3 + sw, -23, 1, 0, 7); c.fill(); }
+    /* buée de la respiration */
     if(pose !== "run"){ const br = (t % 2.5)/2.5;
-      if(br < .6){ c.save(); c.globalCompositeOperation = "lighter";
-        c.globalAlpha = (.6 - br)*.5; c.fillStyle = "#cfe0ff";
-        c.beginPath(); c.arc(10 + br*8, -37, 2 + br*4, 0, 7); c.fill(); c.restore(); c.globalAlpha = 1; } }
-    /* liseré cyan qui capte la lumière (relief) */
-    c.fillStyle = "rgba(143,208,255,.18)"; c.fillRect(-8, -31, 2, 19);
+      if(br < .6){ c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = (.6 - br)*.5;
+        c.fillStyle = "#cfe0ff"; c.beginPath(); c.arc(9 + br*8, -36, 2 + br*4, 0, 7); c.fill(); c.restore(); c.globalAlpha = 1; } }
     c.restore();
   }
   /* une mosaïque : n premières tesselles de la forme */
@@ -6016,8 +6103,8 @@ const Cinematic = (()=>{
         c.beginPath(); c.ellipse(rsx, ry, 16, 4, 0, 0, 7); c.fill(); c.restore(); c.globalAlpha = 1;
         /* traînée de vitesse derrière lui (échos fantômes) */
         c.save(); c.globalCompositeOperation = "lighter";
-        for(let i=1;i<=5;i++){ c.globalAlpha = .13/i;
-          perso(rsx - i*11, ry - hop, scl, "run", t - i*.03, 1); }
+        for(let i=1;i<=3;i++){ c.globalAlpha = .13/i;
+          perso(rsx - i*12, ry - hop, scl, "run", t - i*.03, 1); }
         c.restore(); c.globalAlpha = 1;
         perso(rsx, ry - hop, scl, "run", t, 1);
         if(t > 1.5) once("cavaleWhoosh", ()=>AudioFX.whoosh && AudioFX.whoosh());
@@ -13242,7 +13329,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v83</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v84</p>`);
     wire();
   }
   function wire(){

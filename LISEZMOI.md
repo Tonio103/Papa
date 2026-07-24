@@ -54,6 +54,25 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v84) — de vrais graphismes (ville & personnage illustrés)
+
+Passe « fidélité » sur les deux éléments qu'on voit le plus dans la cinématique :
+
+- **La ville** ne fait plus « rectangles plats » : façades **dégradées** éclairées
+  par la lune (arête droite claire, gauche à l'ombre), **parapets**, **châteaux
+  d'eau**, **clim'** et **antennes** avec **feux rouges** d'obstacle, fenêtres
+  **allumées** chaudes ou cyan qui **rayonnent** (bloom) et fenêtres éteintes qui
+  reflètent le ciel, plus un **voile de brume** pour la profondeur. Le ciel gagne
+  une **Voie lactée** diffuse et une **lune nacrée** avec ses mers et son halo.
+- **Le personnage** passe du bloc à l'**illustration** : capuche **courbe**
+  (bézier) avec ombre interne, visage **ombré** dans la capuche (œil + étincelle),
+  hoodie **dégradé** avec zip, poche kangourou et **plis**, écharpe **ruban** qui
+  flotte, sac à dos arrondi, **baskets** à semelle blanche, liseré lumineux.
+
+Style « indie illustré » (à la Alto's Odyssey), toujours 100 % procédural (aucune
+image externe → le jeu reste hors-ligne). Testé de bout en bout, zéro erreur.
+sw v83→v84.
+
 ## Nouveautés (v83) — la cinématique d'intro, version « cinéma »
 
 Grosse refonte de l'intro pour qu'elle soit digne d'un film :
