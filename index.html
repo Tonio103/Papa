@@ -4618,7 +4618,11 @@ function checkFinal(){
     }, reduced ? 0 : 150*cells.length + 100);
     /* …mais le cadenas ne suffit pas : l'ultime pièce, c'est LUI */
     setTimeout(()=>{
-      SelfieFinal.start(()=>{ S.won = true; persist(); victory(); });
+      SelfieFinal.start(()=>{ S.won = true; persist();
+        /* le grand payoff : la cinématique de FIN, puis l'écran de victoire */
+        if(typeof Cinematic !== "undefined" && Cinematic.playEnd) Cinematic.playEnd(()=>victory());
+        else victory();
+      });
     }, reduced ? 400 : 150*cells.length + 1200);
   }else{
     AudioFX.err();
@@ -5118,6 +5122,7 @@ const Cinematic = (()=>{
   let rain = [], grainTile = null, curLine = "", drips = [], sparks = [];
   let bloomCv = null, bloomCtx = null, canFilter = false;   // étage de post-traitement (bloom)
   let wallTile = null;                                       // texture de brique pré-rendue
+  let curScenes = null, curTotal = 0, curGrades = null;      // séquence en cours (intro OU fin)
   const fired = {};
   const once = (k, fn)=>{ if(!fired[k]){ fired[k] = true; fn(); } };
   const ease = k=>k*k*(3-2*k);
@@ -6622,6 +6627,1219 @@ const Cinematic = (()=>{
     ["#8fd0ff","#141640","#bcd0ff"], ["#39e08a","#020a06","#39e08a"],   // constellation, radar
     ["#FFD23F","#04040e","#FF2E88"],                                    // final
   ];
+
+  /* ══════════════════════════════════════════════════════════════
+     CINÉMATIQUE DE FIN — le grand payoff.
+     Papa a retrouvé les 8 pièces, il a scellé son selfie doré : on
+     lui raconte alors QUI se cachait derrière l'invader. Treize
+     plans, du soir à l'aube, qui rembobinent toute la chasse et
+     finissent sur le cadeau qui l'attend pour de vrai.
+     Tout est peint au canevas — zéro image, ça marche hors-ligne.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ─── petite boîte à outils propre à la fin ─────────────────── */
+
+  /* une mosaïque centrée sur (0,0) — les sprites ne font pas tous 8 de
+     large, donc un -cs*4 en dur les décale. Ici on mesure la forme. */
+  function mosaicMid(shapeName, col, cs, n){
+    const sh = SHAPES[shapeName]; if(!sh) return;
+    mosaic(shapeName, col, -sh[0].length*cs/2, -sh.length*cs/2, cs, n == null ? 999 : n);
+  }
+
+  /* halo doux (utilisé partout : lampions, pièces, bougies…) */
+  function glowDot(x, y, r, col, a){
+    c.save(); c.globalCompositeOperation = "lighter";
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, hexA(col, a)); g.addColorStop(.45, hexA(col, a*.35)); g.addColorStop(1, hexA(col, 0));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.restore();
+  }
+
+  /* gerbe d'étincelles rondes autour d'un point */
+  function sparkleBurst(x, y, r, a, col, n, t, seed){
+    if(a <= 0) return;
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i=0;i<n;i++){
+      const ang = i/n*Math.PI*2 + (seed||0) + t*.25;
+      const rr = r*(.55 + ((i*37)%13)/13*.6);
+      const px = x + Math.cos(ang)*rr, py = y + Math.sin(ang)*rr;
+      const tw = .5 + Math.sin(t*5 + i*1.7)*.5;
+      c.fillStyle = hexA(col, a*tw*.9);
+      c.beginPath(); c.arc(px, py, 1.1 + tw*1.3, 0, 7); c.fill();
+      /* petite croix scintillante sur les plus brillantes */
+      if(tw > .8){ c.strokeStyle = hexA(col, a*.5); c.lineWidth = .8;
+        c.beginPath(); c.moveTo(px-4, py); c.lineTo(px+4, py); c.moveTo(px, py-4); c.lineTo(px, py+4); c.stroke(); }
+    }
+    c.restore();
+  }
+
+  /* rais de lumière en éventail depuis un point (contre-jour / aube) */
+  function sunBurst(cx, cy, q, t, col, n, spread, base){
+    if(q <= 0) return;
+    c.save(); c.globalCompositeOperation = "lighter";
+    n = n || 7; spread = spread || .3; base = base == null ? -1.9 : base;
+    for(let i=0;i<n;i++){
+      const a = base + i*spread + Math.sin(t*.3 + i)*.012;
+      const wob = .018 + Math.abs(Math.sin(t*.6 + i*1.9))*.016;
+      const g = c.createLinearGradient(cx, cy, cx + Math.cos(a)*H, cy + Math.sin(a)*H);
+      g.addColorStop(0, hexA(col || "#ffc882", .075*q)); g.addColorStop(1, hexA(col || "#ffc882", 0));
+      c.fillStyle = g; c.beginPath(); c.moveTo(cx, cy);
+      c.lineTo(cx + Math.cos(a - wob)*H*1.5, cy + Math.sin(a - wob)*H*1.5);
+      c.lineTo(cx + Math.cos(a + wob)*H*1.5, cy + Math.sin(a + wob)*H*1.5);
+      c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  /* texte qui s'écrit de gauche à droite (révélé par un clip) */
+  function handwrite(txt, x, y, size, col, prog, ang, italic){
+    const k = clamp01(prog); if(k <= 0) return;
+    c.save(); c.translate(x, y); c.rotate(ang || 0); c.textAlign = "center";
+    c.font = `${italic ? "italic " : ""}900 ${Math.round(size)}px 'Baloo 2', sans-serif`;
+    const w = c.measureText(txt).width;
+    c.beginPath(); c.rect(-w/2 - 8, -size*1.2, w*k + 14, size*2.4); c.clip();
+    c.shadowColor = col; c.shadowBlur = size*.4; c.fillStyle = col;
+    c.fillText(txt, 0, 0);
+    c.restore(); c.textAlign = "left";
+  }
+
+  /* texte « tamponné » au pochoir : il arrive en écrasant l'écran */
+  function stampText(txt, x, y, size, col, k, ang){
+    if(k <= 0) return;
+    c.save(); c.globalAlpha = clamp01(k); c.textAlign = "center";
+    c.translate(x, y); c.rotate(ang || 0);
+    const sc = 1 + (1 - clamp01(k))*1.1; c.scale(sc, sc);
+    c.font = `900 ${Math.round(size)}px 'Baloo 2', sans-serif`;
+    c.shadowColor = hexA(col, .8); c.shadowBlur = size*.45;
+    c.fillStyle = col; c.fillText(txt, 0, 0);
+    /* léger décalage « mal imprimé » pour l'effet pochoir */
+    c.globalAlpha = clamp01(k)*.22; c.shadowBlur = 0; c.fillStyle = "#0b0b1e";
+    c.fillText(txt, 1.5, 1.5);
+    c.restore(); c.textAlign = "left"; c.globalAlpha = 1;
+  }
+
+  /* ─── LES DEUX PERSONNAGES DE LA FIN ────────────────────────── */
+
+  /* L'ARTISTE de dos, qui ABAISSE sa capuche : la révélation.
+     Rétro-éclairé par l'aube, donc on ne voit jamais son visage —
+     seulement la nuque, la masse des cheveux et un liseré chaud.
+     `open` : 0 = capuche relevée · 1 = capuche tombée sur les épaules. */
+  function revealFigure(x, y, s, t, open){
+    const K = clamp01(open);
+    const reach = Math.sin(Math.PI*K);           // les bras montent puis redescendent
+    const br = Math.sin(t*1.5)*.45;              // respiration
+    const RIM = a => `rgba(255,206,140,${a})`;
+    c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = "round"; c.lineCap = "round";
+
+    /* ombre portée au sol */
+    c.fillStyle = "rgba(0,0,0,.4)";
+    c.beginPath(); c.ellipse(0, 1.5, 14, 3.2, 0, 0, 7); c.fill();
+
+    /* ── JAMBES (de dos, jointes, poids sur la jambe gauche) ── */
+    [[-6, 15.5], [1.6, 15]].forEach(([lx, lh], i)=>{
+      const lg = c.createLinearGradient(lx, 0, lx + 4.8, 0);
+      lg.addColorStop(0, "#08061a"); lg.addColorStop(.7, "#0f0c26"); lg.addColorStop(1, "#171334");
+      c.fillStyle = lg; rrect(lx, -lh, 4.8, lh, 2.2); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = .7;      // couture du jean
+      c.beginPath(); c.moveTo(lx + 2.4, -lh + 2); c.lineTo(lx + 2.4, -4); c.stroke();
+      c.fillStyle = "#2a2842"; rrect(lx - 1.4, -3.8, 7.2, 4, 1.9); c.fill();     // basket vue de dos
+      c.fillStyle = i % 2 ? "#2BE4D0" : "#ff3f8f"; c.fillRect(lx - .9, -3.4, 6, 1.2);
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(lx - 1.4, -.4, 7.2, 1);
+      c.strokeStyle = RIM(.28); c.lineWidth = 1;                                  // liseré latéral
+      c.beginPath(); c.moveTo(lx + (i ? 4.8 : 0), -lh + 2); c.lineTo(lx + (i ? 4.8 : 0), -5); c.stroke();
+    });
+
+    /* ── TORSE : hoodie vu de dos (épaules larges, taille resserrée) ── */
+    { const tg = c.createLinearGradient(0, -35, 0, -13);
+      tg.addColorStop(0, "#171232"); tg.addColorStop(.5, "#100c24"); tg.addColorStop(1, "#080618");
+      c.fillStyle = tg;
+      c.beginPath();
+      c.moveTo(-9.6, -14);
+      c.quadraticCurveTo(-11.2, -26, -10.4, -31.5 + br*.3);
+      c.quadraticCurveTo(-6, -35.2 + br*.3, 0, -35.4 + br*.3);
+      c.quadraticCurveTo(6, -35.2 + br*.3, 10.4, -31.5 + br*.3);
+      c.quadraticCurveTo(11.2, -26, 9.6, -14);
+      c.quadraticCurveTo(0, -12, -9.6, -14); c.closePath(); c.fill();
+      /* plis du tissu dans le dos */
+      c.strokeStyle = "rgba(0,0,0,.2)"; c.lineWidth = .9;
+      c.beginPath(); c.moveTo(-4.5, -31); c.quadraticCurveTo(-2.5, -24, -4, -16); c.stroke();
+      c.beginPath(); c.moveTo(4.5, -31); c.quadraticCurveTo(2.5, -24, 4, -16); c.stroke();
+      /* ourlet du bas */
+      c.fillStyle = "rgba(0,0,0,.3)"; rrect(-9.6, -16.5, 19.2, 3.2, 1.4); c.fill();
+      /* liseré de contre-jour sur toute la silhouette */
+      c.strokeStyle = RIM(.5); c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(-10.2, -20);
+      c.quadraticCurveTo(-10.6, -31, 0, -35.2 + br*.3);
+      c.quadraticCurveTo(10.6, -31, 10.2, -20); c.stroke();
+      /* un petit invader brodé dans le dos (clin d'œil) */
+      c.globalAlpha = .5; mosaic("squid", "#2BE4D0", -3.4, -28, .85, 999); c.globalAlpha = 1; }
+
+    /* ── BRAS : le long du corps, puis levés vers la capuche ── */
+    [-1, 1].forEach(sd=>{
+      const sx = sd*8.6, sy = -32 + br*.3;
+      const hx = sd*(8.4 - reach*3.6), hy = -17 + reach*(-21);
+      const ex = sd*(11.4 - reach*1.4), ey = -24.5 - reach*5;
+      c.strokeStyle = "#0c0920"; c.lineWidth = 4.6;
+      c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(ex, ey, hx, hy); c.stroke();
+      c.strokeStyle = RIM(.34 + reach*.3); c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(sx + sd*1.7, sy); c.quadraticCurveTo(ex + sd*1.6, ey, hx + sd*1.2, hy); c.stroke();
+      c.fillStyle = "#3a2a38"; c.beginPath(); c.arc(hx, hy, 2.2, 0, 7); c.fill();    // main (à contre-jour)
+      c.fillStyle = "rgba(0,0,0,.18)"; c.beginPath(); c.arc(hx - sd*.7, hy + .6, 1.4, 0, 7); c.fill();
+    });
+
+    /* ── TÊTE (apparaît quand la capuche descend) ── */
+    const ha = clamp01((K - .12)/.45);
+    if(ha > 0){
+      c.save(); c.globalAlpha = ha;
+      /* nuque */
+      c.fillStyle = "#3d2c34"; rrect(-2.7, -37.5, 5.4, 5, 2.2); c.fill();
+      c.fillStyle = "rgba(0,0,0,.25)"; rrect(-2.7, -33.6, 5.4, 1.6, .8); c.fill();
+      /* crâne */
+      c.fillStyle = "#0d0a1e"; c.beginPath(); c.ellipse(0, -42.5 + br*.3, 6.3, 7.3, 0, 0, 7); c.fill();
+      /* masse de cheveux vue de dos */
+      c.fillStyle = "#070512"; c.beginPath();
+      c.moveTo(-6.3, -40.5 + br*.3);
+      c.quadraticCurveTo(-6.9, -50.4 + br*.3, 0, -50.6 + br*.3);
+      c.quadraticCurveTo(6.9, -50.4 + br*.3, 6.3, -40.5 + br*.3);
+      c.quadraticCurveTo(3.4, -36.4 + br*.3, 0, -37 + br*.3);
+      c.quadraticCurveTo(-3.4, -36.4 + br*.3, -6.3, -40.5 + br*.3);
+      c.closePath(); c.fill();
+      /* mèches, prises dans la lumière */
+      c.strokeStyle = RIM(.1); c.lineWidth = .7;
+      for(let i=0;i<4;i++){
+        c.beginPath(); c.moveTo(-3.6 + i*2.4, -49.6 + br*.3);
+        c.quadraticCurveTo(-4.6 + i*2.8, -46 + br*.3, -3.2 + i*2.5, -42.4 + br*.3); c.stroke();
+      }
+      /* oreilles, translucides à contre-jour */
+      c.fillStyle = "#5a3a3a";
+      c.beginPath(); c.ellipse(-6.2, -41.6 + br*.3, 1.5, 2.2, -.1, 0, 7); c.fill();
+      c.beginPath(); c.ellipse( 6.2, -41.6 + br*.3, 1.5, 2.2,  .1, 0, 7); c.fill();
+      /* LISERÉ : le contour entier repris par le soleil derrière lui */
+      c.strokeStyle = RIM(.95); c.lineWidth = 1.7;
+      c.beginPath(); c.ellipse(0, -43 + br*.3, 6.9, 7.9, 0, -Math.PI + .35, .35); c.stroke();
+      c.strokeStyle = RIM(.35); c.lineWidth = 1;
+      c.beginPath(); c.ellipse(0, -43 + br*.3, 7.1, 8.1, 0, .35, Math.PI - .35); c.stroke();
+      c.restore(); c.globalAlpha = 1;
+    }
+
+    /* ── CAPUCHE : relevée (K=0) → tombée en collier (K=1) ── */
+    if(K < 1){
+      const drop = K*17;
+      c.save(); c.globalAlpha = 1 - K*.85;
+      const hg = c.createLinearGradient(0, -52 + drop, 0, -30 + drop);
+      hg.addColorStop(0, "#141032"); hg.addColorStop(1, "#080618");
+      c.fillStyle = hg; c.beginPath();
+      c.moveTo(-10.4, -30 + drop);
+      c.quadraticCurveTo(-12.4, -50 + drop*1.25, 0, -52 + drop*1.15);
+      c.quadraticCurveTo(12.4, -50 + drop*1.25, 10.4, -30 + drop);
+      c.quadraticCurveTo(0, -25.5 + drop*.45, -10.4, -30 + drop);
+      c.closePath(); c.fill();
+      c.strokeStyle = RIM(.55); c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(-10.9, -34 + drop);
+      c.quadraticCurveTo(-12.2, -49.4 + drop*1.25, 0, -51.4 + drop*1.15);
+      c.quadraticCurveTo(12.2, -49.4 + drop*1.25, 10.9, -34 + drop); c.stroke();
+      c.restore(); c.globalAlpha = 1;
+    }
+    if(K > .15){
+      /* le collier de tissu bouchonné dans le cou */
+      c.save(); c.globalAlpha = clamp01((K - .15)/.4);
+      c.fillStyle = "#100c26";
+      c.beginPath();
+      c.moveTo(-10.8, -31.6); c.quadraticCurveTo(-8, -26.4, 0, -26);
+      c.quadraticCurveTo(8, -26.4, 10.8, -31.6);
+      c.quadraticCurveTo(5, -34.4, 0, -34.2); c.quadraticCurveTo(-5, -34.4, -10.8, -31.6);
+      c.closePath(); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.28)"; c.lineWidth = .8;   // trois plis
+      [-5, 0, 5].forEach(fx=>{ c.beginPath(); c.moveTo(fx, -33.4); c.lineTo(fx + 1, -27); c.stroke(); });
+      c.strokeStyle = RIM(.45); c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(-10.8, -31.6); c.quadraticCurveTo(0, -34.6, 10.8, -31.6); c.stroke();
+      c.restore(); c.globalAlpha = 1;
+    }
+
+    /* ── ÉCHARPE : un ruban fin qui retombe le long du dos et ondule ── */
+    { c.save(); c.lineCap = "round";
+      const pts = [];
+      for(let i=0;i<=6;i++){
+        const u = i/6;
+        pts.push([-11.6 - u*7.4 - Math.sin(t*1.9 + u*2.4)*1.8*u,
+                  -31 + u*19 + Math.sin(t*2.6 + u*3.1)*2.4*u]);
+      }
+      c.strokeStyle = "#0d2e34"; c.lineWidth = 2.4; c.beginPath();
+      pts.forEach(([px, py], i)=> i ? c.lineTo(px, py) : c.moveTo(px, py)); c.stroke();
+      c.strokeStyle = "rgba(43,228,208,.75)"; c.lineWidth = .9; c.beginPath();
+      pts.forEach(([px, py], i)=> i ? c.lineTo(px - .8, py - .8) : c.moveTo(px - .8, py - .8)); c.stroke();
+      c.restore(); }
+
+    /* ── SAC À DOS : sombre, on ne le devine qu'au liseré ── */
+    { c.save();
+      c.fillStyle = "#0a0716"; rrect(-5.4, -29, 10.8, 12, 3); c.fill();
+      c.strokeStyle = RIM(.3); c.lineWidth = .9;
+      c.beginPath(); c.moveTo(-5.4, -23.5); c.lineTo(5.4, -23.5); c.stroke();
+      c.strokeStyle = RIM(.4); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(5.4, -27); c.lineTo(5.4, -19.5); c.stroke();
+      c.fillStyle = "#0b0818"; rrect(3, -33.5, 2.8, 6, 1.1); c.fill();      // bombe qui dépasse
+      c.fillStyle = "rgba(255,210,63,.55)"; c.fillRect(3, -31.8, 2.8, 1.2);
+      c.restore(); }
+    c.restore();
+  }
+
+  /* PAPA de dos : plus large d'épaules, casquette, veste ouverte,
+     les mains dans les poches. On le reconnaît à sa carrure. */
+  function papaFigure(x, y, s, t, pose, face){
+    const br = Math.sin(t*1.3 + 1)*.5;
+    const RIM = a => `rgba(255,214,150,${a})`;
+    c.save(); c.translate(x, y); c.scale(s*(face || 1), s); c.lineJoin = "round"; c.lineCap = "round";
+    c.fillStyle = "rgba(0,0,0,.4)"; c.beginPath(); c.ellipse(0, 1.6, 15, 3.4, 0, 0, 7); c.fill();
+    /* jambes */
+    [[-7, 16], [2, 16]].forEach(([lx, lh], i)=>{
+      const lg = c.createLinearGradient(lx, 0, lx + 5.4, 0);
+      lg.addColorStop(0, "#090a18"); lg.addColorStop(1, "#15172a");
+      c.fillStyle = lg; rrect(lx, -lh, 5.4, lh, 2.4); c.fill();
+      c.fillStyle = "#170f0c"; rrect(lx - 1.6, -3.6, 8, 3.8, 1.6); c.fill();   // chaussures de marche
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(lx - 1.6, -.4, 8, 1);
+    });
+    /* torse : veste ample, épaules carrées */
+    { const tg = c.createLinearGradient(0, -37, 0, -14);
+      tg.addColorStop(0, "#161d2c"); tg.addColorStop(.55, "#0f141f"); tg.addColorStop(1, "#080b12");
+      c.fillStyle = tg; c.beginPath();
+      c.moveTo(-11, -15);
+      c.quadraticCurveTo(-12.6, -28, -11.6, -33.5 + br*.3);
+      c.lineTo(-8, -36.4 + br*.3); c.quadraticCurveTo(0, -37.6 + br*.3, 8, -36.4 + br*.3);
+      c.lineTo(11.6, -33.5 + br*.3); c.quadraticCurveTo(12.6, -28, 11, -15);
+      c.quadraticCurveTo(0, -13, -11, -15); c.closePath(); c.fill();
+      /* couture centrale + poches */
+      c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(0, -35.5); c.lineTo(0, -15); c.stroke();
+      c.fillStyle = "rgba(0,0,0,.22)"; rrect(-9, -24, 6, 5, 1.6); c.fill(); rrect(3, -24, 6, 5, 1.6); c.fill();
+      /* col relevé */
+      c.fillStyle = "#1c2432"; c.beginPath();
+      c.moveTo(-6.5, -36.2); c.quadraticCurveTo(0, -39.4, 6.5, -36.2);
+      c.quadraticCurveTo(0, -34.4, -6.5, -36.2); c.closePath(); c.fill();
+      c.strokeStyle = RIM(.45); c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(-11.8, -22); c.quadraticCurveTo(-11.4, -34, 0, -37.4 + br*.3);
+      c.quadraticCurveTo(11.4, -34, 11.8, -22); c.stroke(); }
+    /* bras : mains dans les poches (ou une main levée si pose="point") */
+    [-1, 1].forEach(sd=>{
+      const up = (pose === "point" && sd > 0) ? 1 : 0;
+      const sx = sd*10, sy = -33 + br*.3;
+      const hx = sd*(8 + up*10), hy = -20 - up*18;
+      c.strokeStyle = "#0c1018"; c.lineWidth = 5;
+      c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(sd*12.6, -26 - up*4, hx, hy); c.stroke();
+      c.strokeStyle = RIM(.3); c.lineWidth = 1.1;
+      c.beginPath(); c.moveTo(sx + sd*1.8, sy); c.quadraticCurveTo(sd*13.6, -26 - up*4, hx + sd*1.2, hy); c.stroke();
+      if(up){ c.fillStyle = "#3a2c30"; c.beginPath(); c.arc(hx, hy, 2.3, 0, 7); c.fill();
+        c.strokeStyle = RIM(.7); c.lineWidth = .9; c.beginPath(); c.arc(hx, hy, 2.5, -2.4, .5); c.stroke(); }
+    });
+    /* tête + casquette */
+    c.fillStyle = "#3a2c30"; rrect(-2.8, -40, 5.6, 5, 2.2); c.fill();               // nuque
+    c.fillStyle = "#0b0916"; c.beginPath(); c.ellipse(0, -45 + br*.3, 6.4, 7, 0, 0, 7); c.fill();
+    c.fillStyle = "#2e3442"; c.beginPath();                                          // cheveux poivre & sel
+    c.moveTo(-6.4, -44 + br*.3); c.quadraticCurveTo(-6.6, -51 + br*.3, 0, -51.4 + br*.3);
+    c.quadraticCurveTo(6.6, -51 + br*.3, 6.4, -44 + br*.3);
+    c.quadraticCurveTo(0, -41.5 + br*.3, -6.4, -44 + br*.3); c.closePath(); c.fill();
+    c.fillStyle = "#131c28";                                                          // casquette
+    c.beginPath(); c.ellipse(0, -49.5 + br*.3, 6.8, 4.6, 0, Math.PI, 0); c.fill();
+    c.fillStyle = "#0d141d"; rrect(-6.8, -50 + br*.3, 13.6, 2.4, 1); c.fill();
+    c.fillStyle = "rgba(255,210,63,.6)"; c.beginPath(); c.arc(0, -53.4 + br*.3, 1.2, 0, 7); c.fill();   // bouton
+    c.strokeStyle = RIM(.85); c.lineWidth = 1.6;
+    c.beginPath(); c.ellipse(0, -46.5 + br*.3, 7.2, 8.2, 0, -Math.PI + .4, .4); c.stroke();
+    c.restore();
+  }
+
+  /* ─── ACCESSOIRES DE LA FIN ─────────────────────────────────── */
+
+  /* un POLAROID : cadre crème, photo peinte par un callback, scotch */
+  function polaroid(x, y, w, ang, a, inner, legend){
+    if(a <= 0) return;
+    const h = w*1.2, pad = w*.075, pw = w - pad*2, ph = h - pad*3.1;
+    c.save(); c.translate(x, y); c.rotate(ang || 0); c.globalAlpha = clamp01(a);
+    c.fillStyle = "rgba(0,0,0,.45)"; rrect(-w/2 + 2, -h/2 + 5, w, h, 3); c.fill();
+    const pg = c.createLinearGradient(0, -h/2, 0, h/2);
+    pg.addColorStop(0, "#f7f4e8"); pg.addColorStop(1, "#ddd7c4");
+    c.fillStyle = pg; rrect(-w/2, -h/2, w, h, 3); c.fill();
+    /* la photo */
+    c.save(); c.beginPath(); c.rect(-pw/2, -h/2 + pad, pw, ph); c.clip();
+    c.fillStyle = "#171334"; c.fillRect(-pw/2, -h/2 + pad, pw, ph);
+    c.save(); c.translate(0, -h/2 + pad + ph/2);
+    if(inner) inner(pw, ph);
+    c.restore();
+    /* voile chimique du polaroid */
+    const vg = c.createLinearGradient(-pw/2, -h/2, pw/2, -h/2 + ph);
+    vg.addColorStop(0, "rgba(255,190,120,.14)"); vg.addColorStop(1, "rgba(80,120,255,.10)");
+    c.fillStyle = vg; c.fillRect(-pw/2, -h/2 + pad, pw, ph);
+    c.restore();
+    /* légende manuscrite */
+    if(legend){ c.fillStyle = "#3a3450"; c.textAlign = "center";
+      c.font = `italic 700 ${Math.round(w*.11)}px 'Baloo 2', sans-serif`;
+      c.fillText(legend, 0, h/2 - pad*.6); c.textAlign = "left"; }
+    /* bout de scotch en haut */
+    c.fillStyle = "rgba(255,245,210,.35)";
+    c.save(); c.rotate(-.14); c.fillRect(-w*.2, -h/2 - w*.06, w*.4, w*.1); c.restore();
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* PELLICULE : une bande de film qui défile avec ses perforations */
+  function filmStrip(y, hgt, t, speed, a, frames){
+    c.save(); c.globalAlpha = clamp01(a);
+    c.fillStyle = "#0d0a1c"; c.fillRect(0, y, W, hgt);
+    c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(0, y, W, 1.5); c.fillRect(0, y + hgt - 1.5, W, 1.5);
+    const fw = hgt*1.34, off = -((t*speed*fw) % fw);
+    /* perforations */
+    c.fillStyle = "#1c1836";
+    for(let px = off; px < W + fw; px += fw*.25){
+      rrect(px, y + hgt*.06, fw*.09, hgt*.09, 1.2); c.fill();
+      rrect(px, y + hgt*.85, fw*.09, hgt*.09, 1.2); c.fill();
+    }
+    /* les vignettes */
+    let i = 0;
+    for(let px = off; px < W + fw; px += fw, i++){
+      const fx = px + fw*.05, fy = y + hgt*.2, fwi = fw*.9, fhi = hgt*.6;
+      c.save(); c.beginPath(); c.rect(fx, fy, fwi, fhi); c.clip();
+      const idx = Math.abs(Math.round((px - off)/fw) + i) % 8;
+      const st = CONFIG.stations[idx] || CONFIG.stations[0];
+      const g = c.createLinearGradient(fx, fy, fx, fy + fhi);
+      g.addColorStop(0, "#241d4a"); g.addColorStop(1, "#120f28");
+      c.fillStyle = g; c.fillRect(fx, fy, fwi, fhi);
+      if(frames) frames(idx, fx, fy, fwi, fhi);
+      else { const cs = fhi*.09;
+        c.save(); c.globalAlpha = .85; c.translate(fx + fwi/2, fy + fhi/2);
+        mosaicMid(st.sprite, st.couleur, cs); c.restore(); c.globalAlpha = 1; }
+      c.restore();
+      c.strokeStyle = "rgba(0,0,0,.5)"; c.lineWidth = 1; c.strokeRect(fx, fy, fwi, fhi);
+    }
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* CARTE DES VANS dessinée à la main : rivière, routes, 8 repères
+     reliés par un itinéraire qui se trace (prog = 0→1) */
+  function mapLesVans(cx, cy, s, prog, t){
+    c.save(); c.translate(cx, cy); c.scale(s, s);
+    /* parchemin */
+    const pg = c.createLinearGradient(0, -110, 0, 110);
+    pg.addColorStop(0, "#e8dcbd"); pg.addColorStop(.5, "#dfd0ac"); pg.addColorStop(1, "#cdbc95");
+    c.fillStyle = pg; rrect(-120, -110, 240, 220, 6); c.fill();
+    /* bords brûlés / usés */
+    c.strokeStyle = "rgba(90,64,36,.5)"; c.lineWidth = 2.5; rrect(-120, -110, 240, 220, 6); c.stroke();
+    c.save(); c.beginPath(); c.rect(-120, -110, 240, 220); c.clip();
+    const eg = c.createRadialGradient(0, 0, 60, 0, 0, 190);
+    eg.addColorStop(0, "rgba(90,60,30,0)"); eg.addColorStop(1, "rgba(70,44,20,.55)");
+    c.fillStyle = eg; c.fillRect(-120, -110, 240, 220);
+    /* quadrillage léger */
+    c.strokeStyle = "rgba(120,92,58,.16)"; c.lineWidth = .8;
+    for(let g = -100; g <= 100; g += 25){
+      c.beginPath(); c.moveTo(g, -110); c.lineTo(g, 110); c.stroke();
+      c.beginPath(); c.moveTo(-120, g); c.lineTo(120, g); c.stroke();
+    }
+    /* le Chassezac : une rivière bleue qui serpente */
+    c.strokeStyle = "rgba(70,130,170,.55)"; c.lineWidth = 7; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(-120, 46);
+    c.bezierCurveTo(-60, 22, -30, 74, 12, 50);
+    c.bezierCurveTo(52, 28, 74, 68, 120, 44); c.stroke();
+    c.strokeStyle = "rgba(150,205,235,.4)"; c.lineWidth = 2.4;
+    c.beginPath(); c.moveTo(-120, 44);
+    c.bezierCurveTo(-60, 20, -30, 72, 12, 48);
+    c.bezierCurveTo(52, 26, 74, 66, 120, 42); c.stroke();
+    /* routes */
+    c.strokeStyle = "rgba(120,86,52,.45)"; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(-120, -34); c.quadraticCurveTo(-10, -58, 120, -18); c.stroke();
+    c.beginPath(); c.moveTo(-46, -110); c.quadraticCurveTo(-24, 0, -60, 110); c.stroke();
+    c.beginPath(); c.moveTo(48, -110); c.quadraticCurveTo(70, -10, 44, 110); c.stroke();
+    /* pâtés de maisons */
+    c.fillStyle = "rgba(120,92,58,.22)";
+    [[-92,-72,26,18],[-58,-84,20,14],[-14,-70,30,20],[24,-88,18,16],[62,-64,24,18],
+     [-96,-6,22,16],[-52,-16,26,18],[-6,-4,20,14],[34,-16,26,20],[76,-2,20,16],
+     [-84,72,24,18],[-30,84,28,16],[22,74,22,18],[70,86,24,14]].forEach(([bx,by,bw,bh])=>{
+      c.fillRect(bx, by, bw, bh);
+      c.strokeStyle = "rgba(90,64,36,.28)"; c.lineWidth = .8; c.strokeRect(bx, by, bw, bh);
+    });
+    /* rose des vents */
+    c.save(); c.translate(88, -84); c.strokeStyle = "rgba(90,64,36,.6)"; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(0, 0, 14, 0, 7); c.stroke();
+    c.fillStyle = "rgba(90,64,36,.7)";
+    c.beginPath(); c.moveTo(0, -15); c.lineTo(3.4, 0); c.lineTo(-3.4, 0); c.closePath(); c.fill();
+    c.globalAlpha = .5; c.beginPath(); c.moveTo(0, 15); c.lineTo(3.4, 0); c.lineTo(-3.4, 0); c.closePath(); c.fill();
+    c.globalAlpha = 1;
+    c.fillStyle = "rgba(70,48,26,.8)"; c.textAlign = "center";
+    c.font = "900 9px 'Baloo 2', sans-serif"; c.fillText("N", 0, -17);
+    c.textAlign = "left"; c.restore();
+    /* titre du plan */
+    c.fillStyle = "rgba(70,48,26,.8)"; c.textAlign = "center";
+    c.font = "900 15px 'Baloo 2', sans-serif"; c.fillText("LES VANS", 0, -92);
+    c.font = "italic 700 8px 'Baloo 2', sans-serif"; c.fillText("· ARDÈCHE ·", 0, -80);
+    c.textAlign = "left";
+    /* ── l'itinéraire : 8 repères reliés dans l'ordre ── */
+    const PTS = [[-84,-52],[-30,-74],[26,-46],[74,-8],[36,26],[-16,58],[-72,30],[0,-8]];
+    const seg = prog*(PTS.length - 1);
+    c.strokeStyle = "rgba(200,50,110,.85)"; c.lineWidth = 2.4;
+    c.setLineDash([6, 5]); c.lineDashOffset = -t*14;
+    for(let i=0;i<PTS.length-1;i++){
+      const f = clamp01(seg - i); if(f <= 0) break;
+      const [ax, ay] = PTS[i], [bx, by] = PTS[i+1];
+      c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax + (bx-ax)*f, ay + (by-ay)*f); c.stroke();
+    }
+    c.setLineDash([]);
+    PTS.forEach(([px, py], i)=>{
+      const app = clamp01(prog*8.6 - i*1.02); if(app <= 0) return;
+      const st = CONFIG.stations[i];
+      const pu = 1 + Math.sin(t*3 + i)*.08;
+      glowDot(px, py, 17*app*pu, st.couleur, .34*app);
+      /* la punaise */
+      c.save(); c.globalAlpha = app; c.translate(px, py); c.scale(app*pu, app*pu);
+      c.fillStyle = "rgba(0,0,0,.35)"; c.beginPath(); c.ellipse(1.5, 2, 6, 2.4, 0, 0, 7); c.fill();
+      c.fillStyle = st.couleur; c.beginPath();
+      c.moveTo(0, 2); c.quadraticCurveTo(-6, -5, -3.6, -9.4);
+      c.quadraticCurveTo(0, -13, 3.6, -9.4); c.quadraticCurveTo(6, -5, 0, 2); c.closePath(); c.fill();
+      c.fillStyle = "rgba(255,255,255,.55)"; c.beginPath(); c.arc(0, -8, 1.7, 0, 7); c.fill();
+      c.restore(); c.globalAlpha = 1;
+      /* le nom du défi, à côté */
+      if(app > .6){ c.save(); c.globalAlpha = (app - .6)/.4;
+        c.fillStyle = "rgba(60,40,22,.9)"; c.font = "800 8px 'Baloo 2', sans-serif";
+        c.textAlign = i % 2 ? "left" : "right";
+        c.fillText(st.nom, px + (i % 2 ? 10 : -10), py + 4);
+        c.restore(); c.textAlign = "left"; c.globalAlpha = 1; }
+    });
+    c.restore();
+    c.restore();
+  }
+
+  /* LAMPION qui monte doucement dans le ciel */
+  function lantern(x, y, s, col, t, ph){
+    const sway = Math.sin(t*.7 + (ph || 0))*4;
+    c.save(); c.translate(x + sway, y); c.scale(s, s);
+    glowDot(0, 0, 26, col, .34);
+    /* papier */
+    const g = c.createLinearGradient(0, -12, 0, 10);
+    g.addColorStop(0, hexA(col, .95)); g.addColorStop(1, hexA(col, .5));
+    c.fillStyle = g; c.beginPath();
+    c.moveTo(-7, -8); c.quadraticCurveTo(-9.5, 2, -5, 9);
+    c.lineTo(5, 9); c.quadraticCurveTo(9.5, 2, 7, -8);
+    c.quadraticCurveTo(0, -12, -7, -8); c.closePath(); c.fill();
+    c.strokeStyle = hexA(col, .8); c.lineWidth = .8;
+    c.beginPath(); c.moveTo(0, -10.5); c.lineTo(0, 9); c.stroke();
+    /* flamme */
+    c.save(); c.globalCompositeOperation = "lighter";
+    c.fillStyle = "rgba(255,230,170,.9)";
+    c.beginPath(); c.ellipse(0, 5.5, 1.8, 3 + Math.sin(t*9 + (ph||0))*.7, 0, 0, 7); c.fill();
+    c.restore();
+    c.restore();
+  }
+
+  /* BOÎTE CADEAU qui s'ouvre, avec de la lumière qui déborde */
+  function giftBox(x, y, s, open, t){
+    const K = clamp01(open);
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.fillStyle = "rgba(0,0,0,.45)"; c.beginPath(); c.ellipse(0, 2, 44, 8, 0, 0, 7); c.fill();
+    /* lumière qui sort de la boîte */
+    if(K > .05){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const lg = c.createLinearGradient(0, -30, 0, -160*K);
+      lg.addColorStop(0, `rgba(255,225,150,${.5*K})`); lg.addColorStop(1, "rgba(255,225,150,0)");
+      c.fillStyle = lg; c.beginPath();
+      c.moveTo(-30, -30); c.lineTo(-64*K - 20, -170*K); c.lineTo(64*K + 20, -170*K); c.lineTo(30, -30);
+      c.closePath(); c.fill();
+      c.restore();
+      sparkleBurst(0, -60*K, 46*K, K*.9, "#FFD23F", 14, t, 1.2);
+    }
+    /* corps de la boîte */
+    const bg = c.createLinearGradient(-34, 0, 34, 0);
+    bg.addColorStop(0, "#8f1348"); bg.addColorStop(.5, "#c81a63"); bg.addColorStop(1, "#7d1040");
+    c.fillStyle = bg; rrect(-34, -30, 68, 30, 3); c.fill();
+    c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(-34, -6, 68, 6);
+    /* ruban vertical */
+    c.fillStyle = "#FFD23F"; c.fillRect(-6, -30, 12, 30);
+    c.fillStyle = "rgba(255,255,255,.22)"; c.fillRect(-6, -30, 3, 30);
+    /* couvercle, qui se soulève et bascule */
+    c.save(); c.translate(0, -30 - K*34); c.rotate(-K*.22);
+    const cg = c.createLinearGradient(-38, 0, 38, 0);
+    cg.addColorStop(0, "#a2154f"); cg.addColorStop(.5, "#e01f70"); cg.addColorStop(1, "#8f1348");
+    c.fillStyle = cg; rrect(-38, -11, 76, 12, 3); c.fill();
+    c.fillStyle = "#FFD23F"; c.fillRect(-6, -11, 12, 12);
+    /* nœud */
+    c.fillStyle = "#FFD23F";
+    c.beginPath(); c.moveTo(0, -11); c.quadraticCurveTo(-18, -26, -7, -13); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(0, -11); c.quadraticCurveTo(18, -26, 7, -13); c.closePath(); c.fill();
+    c.fillStyle = "rgba(255,255,255,.25)";
+    c.beginPath(); c.arc(0, -13, 3, 0, 7); c.fill();
+    c.restore();
+    c.restore();
+  }
+
+  /* GUIRLANDE de fanions qui ondule */
+  function bunting(y, t, cols){
+    cols = cols || ["#2BE4D0", "#FFD23F", "#FF2E88", "#8fd0ff", "#ff8a4c"];
+    const n = 11, sag = 26;
+    c.save(); c.strokeStyle = "rgba(255,240,210,.35)"; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(-10, y);
+    c.quadraticCurveTo(W*.5, y + sag + Math.sin(t)*3, W + 10, y - 6); c.stroke();
+    for(let i=0;i<=n;i++){
+      const u = i/n;
+      const bx = -10 + u*(W + 20);
+      /* courbe de la corde : parabole douce + léger balancement */
+      const by = y + sag*(1 - Math.pow(2*u - 1, 2)) - u*6 + Math.sin(t + u*3)*2;
+      const sw = Math.sin(t*1.6 + i)*2.4;
+      c.fillStyle = cols[i % cols.length];
+      c.beginPath(); c.moveTo(bx - 7, by); c.lineTo(bx + 7, by); c.lineTo(bx + sw, by + 15); c.closePath(); c.fill();
+      c.fillStyle = "rgba(0,0,0,.2)";
+      c.beginPath(); c.moveTo(bx + 2, by); c.lineTo(bx + 7, by); c.lineTo(bx + sw, by + 15); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  /* CONFETTIS de papier qui tombent en tournoyant */
+  let endConfs = null;
+  function confettiFall(t, a, n){
+    if(!endConfs) endConfs = Array.from({length: n || 60}, (_, i)=>({
+      x: Math.random(), y: Math.random()*1.6 - .6, v: .16 + Math.random()*.22,
+      w: 3 + Math.random()*5, h: 5 + Math.random()*7, sp: 1 + Math.random()*4,
+      ph: Math.random()*7, col: ["#2BE4D0","#FFD23F","#FF2E88","#8fd0ff","#ff8a4c","#b78cff"][i % 6] }));
+    c.save(); c.globalAlpha = clamp01(a);
+    endConfs.forEach(f=>{
+      f.y += f.v*.012;
+      if(f.y > 1.15){ f.y = -.1; f.x = Math.random(); }
+      const px = (f.x + Math.sin(t*.8 + f.ph)*.03)*W, py = f.y*H;
+      const sq = Math.cos(t*f.sp + f.ph);
+      c.save(); c.translate(px, py); c.rotate(t*f.sp*.5 + f.ph); c.scale(1, Math.max(.15, Math.abs(sq)));
+      c.fillStyle = f.col; c.fillRect(-f.w/2, -f.h/2, f.w, f.h);
+      c.fillStyle = "rgba(0,0,0,.2)"; c.fillRect(-f.w/2, 0, f.w, f.h/2);
+      c.restore();
+    });
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* RIVIÈRE à l'aube : reflets qui ondulent sous l'horizon */
+  function riverReflect(y, t, cols){
+    const g = c.createLinearGradient(0, y, 0, H);
+    g.addColorStop(0, "rgba(60,40,70,.9)"); g.addColorStop(1, "rgba(20,16,40,1)");
+    c.fillStyle = g; c.fillRect(0, y, W, H - y);
+    c.save(); c.globalCompositeOperation = "lighter";
+    (cols || ["#ffb060", "#ff8a4c", "#ffd9a0"]).forEach((col, k)=>{
+      for(let i=0;i<9;i++){
+        const rx = W*(.08 + i*.1) + Math.sin(t*.6 + i + k)*7;
+        const ry = y + 6 + i*((H - y)/11) + k*3;
+        const wdt = 12 + Math.abs(Math.sin(t*1.4 + i*1.3 + k))*26;
+        c.fillStyle = hexA(col, .06 + Math.abs(Math.sin(t + i))*.05);
+        c.beginPath(); c.ellipse(rx, ry, wdt, 1.6, 0, 0, 7); c.fill();
+      }
+    });
+    c.restore();
+    /* le reflet du soleil, une colonne tremblante */
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i=0;i<16;i++){
+      const ry = y + i*((H - y)/16);
+      const wdt = (10 + i*2.6) + Math.sin(t*3 + i*.9)*5;
+      c.fillStyle = `rgba(255,190,110,${(.16 - i*.008).toFixed(3)})`;
+      c.beginPath(); c.ellipse(W*.5 + Math.sin(t*1.2 + i)*3, ry, wdt, 2, 0, 0, 7); c.fill();
+    }
+    c.restore();
+  }
+
+  /* OISEAUX du matin : des V qui traversent lentement */
+  function birdsDawn(t, n, y0, speed, col){
+    c.save(); c.strokeStyle = col || "rgba(30,22,48,.6)"; c.lineWidth = 1.6; c.lineCap = "round";
+    for(let i=0;i<(n || 9);i++){
+      const u = ((t*(speed || .045) + i*.13) % 1.25) - .12;
+      const bx = u*W*1.2, by = (y0 || H*.24) + Math.sin(i*2.3)*H*.05 + Math.sin(t*1.6 + i)*3;
+      const fl = Math.sin(t*(5 + (i%3)) + i)*3.4;
+      const sz = 4 + (i % 3);
+      c.beginPath();
+      c.moveTo(bx - sz, by + fl*.5); c.quadraticCurveTo(bx - sz*.4, by - fl, bx, by);
+      c.quadraticCurveTo(bx + sz*.4, by - fl, bx + sz, by + fl*.5); c.stroke();
+    }
+    c.restore();
+  }
+
+  /* ATELIER : le plan de travail secret où les 8 pièces sont nées */
+  function atelierBench(y, t, prog){
+    /* établi */
+    const bg = c.createLinearGradient(0, y, 0, H);
+    bg.addColorStop(0, "#5a3f2c"); bg.addColorStop(1, "#33241a");
+    c.fillStyle = bg; c.fillRect(0, y, W, H - y);
+    c.fillStyle = "rgba(255,220,170,.08)"; c.fillRect(0, y, W, 3);
+    /* veines du bois */
+    c.strokeStyle = "rgba(0,0,0,.18)"; c.lineWidth = 1;
+    for(let i=0;i<7;i++){
+      c.beginPath(); c.moveTo(0, y + 12 + i*13);
+      c.quadraticCurveTo(W*.5, y + 8 + i*13 + Math.sin(i)*5, W, y + 14 + i*13); c.stroke();
+    }
+    /* taches de peinture aux 8 couleurs */
+    CONFIG.stations.forEach((st, i)=>{
+      const sx = W*(.07 + i*.115), sy = y + 16 + (i % 3)*9;
+      c.fillStyle = hexA(st.couleur, .5);
+      c.beginPath(); c.ellipse(sx, sy, 9 + (i%4)*3, 3.4 + (i%2)*1.6, i*.7, 0, 7); c.fill();
+      c.fillStyle = hexA(st.couleur, .3);
+      c.beginPath(); c.arc(sx + 12 + (i%3)*4, sy + 5, 2 + (i%2), 0, 7); c.fill();
+    });
+    /* rangée de bombes de peinture, l'une après l'autre */
+    CONFIG.stations.forEach((st, i)=>{
+      const app = clamp01(prog*9 - i*.9); if(app <= 0) return;
+      const cx = W*(.1 + i*.107), cyy = y - 2, s = Math.min(W, H)*.055*app;
+      c.save(); c.translate(cx, cyy); c.scale(s/24, s/24);
+      c.fillStyle = "rgba(0,0,0,.4)"; c.beginPath(); c.ellipse(2, 2, 11, 3, 0, 0, 7); c.fill();
+      const mg = c.createLinearGradient(-9, 0, 9, 0);
+      mg.addColorStop(0, "#4c5068"); mg.addColorStop(.42, "#c3c8dd"); mg.addColorStop(1, "#4c5068");
+      c.fillStyle = mg; rrect(-9, -40, 18, 40, 3); c.fill();
+      c.fillStyle = st.couleur; c.fillRect(-9, -28, 18, 11);
+      c.fillStyle = "rgba(255,255,255,.2)"; c.fillRect(-7, -38, 3, 36);
+      c.fillStyle = "#191630"; rrect(-4, -47, 8, 8, 2); c.fill();
+      c.fillStyle = "#0d0b1c"; c.fillRect(-2, -50, 4, 4);
+      c.restore();
+    });
+  }
+
+  /* POCHOIR découpé : la forme apparaît, découpée dans un carton */
+  function stencilCut(x, y, s, sprite, col, prog, t){
+    const sh = SHAPES[sprite]; if(!sh) return;
+    const rows = sh.length, cols = sh[0].length;
+    c.save(); c.translate(x, y); c.scale(s, s); c.rotate(Math.sin(t*.4)*.02);
+    /* le carton */
+    c.fillStyle = "rgba(0,0,0,.4)"; rrect(-cols/2 - 2.5, -rows/2 - 2.5, cols + 5, rows + 5, 1.4); c.fill();
+    const cg = c.createLinearGradient(0, -rows/2, 0, rows/2);
+    cg.addColorStop(0, "#c9a97a"); cg.addColorStop(1, "#9d7f56");
+    c.fillStyle = cg; rrect(-cols/2 - 3, -rows/2 - 3, cols + 6, rows + 6, 1.4); c.fill();
+    c.strokeStyle = "rgba(60,40,20,.5)"; c.lineWidth = .5; rrect(-cols/2 - 3, -rows/2 - 3, cols + 6, rows + 6, 1.4); c.stroke();
+    /* les cases découpées, une par une */
+    let i = 0, total = 0;
+    sh.forEach(r=>[...r].forEach(ch=>{ if(ch !== "." && ch !== " ") total++; }));
+    const cut = clamp01(prog)*total;
+    sh.forEach((row, gy)=>[...row].forEach((ch, gx)=>{
+      if(ch === "." || ch === " ") return;
+      i++; if(i > cut) return;
+      const px = gx - cols/2, py = gy - rows/2;
+      c.fillStyle = hexA(col, .95); c.fillRect(px, py, 1.02, 1.02);
+      c.fillStyle = "rgba(0,0,0,.35)"; c.fillRect(px, py, 1.02, .28);
+    }));
+    /* le cutter, qui suit la découpe */
+    if(prog > 0 && prog < 1){
+      const k = Math.min(total - 1, Math.floor(cut));
+      let j = 0, kx = 0, ky = 0;
+      sh.forEach((row, gy)=>[...row].forEach((ch, gx)=>{
+        if(ch === "." || ch === " ") return;
+        if(j === k){ kx = gx - cols/2; ky = gy - rows/2; } j++;
+      }));
+      c.save(); c.translate(kx + .5, ky + .5); c.rotate(-.5);
+      c.fillStyle = "#d8dae8"; c.fillRect(0, -6, 1.1, 6);
+      c.fillStyle = "#2b2b48"; rrect(-.8, 0, 2.6, 7, .8); c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  /* SIGNATURE à la bombe : un trait de peinture qui se trace */
+  function sprayScript(pts, col, prog, width, t){
+    const k = clamp01(prog); if(k <= 0) return;
+    const seg = k*(pts.length - 1);
+    c.save(); c.lineCap = "round"; c.lineJoin = "round";
+    /* halo de peinture (overspray) */
+    c.save(); c.globalCompositeOperation = "lighter";
+    c.strokeStyle = hexA(col, .18); c.lineWidth = width*2.6; c.beginPath();
+    c.moveTo(pts[0][0], pts[0][1]);
+    for(let i=0;i<pts.length-1;i++){
+      const f = clamp01(seg - i); if(f <= 0) break;
+      c.lineTo(pts[i][0] + (pts[i+1][0]-pts[i][0])*f, pts[i][1] + (pts[i+1][1]-pts[i][1])*f);
+    }
+    c.stroke(); c.restore();
+    /* le trait plein */
+    c.strokeStyle = col; c.lineWidth = width; c.beginPath();
+    c.moveTo(pts[0][0], pts[0][1]);
+    let hx = pts[0][0], hy = pts[0][1];
+    for(let i=0;i<pts.length-1;i++){
+      const f = clamp01(seg - i); if(f <= 0) break;
+      hx = pts[i][0] + (pts[i+1][0]-pts[i][0])*f; hy = pts[i][1] + (pts[i+1][1]-pts[i][1])*f;
+      c.lineTo(hx, hy);
+    }
+    c.stroke();
+    /* la buse qui écrit + son nuage */
+    if(k < 1){
+      c.save(); c.globalCompositeOperation = "lighter";
+      for(let i=0;i<10;i++){
+        const a = Math.random()*7, r = Math.random()*width*1.8;
+        c.fillStyle = hexA(col, .12);
+        c.beginPath(); c.arc(hx + Math.cos(a)*r, hy + Math.sin(a)*r, .8, 0, 7); c.fill();
+      }
+      c.restore();
+      glowDot(hx, hy, width*2.4, col, .3);
+    }
+    c.restore();
+  }
+
+  /* CŒUR D'INVADERS : les 8 pièces disposées en cœur qui pulse */
+  function heartOfPieces(t, appear, cx, cy, r, showLinks){
+    const cs = Math.min(W, H)*.0072;
+    const P = CONFIG.stations.map((st, i)=>{
+      const ang = -Math.PI/2 + i/8*Math.PI*2;
+      return {
+        st, i,
+        x: cx + r*.9*Math.pow(Math.sin(ang), 3),
+        y: cy - r*(.81*Math.cos(ang) - .31*Math.cos(2*ang) - .13*Math.cos(3*ang) - .06*Math.cos(4*ang)),
+        a: ease(clamp01(appear*1.35 - i*.055)),
+      };
+    });
+    /* le contour du cœur, tracé en lumière */
+    if(showLinks){
+      c.save(); c.globalCompositeOperation = "lighter";
+      c.strokeStyle = `rgba(255,120,180,${(.3*clamp01(appear*1.5 - .3)).toFixed(3)})`;
+      c.lineWidth = 1.6; c.beginPath();
+      for(let a = 0; a <= Math.PI*2 + .05; a += .06){
+        const hx = cx + r*.9*Math.pow(Math.sin(a), 3);
+        const hy = cy - r*(.81*Math.cos(a) - .31*Math.cos(2*a) - .13*Math.cos(3*a) - .06*Math.cos(4*a));
+        a === 0 ? c.moveTo(hx, hy) : c.lineTo(hx, hy);
+      }
+      c.stroke(); c.restore();
+    }
+    P.forEach(p=>{
+      if(p.a <= 0) return;
+      const bob = Math.sin(t*3 + p.i)*3;
+      glowDot(p.x, p.y + bob, Math.min(W,H)*.042, p.st.couleur, .32*p.a);
+      c.save(); c.globalAlpha = p.a; c.translate(p.x, p.y + bob);
+      const pu = p.a*(1 + Math.sin(t*4 + p.i)*.05); c.scale(pu, pu);
+      mosaicMid(p.st.sprite, p.st.couleur, cs);
+      c.restore(); c.globalAlpha = 1;
+    });
+    return P;
+  }
+
+  /* les 8 vraies pièces qui rayonnent, alignées au-dessus d'une ville */
+  function endPiecesGlow(baseY, prog, t){
+    const cs = Math.min(W, H)*.0085;
+    CONFIG.stations.forEach((st, i)=>{
+      const lit = clamp01((prog - i*.06)*2.6); if(lit <= 0) return;
+      const sh = SHAPES[st.sprite]; if(!sh) return;
+      const w = sh[0].length*cs, x = (.09 + i*.112)*W, y = baseY - Math.sin(t*.5 + i)*3;
+      once("endLit"+i, ()=>{ i % 2 ? AudioFX.pixel(420 + i*44) : (AudioFX.spray && AudioFX.spray()); });
+      glowDot(x, y, cs*8, st.couleur, .3*lit);
+      /* un fin trait de lumière qui redescend vers la rue */
+      c.save(); c.globalCompositeOperation = "lighter";
+      const bg = c.createLinearGradient(x, y, x, y + H*.12);
+      bg.addColorStop(0, hexA(st.couleur, .16*lit)); bg.addColorStop(1, hexA(st.couleur, 0));
+      c.fillStyle = bg; c.fillRect(x - cs*2.6, y, cs*5.2, H*.12); c.restore();
+      c.save(); c.globalAlpha = lit; c.translate(x, y); c.scale(lit, lit);
+      mosaic(st.sprite, st.couleur, -w/2, -cs*3, cs, 999); c.restore(); c.globalAlpha = 1;
+    });
+  }
+
+  /* un feu d'artifice qui éclot (déterministe par graine) */
+  function firework(cx, cy, t, seed, col){
+    const life = ((t + seed) % 4);
+    if(life > 1.6) return;
+    const r = ease(clamp01(life/1.2)) * Math.min(W, H)*.22, a = clamp01(1 - life/1.6);
+    /* la traînée de montée, juste avant l'explosion */
+    if(life < .12){ glowDot(cx, cy + (1 - life/.12)*H*.2, 10, col, .5); }
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i=0;i<26;i++){
+      const ang = i/26*Math.PI*2 + seed;
+      const rr = r*(i % 3 === 0 ? .72 : 1);
+      const px = cx + Math.cos(ang)*rr, py = cy + Math.sin(ang)*rr + life*life*34;
+      c.fillStyle = hexA(col, a*.9); c.beginPath(); c.arc(px, py, 2.2, 0, 7); c.fill();
+      c.strokeStyle = hexA(col, a*.28); c.lineWidth = 1.1;
+      c.beginPath(); c.moveTo(cx + Math.cos(ang)*rr*.62, cy + Math.sin(ang)*rr*.62 + life*life*14); c.lineTo(px, py); c.stroke();
+    }
+    /* le flash central */
+    if(life < .3) glowDot(cx, cy, 60*(1 - life/.3), "#ffffff", .35*(1 - life/.3));
+    c.restore();
+  }
+
+  /* ═══════════════ LES TREIZE PLANS DE LA FIN ═══════════════ */
+
+  const SCENES_END = [
+    /* ── E1 · LES HUIT PIÈCES ────────────────────────────────────
+       Papa a tout retrouvé. Les huit invaders s'allument un à un
+       sur la ville endormie, puis s'élèvent en constellation. */
+    { d:9, subs:[[1,"Huit murs. Huit pièces."],[5,"Tu les as toutes retrouvées."]],
+      draw(t, p){
+        drawSky("#0c0c2c", "#2a1e4a", 1, .1);
+        satellite(t, 3); nightPlane(t, 1);
+        drawCity(cityFar,  H*.84, .5, "#161334", .45, .02 + p*.03, .12);
+        drawCity(cityNear, H*.92, .7, "#231d48", .7, .03 + p*.04);
+        c.fillStyle = "#1a1638"; c.fillRect(0, H*.92, W, H);
+        wetStreet(H*.92, "#8fa8ff");
+        endPiecesGlow(H*.86, clamp01(p*1.3), t);
+        if(p > .45) constellation(t, ease(clamp01((p - .45)/.5)));
+        drawEmbers("#bcd0ff");
+      } },
+
+    /* ── E2 · LA CARTE ───────────────────────────────────────────
+       Le plan de la chasse, punaisé : ton itinéraire se trace. */
+    { d:8, subs:[[.8,"Huit points sur une carte."],[4.4,"Un parcours que tu as fait\nen entier, sans jamais lâcher."]],
+      draw(t, p){
+        /* fond : le mur de l'atelier, éclairé par une lampe */
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#1a1530"); g.addColorStop(1, "#100c22");
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+        brickWall(0, H*.06, W, H*.88, W*.5);
+        flickerLamp(W*.86, H*.04, H*.94, t, "#ffd9a0");
+        const s = Math.min(W, H)/392*(1.02 + ease(p)*.06);
+        mapLesVans(W*.5, H*.47, s, ease(clamp01(p*1.25)), t);
+        /* deux polaroids punaisés autour de la carte (hors zone sous-titres) */
+        const pw = Math.min(W, H)*.13;
+        polaroid(W*.21, H*.2, pw, -.2, clamp01(p*3 - .3), (w, h)=>{
+          const cs = h*.09; mosaicMid("squid", "#2BE4D0", cs);
+        }, "n°1");
+        polaroid(W*.79, H*.19, pw, .16, clamp01(p*3 - 1.1), (w, h)=>{
+          const cs = h*.09; mosaicMid("octo", "#FF2E88", cs);
+        }, "n°8");
+        drawEmbers("#ffcf8f");
+      } },
+
+    /* ── E3 · QUELQU'UN REGARDAIT ────────────────────────────────
+       Sur un toit, l'artiste encapuchonné observe la ville éclairée
+       par les pièces. Immobile. Il a tout vu. */
+    { d:8, subs:[[.8,"Pendant tout ce temps…"],[4.4,"quelqu'un t'a regardé chercher."]],
+      draw(t, p){
+        drawSky("#0e0e2e", "#3a2850", 1, .1);
+        satellite(t, 1.4);
+        drawCity(cityFar,  H*.7, .55, "#171436", .5, .04 + p*.05, .14);
+        drawCity(cityNear, H*.8, .8, "#221c46", .7, .06 + p*.08);
+        endPiecesGlow(H*.66, 1, t);
+        fogBank(H*.78, t, "#8090c8", .05, .04);
+        pigeonFlock(W*.7, H*.44, t, 7, p > .6 ? 1 : 0);
+        /* le toit au premier plan */
+        c.fillStyle = "#0a0820"; c.fillRect(0, H*.82, W, H);
+        c.fillStyle = "#12102e"; c.fillRect(W*.08, H*.78, W*.5, H*.045);
+        waterTower(W*.82, H*.82, Math.min(W,H)*.0016, "#171436");
+        fireEscape(W*.04, H*.5, 3, "#171436");
+        /* l'artiste, de dos, assis sur la margelle : immobile */
+        perso(W*.30, H*.82, Math.min(W,H)/165, "stand", t, 1);
+        c.fillStyle = "#141428"; rrect(W*.30 + 22, H*.82 - 10, 6, 12, 2); c.fill();
+        /* sa bombe, et la petite fumée d'un thermos */
+        c.save(); c.globalAlpha = .12; c.fillStyle = "#c8d0f0";
+        for(let k=0;k<3;k++) { c.beginPath();
+          c.arc(W*.30 + 26 + Math.sin(t*1.3 + k)*4, H*.82 - 18 - k*9 - (t*7)%9, 3 + k, 0, 7); c.fill(); }
+        c.restore();
+        drawEmbers("#9fb4ff");
+      } },
+
+    /* ── E4 · L'ATELIER ──────────────────────────────────────────
+       Le repaire : les pochoirs découpés, les bombes alignées, les
+       croquis punaisés. C'est là que les huit pièces sont nées. */
+    { d:8, subs:[[.8,"Il y a un endroit que tu n'as pas trouvé."],[4.2,"C'est là que tout a été fabriqué."]],
+      draw(t, p){
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#241a34"); g.addColorStop(1, "#150f24");
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+        brickWall(0, 0, W, H*.72, W*.36);
+        /* ampoule nue qui se balance */
+        { const sw = Math.sin(t*.9)*W*.012;
+          c.strokeStyle = "rgba(0,0,0,.6)"; c.lineWidth = 1.2;
+          c.beginPath(); c.moveTo(W*.36, -4); c.lineTo(W*.36 + sw, H*.14); c.stroke();
+          glowDot(W*.36 + sw, H*.15, Math.min(W,H)*.3, "#ffd9a0", .22);
+          c.fillStyle = "#ffe9c0"; c.beginPath(); c.arc(W*.36 + sw, H*.15, Math.min(W,H)*.016, 0, 7); c.fill();
+          c.fillStyle = "#3a3450"; rrect(W*.36 + sw - 3, H*.135, 6, 6, 1.5); c.fill(); }
+        /* croquis punaisés au mur */
+        CONFIG.stations.slice(0, 5).forEach((st, i)=>{
+          const app = clamp01(p*5.4 - i*.42); if(app <= 0) return;
+          const sx = W*(.12 + i*.19), sy = H*(.26 + (i % 2)*.1);
+          c.save(); c.globalAlpha = app*.92; c.translate(sx, sy); c.rotate(((i*7) % 5 - 2)*.035);
+          const w = Math.min(W,H)*.11;
+          c.fillStyle = "rgba(0,0,0,.4)"; c.fillRect(-w/2 + 2, -w/2 + 3, w, w);
+          c.fillStyle = "#e6dcc2"; c.fillRect(-w/2, -w/2, w, w);
+          const cs = w*.07; c.globalAlpha = app*.6;
+          mosaicMid(st.sprite, "#2a2438", cs);
+          c.globalAlpha = app;
+          c.fillStyle = "#c0392b"; c.beginPath(); c.arc(0, -w/2 + 4, 2.4, 0, 7); c.fill();   // punaise
+          c.restore(); c.globalAlpha = 1;
+        });
+        /* un pochoir en cours de découpe, posé de biais sur l'établi */
+        atelierBench(H*.72, t, clamp01(p*2.2));
+        stencilCut(W*.66, H*.5, Math.min(W,H)*.013, "crab", "#0d0a1c", clamp01(p*2.2 - .1), t);
+        drawEmbers("#ffcf8f");
+      } },
+
+    /* ── E5 · LA RÉVÉLATION ──────────────────────────────────────
+       L'aube se lève derrière lui. Il abaisse lentement sa capuche.
+       L'invader n'a jamais été un inconnu. */
+    { d:10, subs:[[.8,"L'invader n'a jamais été un inconnu."],[5.4,"C'était moi. Depuis le début."]],
+      draw(t, p){
+        const q = ease(clamp01(p*1.15));
+        drawSky(q < .5 ? "#2a1e4a" : "#4a2e50", "#e08a54", 1 - q*.5);
+        glowDot(W*.5, H*.36, H*.55, "#ffc878", .42*q);
+        sunBurst(W*.5, H*.36, q, t, "#ffc882", 9, .26, -2.15);
+        birdsDawn(t, 7, H*.2, .05, "rgba(40,26,54,.55)");
+        /* la ville reste BASSE et lointaine : rien ne doit encombrer
+           la silhouette, qui doit se lire d'un bloc contre le soleil */
+        drawCity(cityFar, H*.87, .26, "#1c1434", .12, .03, .32);
+        fogBank(H*.83, t, "#c8a0a0", .07, .02);
+        c.fillStyle = "#120d26"; c.fillRect(0, H*.87, W, H);
+        c.fillStyle = "rgba(255,190,120,.12)"; c.fillRect(0, H*.87, W, 2.5);
+        /* la silhouette, grande, entière et bien détachée */
+        const open = ease(clamp01((p - .22)/.46));
+        revealFigure(W*.5, H*.865, Math.min(W,H)/104, t, open);
+        /* poussière en suspension dans les rais */
+        c.save(); c.globalCompositeOperation = "lighter";
+        for(let i=0;i<28;i++){
+          const dx = W*.5 + Math.sin(i*2.7 + t*.2)*W*.36;
+          const dy = H*.3 + ((i*37 + t*9) % (H*.5));
+          c.fillStyle = `rgba(255,220,170,${(.05 + Math.abs(Math.sin(t + i))*.09).toFixed(3)})`;
+          c.beginPath(); c.arc(dx, dy, 1 + (i % 3)*.5, 0, 7); c.fill();
+        }
+        c.restore();
+        once("revealSfx", ()=>AudioFX.pixel && AudioFX.pixel(660));
+        drawEmbers("#ffcf8f");
+      } },
+
+    /* ── E6 · LA SIGNATURE ───────────────────────────────────────
+       Sur le dernier mur, il écrit ce qu'il n'a jamais osé dire. */
+    { d:8, subs:[[.6,"Alors j'ai signé le dernier mur."],[4,"Avec les seuls mots qui comptaient."]],
+      draw(t, p){
+        c.fillStyle = "#120e26"; c.fillRect(0, 0, W, H);
+        brickWall(0, H*.04, W, H*.82, W*.48);
+        flickerLamp(W*.1, H*.02, H*.86, t, "#ffd9a0");
+        /* 1) LES MOTS, peints au pochoir sur le mur */
+        handwrite("POUR PAPA", W*.5, H*.42, Math.min(W,H)*.105, "#FFD23F",
+          clamp01((p - .08)/.26), -.03);
+        handwrite("le seul, l'unique", W*.5, H*.53, Math.min(W,H)*.045, "#2BE4D0",
+          clamp01((p - .38)/.2), -.02, true);
+        /* 2) LE PARAPHE : un soulignement de graffeur qui repart en boucle,
+              tracé à la bombe une fois les mots posés */
+        const prog = clamp01((p - .5)/.38);
+        const PTS = [];
+        for(let i=0;i<=60;i++){
+          const u = i/60;
+          if(u < .68){                                   // le long balayage vers la droite
+            const v = u/.68;
+            PTS.push([W*(.13 + v*.75), H*(.60 + Math.sin(v*Math.PI)*.032) + Math.sin(v*17)*1.6]);
+          } else {                                       // la boucle de retour, vers le haut
+            const v = (u - .68)/.32;
+            PTS.push([W*(.88 - v*.52), H*(.60 - v*.075 - Math.sin(v*Math.PI)*.022)]);
+          }
+        }
+        sprayScript(PTS, "#FF2E88", prog, Math.min(W,H)*.014, t);
+        if(prog > 0 && prog < 1) once("sig" + Math.floor(prog*5), ()=>AudioFX.spray && AudioFX.spray());
+        /* la petite étoile finale du tag */
+        if(prog > .97) sparkleBurst(W*.36, H*.525, Math.min(W,H)*.05, .8, "#FF2E88", 6, t, .8);
+        /* coulures de peinture fraîche sous le paraphe */
+        if(prog > .2 && prog < 1 && Math.random() < .09)
+          spawnDrip(W*(.16 + Math.random()*.7), H*.615, "#FF2E88");
+        drawDrips();
+        /* la bombe posée au pied du mur */
+        sprayCan(W*.14, H*.80, Math.min(W,H)*.0021, t, prog > 0 && prog < 1, "#FF2E88");
+        c.fillStyle = "#0d0a1c"; c.fillRect(0, H*.82, W, H);
+        c.fillStyle = "rgba(255,180,120,.05)"; c.fillRect(0, H*.82, W, 2);
+        drawEmbers("#ffd98a");
+      } },
+
+    /* ── E7 · LE SOUVENIR ────────────────────────────────────────
+       Retour en arrière : un toit, une nuit d'été, deux silhouettes
+       qui regardent les étoiles. C'est de là que tout vient. */
+    { d:9, subs:[[.8,"Tu m'as tout appris."],[4.6,"Les étoiles. Les invaders.\nEt les blagues pourries."]],
+      draw(t, p){
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#20143a"); g.addColorStop(.55, "#3a2442"); g.addColorStop(1, "#5c3a3c");
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+        stars.forEach(s=>{ c.globalAlpha = .35 + Math.sin(performance.now()/700 + s[3])*.3;
+          c.fillStyle = "#ffe9c2"; c.fillRect(s[0]*W, s[1]*H*.9, s[2], s[2]); }); c.globalAlpha = 1;
+        /* une étoile filante, une seule */
+        { const sh = ((t*.5 + .1) % 3); if(sh < .5){
+            const u = sh/.5, sx = W*(.2 + u*.5), sy = H*(.1 + u*.18);
+            c.save(); c.globalCompositeOperation = "lighter";
+            const tg = c.createLinearGradient(sx, sy, sx - 70, sy - 24);
+            tg.addColorStop(0, `rgba(255,240,200,${(1-u)*.9})`); tg.addColorStop(1, "rgba(255,240,200,0)");
+            c.strokeStyle = tg; c.lineWidth = 2;
+            c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx - 70, sy - 24); c.stroke(); c.restore(); } }
+        /* lune */
+        { const mx = W*.76, my = H*.2;
+          glowDot(mx, my, H*.17, "#ffdca0", .4);
+          c.fillStyle = "#ffe6b0"; c.beginPath(); c.arc(mx, my, Math.min(W,H)*.05, 0, 7); c.fill();
+          c.fillStyle = "rgba(210,180,140,.25)";
+          c.beginPath(); c.arc(mx - 6, my - 5, 4, 0, 7); c.arc(mx + 8, my + 4, 5.5, 0, 7); c.fill(); }
+        /* le tout premier invader peint, qui se remplit */
+        { const ix = W*.28, iy = H*.36, cs = Math.min(W,H)*.011;
+          const n = Math.floor(clamp01(p*1.5)*cells("squid"));
+          c.save(); c.globalAlpha = .65; c.translate(ix, iy);
+          mosaicMid("squid", "#8fd0ff", cs, n); c.restore(); c.globalAlpha = 1;
+          if(n > 0) glowDot(ix, iy, cs*7, "#8fd0ff", .16); }
+        /* le toit + les deux silhouettes assises, la tête levée */
+        c.fillStyle = "#0d0a1e"; c.fillRect(0, H*.74, W, H);
+        c.fillRect(W*.1, H*.7, W*.44, H*.045);
+        const bx = W*.42;
+        child(bx, H*.74, Math.min(W,H)/145, t);
+        child(bx + Math.min(W,H)*.055, H*.74, Math.min(W,H)/210, t);
+        /* le doigt levé du grand qui montre une étoile */
+        c.strokeStyle = "#20204a"; c.lineWidth = Math.min(W,H)*.008; c.lineCap = "round";
+        c.beginPath(); c.moveTo(bx + 4, H*.72); c.lineTo(bx + Math.min(W,H)*.05, H*.66); c.stroke();
+        /* lucioles */
+        c.save(); c.globalCompositeOperation = "lighter";
+        for(let i=0;i<10;i++){
+          const fx = bx - 40 + Math.sin(t*.8 + i*2)*70 + i*7;
+          const fy = H*.64 + Math.sin(t*1.3 + i)*32, a = .3 + Math.sin(t*3 + i*1.7)*.3;
+          c.fillStyle = `rgba(255,214,130,${Math.max(0, a).toFixed(3)})`;
+          c.beginPath(); c.arc(fx, fy, 1.7, 0, 7); c.fill();
+        }
+        c.restore();
+      } },
+
+    /* ── E8 · LES ANNÉES ─────────────────────────────────────────
+       Une pellicule défile : tous les moments, en polaroids. */
+    { d:7, subs:[[.6,"Et puis les années sont passées…"],[3.8,"mais pas cette habitude-là."]],
+      draw(t, p){
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#191234"); g.addColorStop(1, "#0c0a1e");
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+        /* halo de projecteur, comme dans une salle de projection */
+        glowDot(W*.5, H*.5, Math.min(W,H)*.75, "#8fa8ff", .1);
+        /* deux bandes de pellicule qui défilent en sens inverse */
+        filmStrip(H*.115, H*.17, t, .18, .9);
+        filmStrip(H*.615, H*.17, -t, .14, .9);
+        /* les polaroids, au centre, qui se posent un par un */
+        const pw = Math.min(W, H)*.185;
+        const CARDS = [
+          [W*.24, H*.43, -.14, "squid", "#2BE4D0", "1998"],
+          [W*.5,  H*.41,  .05, "crab",  "#FFD23F", "2007"],
+          [W*.76, H*.44,  .17, "octo",  "#FF2E88", "aujourd'hui"],
+        ];
+        CARDS.forEach(([px, py, ang, sp, col, leg], i)=>{
+          const app = ease(clamp01(p*3.1 - i*.75)); if(app <= 0) return;
+          const rise = (1 - app)*H*.1;
+          polaroid(px, py + rise, pw, ang*app, app, (w, h)=>{
+            const cs = h*.085;
+            const bgg = c.createLinearGradient(0, -h/2, 0, h/2);
+            bgg.addColorStop(0, "#2a2050"); bgg.addColorStop(1, "#150f2c");
+            c.fillStyle = bgg; c.fillRect(-w/2, -h/2, w, h);
+            /* un mur + la pièce peinte dessus */
+            c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(-w/2, h*.2, w, h*.3);
+            mosaicMid(sp, col, cs);
+            glowDot(0, 0, cs*7, col, .2);
+          }, leg);
+        });
+        drawEmbers("#9fb4ff");
+      } },
+
+    /* ── E9 · LES RETROUVAILLES ──────────────────────────────────
+       À l'aube, deux silhouettes côte à côte sur un toit, au-dessus
+       de la ville où brillent les huit pièces. */
+    { d:9, subs:[[.8,"Alors j'ai semé les Vans d'étoiles…"],[4.8,"rien que pour toi."]],
+      draw(t, p){
+        const q = ease(clamp01(p));
+        drawSky("#3a2850", "#f0a45c", 1 - q*.4);
+        glowDot(W*.5, H*.88, H*.7, "#ffb464", .4);
+        sunBurst(W*.5, H*.88, q*.7, t, "#ffcf8f", 7, .34, -2.5);
+        birdsDawn(t, 9, H*.22, .05, "rgba(60,36,60,.5)");
+        drawCity(cityFar,  H*.74, .5, "#3a2a48", .3, .02, .1);
+        drawCity(cityNear, H*.82, .7, "#2a2040", .5, .03 + p*.03);
+        endPiecesGlow(H*.63, 1, t);
+        fogBank(H*.8, t, "#c89ab0", .06, .03);
+        c.fillStyle = "#1a1226"; c.fillRect(0, H*.84, W, H);
+        c.fillStyle = "#231832"; c.fillRect(W*.06, H*.8, W*.5, H*.045);
+        /* les deux, épaule contre épaule, de dos */
+        papaFigure(W*.43, H*.85, Math.min(W,H)/135, t, "stand", 1);
+        revealFigure(W*.545, H*.85, Math.min(W,H)/155, t + .4, 1);
+        /* la main sur l'épaule, à la fin du plan */
+        if(p > .6){ c.save(); c.globalAlpha = clamp01((p - .6)/.25);
+          c.strokeStyle = "#26303f"; c.lineWidth = Math.min(W,H)*.011; c.lineCap = "round";
+          c.beginPath(); c.moveTo(W*.452, H*.795); c.lineTo(W*.527, H*.788); c.stroke();
+          c.fillStyle = "#e0b189"; c.beginPath(); c.arc(W*.529, H*.788, Math.min(W,H)*.008, 0, 7); c.fill();
+          c.restore(); c.globalAlpha = 1; }
+        drawEmbers("#ffcf8f");
+      } },
+
+    /* ── E10 · LES LAMPIONS ──────────────────────────────────────
+       Huit lampions montent au-dessus des Vans, un par pièce. */
+    { d:7, subs:[[.8,"Huit lumières au-dessus des Vans."],[4,"Une pour chaque endroit\noù tu es allé me chercher."]],
+      draw(t, p){
+        drawSky("#2a1e46", "#6a3a58", 1, .12);
+        drawCity(cityFar,  H*.82, .5, "#221a40", .4, .02, .12);
+        drawCity(cityNear, H*.9, .7, "#2c2050", .6, .03);
+        c.fillStyle = "#1c1436"; c.fillRect(0, H*.9, W, H);
+        /* le toit du premier plan, sur lequel ils se tiennent */
+        c.fillStyle = "#100b22"; c.fillRect(0, H*.87, W, H);
+        c.fillStyle = "rgba(255,200,140,.07)"; c.fillRect(0, H*.87, W, 2);
+        /* les huit lampions, décalés, qui montent */
+        CONFIG.stations.forEach((st, i)=>{
+          const u = clamp01(p*1.35 - i*.055); if(u <= 0) return;
+          const lx = W*(.12 + i*.107), ly = H*(.94 - ease(u)*.72);
+          lantern(lx, ly, Math.min(W,H)*.0034*(0.7 + u*.5), st.couleur, t, i*1.3);
+          once("lant"+i, ()=>AudioFX.pixel && AudioFX.pixel(360 + i*38));
+        });
+        /* deux silhouettes en bas, qui regardent monter */
+        papaFigure(W*.42, H*.875, Math.min(W,H)/128, t, "point", 1);
+        revealFigure(W*.55, H*.875, Math.min(W,H)/146, t + .4, 1);
+        drawEmbers("#ffd98a");
+      } },
+
+    /* ── E11 · JOYEUX ANNIVERSAIRE ───────────────────────────────
+       Le cœur d'invaders, les feux d'artifice, le message tamponné. */
+    { d:10, subs:[[0,""]],
+      draw(t, p){
+        drawSky("#241848", "#4a2c5a", 1, .1);
+        drawCity(cityFar, H*.86, .5, "#20183c", .4, .02);
+        c.fillStyle = "#1a1434"; c.fillRect(0, H*.86, W, H);
+        firework(W*.26, H*.3, t, 0, "#FFD23F");
+        firework(W*.72, H*.24, t, 1.3, "#FF2E88");
+        firework(W*.5,  H*.38, t, 2.6, "#2BE4D0");
+        firework(W*.14, H*.44, t, 3.4, "#8fd0ff");
+        bunting(H*.15, t);
+        heartOfPieces(t, ease(clamp01(p*1.4)), W*.5, H*.36, Math.min(W,H)*.25, true);
+        if(p > .28){
+          const k = ease(clamp01((p - .28)/.26));
+          once("endStamp", ()=>AudioFX.spray && AudioFX.spray());
+          stampText("JOYEUX", W*.5, H*.63, Math.min(W,H)*.062, "#FFD23F", k, -.04);
+          stampText("ANNIVERSAIRE", W*.5, H*.7, Math.min(W,H)*.062, "#FFD23F", clamp01(k*1.3 - .2), -.04);
+        }
+        if(p > .5){
+          const k = ease(clamp01((p - .5)/.24));
+          once("endStamp2", ()=>AudioFX.star && AudioFX.star(2));
+          stampText("PAPA", W*.5, H*.795, Math.min(W,H)*.085, "#FF2E88", k, .03);
+        }
+        confettiFall(t, clamp01((p - .35)*2.6));
+        drawEmbers("#ffd98a");
+      } },
+
+    /* ── E12 · LE CADEAU ─────────────────────────────────────────
+       Une boîte, posée là. Elle s'ouvre. La lumière déborde. */
+    { d:7, subs:[[.8,"Il reste une dernière chose à trouver."],[4,"Et celle-là, elle est bien réelle."]],
+      draw(t, p){
+        const g = c.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#2a1c46"); g.addColorStop(1, "#140f28");
+        c.fillStyle = g; c.fillRect(0, 0, W, H);
+        brickWall(0, 0, W, H*.66, W*.5);
+        c.fillStyle = "#241a34"; c.fillRect(0, H*.66, W, H);         // le sol
+        c.fillStyle = "rgba(255,220,170,.05)"; c.fillRect(0, H*.66, W, 2);
+        /* la boîte, au centre, qui s'ouvre en fin de plan */
+        const open = ease(clamp01((p - .3)/.5));
+        giftBox(W*.5, H*.74, Math.min(W,H)/250, open, t);
+        /* le cœur d'invaders qui s'échappe de la boîte */
+        if(open > .3){
+          const k = clamp01((open - .3)/.7);
+          c.save(); c.globalAlpha = k;
+          heartOfPieces(t, k, W*.5, H*.32, Math.min(W,H)*.22*k, false);
+          c.restore(); c.globalAlpha = 1;
+        }
+        confettiFall(t, clamp01((p - .4)*2));
+        drawEmbers("#ffd98a");
+      } },
+
+    /* ── E13 · LA DERNIÈRE IMAGE ─────────────────────────────────
+       On garde le cœur, le message final, puis fondu : la main est
+       rendue à l'écran de victoire. */
+    { d:6, noKB:true, subs:[[.6,"Ton cadeau t'attend dans la boîte."]],
+      draw(t, p){
+        drawSky("#241848", "#4a2c5a", 1, .1);
+        heartOfPieces(t, 1, W*.5, H*.4, Math.min(W,H)*.26, true);
+        sparkleBurst(W*.5, H*.4, Math.min(W,H)*.32, .5, "#ffd98a", 18, t, .4);
+        handwrite("avec tout mon amour", W*.5, H*.68, Math.min(W,H)*.045,
+          "#2BE4D0", clamp01(p*3), -.02, true);
+        confettiFall(t, .5);
+        drawEmbers("#ffd98a");
+        if(p > .55){ c.fillStyle = `rgba(4,4,14,${((p - .55)/.45).toFixed(3)})`; c.fillRect(0, 0, W, H); }
+      } },
+  ];
+
+  /* étalonnage par plan de la fin : [haut chaud, bas froid, bokeh] */
+  const GRADES_END = [
+    ["#8fb0ff","#0a0a26","#bcd0ff"],   // E1  pièces
+    ["#ffd9a0","#1a1530","#ffcf8f"],   // E2  carte
+    ["#8090c8","#0e0e2e","#9fb4ff"],   // E3  guetteur
+    ["#ffd9a0","#241a34","#ffcf8f"],   // E4  atelier
+    ["#ffb060","#2a1e42","#ffcf8f"],   // E5  révélation
+    ["#FF2E88","#120e26","#FFD23F"],   // E6  signature
+    ["#ffd9a0","#3a2442","#ffcf8f"],   // E7  souvenir
+    ["#8fa8ff","#0c0a1e","#bcd0ff"],   // E8  les années
+    ["#ffb060","#3a2038","#ffd9a0"],   // E9  retrouvailles
+    ["#ff9ac0","#2a1e46","#ffd98a"],   // E10 lampions
+    ["#FFD23F","#241848","#FF2E88"],   // E11 anniversaire
+    ["#FFD23F","#2a1c46","#ffd98a"],   // E12 cadeau
+    ["#FFD23F","#241848","#ffd98a"],   // E13 dernière image
+  ];
+  const TOTAL_END = SCENES_END.reduce((a, s)=>a + s.d, 0);
+
   function frame(now){
     if(ended) return;
     dpr = Math.min(2, devicePixelRatio || 1);
@@ -6630,10 +7848,11 @@ const Cinematic = (()=>{
     W = innerWidth; H = innerHeight;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const T = (now - t0)/1000;
+    const SC = curScenes || SCENES;
     let acc = 0, sc = null, t = 0, idx = 0;
-    for(let i=0;i<SCENES.length;i++){ if(T < acc + SCENES[i].d){ sc = SCENES[i]; t = T - acc; idx = i; break; } acc += SCENES[i].d; }
+    for(let i=0;i<SC.length;i++){ if(T < acc + SC[i].d){ sc = SC[i]; t = T - acc; idx = i; break; } acc += SC[i].d; }
     if(!sc){ end(); return; }
-    const p = t / sc.d, last = idx === SCENES.length - 1, first = idx === 0;
+    const p = t / sc.d, last = idx === SC.length - 1, first = idx === 0;
 
     /* ── Ken Burns : lent zoom/travelling, alterné selon le plan ── */
     c.save();
@@ -6649,7 +7868,7 @@ const Cinematic = (()=>{
     c.restore();
 
     /* ── ÉTAGE CINÉMA : bloom + étalonnage + fuite + bokeh ── */
-    cinePost(T, idx, GRADES[idx] || null);
+    cinePost(T, idx, (curGrades || GRADES)[idx] || null);
 
     /* ── fondu au noir entre les plans (« cut » cinéma) ── */
     let blackA = 0;
@@ -6669,9 +7888,10 @@ const Cinematic = (()=>{
     }
 
     /* ── bandes cinéma animées (entrent au début, sortent à la fin) ── */
+    const TOT = curTotal || TOTAL;
     let bar = H * .10;
     if(T < .8) bar = H * .10 * ease(T / .8);
-    else if(T > TOTAL - .8) bar = H * .10 * ease(Math.max(0, (TOTAL - T) / .8));
+    else if(T > TOT - .8) bar = H * .10 * ease(Math.max(0, (TOT - T) / .8));
     c.fillStyle = "#04040e";
     c.fillRect(0, 0, W, bar); c.fillRect(0, H - bar, W, bar);
 
@@ -6694,10 +7914,11 @@ const Cinematic = (()=>{
     const cb = doneCb; doneCb = null;
     if(cb) cb();
   }
-  function play(done){
+  function boot(done, scenes, total, grades){
     cv = $("#cine-cv"); c = cv.getContext("2d");
     subEl = $("#cine-sub"); skipBt = $("#cine-skip");
     if(matchMedia("(prefers-reduced-motion: reduce)").matches){ done(); return; }
+    curScenes = scenes; curTotal = total; curGrades = grades;
     doneCb = done; ended = false; t0 = performance.now();
     Object.keys(fired).forEach(k=>delete fired[k]);
     W = innerWidth; H = innerHeight;
@@ -6728,10 +7949,12 @@ const Cinematic = (()=>{
     skipBt.hidden = true;
     skipBt.onclick = ()=>{ AudioFX.back(); end(); };
     show("cine-screen");
-    guard = setTimeout(end, (TOTAL + 5)*1000);   // filet si rAF est gelé
+    guard = setTimeout(end, (total + 5)*1000);   // filet si rAF est gelé
     raf = requestAnimationFrame(frame);
   }
-  return { play, TOTAL };
+  function play(done){ boot(done, SCENES, TOTAL, GRADES); }
+  function playEnd(done){ boot(done, SCENES_END, TOTAL_END, GRADES_END); }
+  return { play, playEnd, TOTAL };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -13419,7 +14642,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v86</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v88</p>`);
     wire();
   }
   function wire(){
