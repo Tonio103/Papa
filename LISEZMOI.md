@@ -54,21 +54,29 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
-## Nouveautés (v80) — LV_02 devient un vrai TERMINAL DE DÉCODAGE
+## Nouveautés (v81) — LV_02 : « L'INVADER BINAIRE », un vrai décor
 
-Le défi du binaire était trop facile (3 petits nombres sur 4 bits). Il est
-**entièrement refait** en un terminal à décrypter en **5 manches** qui montent
-en difficulté (~510 lignes) :
+Le binaire est **entièrement remis en scène**. Fini l'exercice à cases posé sur
+fond gris : c'est maintenant **une œuvre à révéler sur un mur**.
 
-1. **COMPOSER** — reconstituer des nombres sur **5 bits** (0–31), plus seulement 4.
-2. **LIRE** — la machine **allume un code** binaire ; tu le lis, tu additionnes les blocs allumés et tu **tapes le nombre** sur un pavé (sens inverse : bien plus dur).
-3. **INCRÉMENTER** — repartir d'un nombre et faire **+1** en binaire, en gérant la **retenue** (0111 → 1000).
-4. **ADDITION** — **additionner** deux nombres binaires et écrire la somme sur **6 bits** (0–63).
-5. **CODE D'ACCÈS** — palier « boss » : recomposer le **matricule de l'invader** pour déverrouiller le fragment (petite mise en scène 🔓).
+- **Le décor** : un mur de briques peint (canvas), un projecteur, de la poussière
+  dans le faisceau, de vieux tags fantômes. Au centre, un **invader éteint**.
+- **Le geste, unique et clair** : chaque **ligne** de l'invader est un **nombre**.
+  Tu allumes les blocs (16·8·4·2·1) pour composer ce nombre — et les blocs allumés
+  **s'allument sur le mur** et dessinent l'invader, pixel par pixel. *Le binaire
+  EST l'image.*
+- **La récompense** : à chaque ligne juste, la peinture **jaillit** (bombe +
+  particules). La dernière ligne posée, l'invader entier **s'embrase** en néon.
+- **Lisible d'un coup d'œil** : gros nombre-cible néon, ligne en cours encadrée et
+  fléchée sur le mur, somme affichée en direct, interrupteurs tactiles qui
+  s'illuminent. **Impossible de perdre** — les fautes ne coûtent que des étoiles.
+  Deux coups de pouce. 3★ = invader rallumé vite, sans aide et sans faute → flash
+  **« INVADER PARFAIT »**.
 
-Garde-fous pensés pour Papa : **impossible de perdre** (les erreurs coûtent des étoiles et du temps, jamais la partie), fil des manches visible, tour 3D « cible vs toi », addition/lecture affichées en direct, et **3 coups de pouce** (qui coûtent l'étoile parfaite). 3★ = terminal bouclé vite, sans aide et sans faute → flash **« CERVEAU BINAIRE »**.
-
-Testé de bout en bout (les 5 manches jouées jusqu'à la victoire en automatique) : **zéro erreur** console. sw v79→v80, pied de page v80.
+Un seul mécanisme à comprendre, une seule image à faire renaître — beau,
+compréhensible, et quand même un vrai petit défi de calcul binaire. Testé de bout
+en bout (invader rallumé jusqu'à la victoire en automatique) : **zéro erreur**
+console. sw v80→v81, pied de page v81.
 
 ## Nouveautés (v79) — passe « fin prêt » : relecture + finitions
 
