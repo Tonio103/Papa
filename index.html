@@ -5117,6 +5117,7 @@ const Cinematic = (()=>{
   let stars = [], cityFar = [], cityNear = [], mist = [], blips = [];
   let rain = [], grainTile = null, curLine = "", drips = [], sparks = [];
   let bloomCv = null, bloomCtx = null, canFilter = false;   // étage de post-traitement (bloom)
+  let wallTile = null;                                       // texture de brique pré-rendue
   const fired = {};
   const once = (k, fn)=>{ if(!fired[k]){ fired[k] = true; fn(); } };
   const ease = k=>k*k*(3-2*k);
@@ -5131,6 +5132,27 @@ const Cinematic = (()=>{
       id.data[i]=id.data[i+1]=id.data[i+2]=v; id.data[i+3]=255;
     }
     gc.putImageData(id, 0, 0); return g;
+  }
+  /* tuile de MUR DE BRIQUES pré-rendue une fois (mortier + reliefs +
+     variations), tuilée sans coût ensuite. Motif sans couture. */
+  function makeWallTile(){
+    const BH = 14, BW = 34, tw = BW*4, th = BH*8;   // motif raccordable
+    const g = document.createElement("canvas"); g.width = tw*2; g.height = th*2;
+    const x = g.getContext("2d"); x.scale(2, 2);
+    x.fillStyle = "#221d3a"; x.fillRect(0, 0, tw, th);
+    for(let row=0, y=0; y<th; y+=BH, row++){
+      const off = row%2 ? BW/2 : 0;
+      for(let bx=-BW; bx<tw; bx+=BW){
+        const X = bx+off+1, Y = y+1, W2 = BW-2, H2 = BH-2;
+        const v = ((((Math.round(X)*7 + row*13) % 11) - 5)) * .015;
+        const grimy = (((Math.round(X)*3 + row*5) % 9) === 0) ? -.06 : 0;
+        x.fillStyle = shade("#2c2549", v + grimy); x.fillRect(X, Y, W2, H2);
+        x.fillStyle = "rgba(255,255,255,.05)"; x.fillRect(X, Y, W2, 1);       // liseré haut
+        x.fillStyle = "rgba(0,0,0,.30)"; x.fillRect(X, Y+H2-1, W2, 1);        // mortier (ombre)
+        x.fillStyle = "rgba(0,0,0,.14)"; x.fillRect(X, Y, 1, H2);
+      }
+    }
+    return { img:g, w:tw, h:th };
   }
   /* pluie fine, en biais : gouttes qui tombent et se recyclent */
   function drawRain(intensity){
@@ -5376,21 +5398,53 @@ const Cinematic = (()=>{
   /* une voiture traverse la rue en bas, ses phares balaient le mur */
   function drawCar(base){
     if(cars.length === 0 && Math.random() < .01)
-      cars.push({ x:-.16, dir:1, sp:.005+Math.random()*.004,
-        col:Math.random()<.5?"#ffd27a":"#ff7aa2" });
+      cars.push({ x:-.22, dir:1, sp:.006 + Math.random()*.004,
+        beam: Math.random()<.5 ? "#fff0c8" : "#e8f0ff",
+        body: ["#b32a44","#264a80","#1f2e3a","#7a1f3a","#2a6a5a"][Math.floor(Math.random()*5)] });
     for(let i=cars.length-1;i>=0;i--){ const car=cars[i];
       car.x += car.sp*car.dir;
-      if(car.x > 1.25){ cars.splice(i,1); continue; }
-      const cx = car.x*W, cy = base - 4;
+      if(car.x > 1.32){ cars.splice(i,1); continue; }
+      const cx = car.x*W, cy = base - 2, s = Math.min(W,H)*.05, d = car.dir;
+      c.save(); c.translate(cx, cy); c.scale(d, 1);
+      /* faisceau des phares (cône vers l'avant) */
       c.save(); c.globalCompositeOperation = "lighter";
-      const bg = c.createRadialGradient(cx+24, cy-7, 4, cx+24, cy-7, 130);
-      bg.addColorStop(0, hexA(car.col,.45)); bg.addColorStop(1, hexA(car.col,0));
-      c.fillStyle = bg; c.fillRect(cx-30, cy-100, 220, 110);
+      const bg = c.createLinearGradient(s, 0, s*4.4, 0);
+      bg.addColorStop(0, hexA(car.beam, .5)); bg.addColorStop(1, hexA(car.beam, 0));
+      c.fillStyle = bg; c.beginPath();
+      c.moveTo(s*.95, -s*.32); c.lineTo(s*4.4, -s*1.0); c.lineTo(s*4.4, s*.55); c.lineTo(s*.95, s*.05); c.closePath(); c.fill();
       c.restore();
-      c.fillStyle = "#05050f";
-      c.fillRect(cx, cy-9, 28, 9); c.fillRect(cx+5, cy-15, 16, 7);
-      c.fillStyle = car.col; c.fillRect(cx+25, cy-7, 4, 4);
-      c.fillStyle = "#ff3b3b"; c.fillRect(cx-2, cy-7, 3, 4);
+      /* ombre au sol */
+      c.fillStyle = "rgba(0,0,0,.4)"; c.beginPath(); c.ellipse(0, s*.12, s*1.35, s*.2, 0, 0, 7); c.fill();
+      /* carrosserie (silhouette arrondie + dégradé) */
+      const bd = c.createLinearGradient(0, -s*.8, 0, s*.1);
+      bd.addColorStop(0, shade(car.body, .28)); bd.addColorStop(.6, car.body); bd.addColorStop(1, shade(car.body, -.25));
+      c.fillStyle = bd; c.beginPath();
+      c.moveTo(-s*1.25, 0);
+      c.quadraticCurveTo(-s*1.3, -s*.32, -s*1.05, -s*.36);
+      c.quadraticCurveTo(-s*.75, -s*.4, -s*.6, -s*.42);
+      c.lineTo(-s*.42, -s*.74); c.quadraticCurveTo(0, -s*.86, s*.36, -s*.74);
+      c.lineTo(s*.52, -s*.42);
+      c.quadraticCurveTo(s*.95, -s*.4, s*1.08, -s*.34);
+      c.quadraticCurveTo(s*1.2, -s*.3, s*1.2, 0); c.closePath(); c.fill();
+      /* bas de caisse plus sombre */
+      c.fillStyle = "rgba(0,0,0,.25)"; rrect(-s*1.2, -s*.12, s*2.35, s*.14, s*.05); c.fill();
+      /* vitres teintées */
+      c.fillStyle = "rgba(170,215,255,.4)"; c.beginPath();
+      c.moveTo(-s*.44, -s*.44); c.lineTo(-s*.34, -s*.7); c.quadraticCurveTo(0, -s*.8, s*.3, -s*.7);
+      c.lineTo(s*.42, -s*.44); c.closePath(); c.fill();
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(-s*.06, -s*.72, s*.05, s*.3);   // montant central
+      c.fillStyle = "rgba(255,255,255,.14)"; c.fillRect(-s*.34, -s*.78, s*.5, s*.05);   // reflet toit
+      /* roues + jantes */
+      [-s*.72, s*.78].forEach(wx=>{
+        c.fillStyle = "#0a0a12"; c.beginPath(); c.arc(wx, 0, s*.3, 0, 7); c.fill();
+        c.fillStyle = "#4a4a58"; c.beginPath(); c.arc(wx, 0, s*.14, 0, 7); c.fill();
+        c.fillStyle = "#0a0a12"; c.beginPath(); c.arc(wx, 0, s*.05, 0, 7); c.fill();
+      });
+      /* phare avant + feu arrière */
+      c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = car.beam;
+      c.beginPath(); c.ellipse(s*1.12, -s*.16, s*.13, s*.1, 0, 0, 7); c.fill(); c.restore();
+      c.fillStyle = "#ff3b3b"; c.beginPath(); c.ellipse(-s*1.18, -s*.16, s*.09, s*.08, 0, 0, 7); c.fill();
+      c.restore();
     }
   }
   /* un chat de gouttière, immobile, la queue qui balance */
@@ -5551,8 +5605,13 @@ const Cinematic = (()=>{
     list.forEach(b=>{
       const bx = (b.x - pan)*W, bw = b.w*W, by = H*(1 - b.h);
       if(bx > W + 30 || bx + bw < -30) return;
-      c.fillStyle = col; c.fillRect(bx, by, bw, H - by);
-      c.fillStyle = "rgba(255,255,255,.04)"; c.fillRect(bx, by, bw, 2);
+      /* façade dégradée (arête droite éclairée) comme la ville */
+      const fg = c.createLinearGradient(bx, 0, bx + bw, 0);
+      fg.addColorStop(0, shade(col, -.12)); fg.addColorStop(.75, col); fg.addColorStop(1, shade(col, .14));
+      c.fillStyle = fg; c.fillRect(bx, by, bw, H - by);
+      c.fillStyle = "rgba(255,240,220,.05)"; c.fillRect(bx + bw - 2, by, 2, H - by);   // liseré éclairé
+      c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(bx, by, 2, H - by);                  // arête ombrée
+      c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(bx, by, bw, 2);                 // parapet
       /* fenêtres allumées sur la façade */
       b.litWins.forEach(([wx, wy, cyan])=>{
         c.fillStyle = cyan ? "rgba(120,220,255,.5)" : "rgba(255,214,150,.4)";
@@ -5631,6 +5690,30 @@ const Cinematic = (()=>{
     c.fillStyle = "#e8b98a"; c.fillRect(-3, -22, 7, 7);          // tête levée
     c.fillStyle = "#1a1a3a"; c.fillRect(-4, -24, 9, 3);          // cheveux
     c.fillRect(4, -14, 7, 3);                                    // bras posé
+    c.restore();
+  }
+
+  /* MUR DE BRIQUES illustré : tuile pré-rendue + éclairage doux,
+     fissures et mousse humide au pied. Le canevas de l'artiste. */
+  function brickWall(x0, y0, w, h, lampX){
+    if(!wallTile){ c.fillStyle = "#231e3c"; c.fillRect(x0, y0, w, h); return; }
+    c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+    for(let y=y0; y<y0+h; y+=wallTile.h) for(let x=x0; x<x0+w; x+=wallTile.w)
+      c.drawImage(wallTile.img, x, y, wallTile.w, wallTile.h);
+    /* éclairage : halo clair là où tombe la lumière (lampe/lune), bords sombres */
+    const lx = lampX != null ? lampX : x0 + w*.5;
+    const lg = c.createRadialGradient(lx, y0 + h*.24, h*.12, lx, y0 + h*.55, w*.75);
+    lg.addColorStop(0, "rgba(255,240,210,.08)"); lg.addColorStop(.6, "rgba(0,0,10,.12)"); lg.addColorStop(1, "rgba(0,0,10,.42)");
+    c.fillStyle = lg; c.fillRect(x0, y0, w, h);
+    /* deux fissures qui serpentent */
+    c.strokeStyle = "rgba(0,0,0,.32)"; c.lineWidth = 1.3;
+    for(let k=0;k<2;k++){ let cx = x0 + w*(0.16 + 0.52*k), cy = y0 + 4;
+      c.beginPath(); c.moveTo(cx, cy);
+      for(let sN=0;sN<5;sN++){ cx += Math.sin(k*7 + sN)*9; cy += h/6; c.lineTo(cx, cy); } c.stroke(); }
+    /* mousse / humidité au pied du mur */
+    const mg = c.createLinearGradient(0, y0 + h - h*.14, 0, y0 + h);
+    mg.addColorStop(0, "rgba(48,105,66,0)"); mg.addColorStop(1, "rgba(48,105,66,.32)");
+    c.fillStyle = mg; c.fillRect(x0, y0 + h - h*.14, w, h*.14);
     c.restore();
   }
 
@@ -5914,12 +5997,7 @@ const Cinematic = (()=>{
       draw(t, p){
         drawSky("#08081e", "#10102a", 1);
         drawCity(cityFar, H*.42, .4, "#0e0e26", .25, .06);
-        c.fillStyle = "#1d1a36"; c.fillRect(0, H*.42, W, H*.36);       // le mur
-        c.fillStyle = "rgba(0,0,0,.18)";
-        for(let y=H*.42; y<H*.78; y+=14){
-          const sh = Math.round(y/14)%2 ? 16 : 0;
-          for(let x=-32; x<W; x+=32) c.fillRect(x+sh, y, 30, 12);
-        }
+        brickWall(0, H*.42, W, H*.36, W*.68);                          // le mur, éclairé par le réverbère
         fireEscape(W*.06, H*.44, 3, "#0a0a18");                        // escalier de secours
         graffTag(W*.30, H*.56, .8, "#ff2e88", 2);                      // vieux tags sur le mur
         graffTag(W*.48, H*.62, .6, "#39e08a", 5);
@@ -6003,12 +6081,7 @@ const Cinematic = (()=>{
       draw(t, p){
         drawSky("#08081e", "#0e0e26", .8, .075);
         nightPlane(t, 6);
-        c.fillStyle = "#1d1a36"; c.fillRect(0, H*.16, W, H*.62);
-        c.fillStyle = "rgba(0,0,0,.18)";
-        for(let y=H*.16; y<H*.78; y+=15){
-          const sh = Math.round(y/15)%2 ? 17 : 0;
-          for(let x=-34; x<W; x+=34) c.fillRect(x+sh, y, 32, 13);
-        }
+        brickWall(0, H*.16, W, H*.62, W*.42);                          // le grand mur, sous le projecteur
         fireEscape(W*.80, H*.20, 3, "#0a0a18");                        // escalier sur le mur
         graffTag(W*.14, H*.30, .7, "#FFD23F", 7);                      // anciens tags
         c.fillStyle = "#0d0d22"; c.fillRect(0, H*.78, W, H);
@@ -6293,11 +6366,12 @@ const Cinematic = (()=>{
           const wing = Math.sin(t*10 + i) > 0 ? -3 : 2;
           c.fillRect(bx2, by2, 7, 3); c.fillRect(bx2 + 1, by2 + wing, 5, 2);
         }
-        /* l'artiste, dos tourné, s'éloigne dans la lumière (il a fini) */
+        /* l'artiste s'éloigne vers le soleil levant : il MARCHE À GAUCHE
+           et REGARDE À GAUCHE (sens de marche = sens du regard) */
         if(p > .25){
           const away = clamp01((p-.25)/.7);
-          c.globalAlpha = .85;
-          perso(W*.18 + away*W*.14, H*.72, Math.min(W,H)/240, "walk", t, -1);
+          c.globalAlpha = .9;
+          perso(W*.46 - away*W*.28, H*.72, Math.min(W,H)/240, "walk", t, -1);
           c.globalAlpha = 1;
         }
       } },
@@ -6640,6 +6714,7 @@ const Cinematic = (()=>{
     cityFar = buildCity(0, .12, .3); cityNear = buildCity(0, .08, .22);
     mist = []; TOUR = null; drips = []; sparks = []; ROOFS = null; CONSTEL = null; seedAmbience();
     if(!grainTile) grainTile = makeGrain();
+    if(!wallTile) wallTile = makeWallTile();
     rain = Array.from({length:90}, ()=>({
       x: Math.random()*W*1.2, y: Math.random()*H,
       l: 10 + Math.random()*14, v: 9 + Math.random()*7,
@@ -13329,7 +13404,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v84</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v85</p>`);
     wire();
   }
   function wire(){
