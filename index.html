@@ -53,7 +53,8 @@
   --f-pix:     'Press Start 2P', monospace;
   --f-term:    'VT323', monospace;
 }
-*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;
+   touch-action:manipulation; }
 /* désactive le double-tap qui zoome sur iPhone (Safari ignore user-scalable) */
 html,body{ height:100%; touch-action:manipulation; -ms-touch-action:manipulation;
   overscroll-behavior:none; }
@@ -12749,6 +12750,36 @@ document.addEventListener("visibilitychange", ()=>{
     Scanner.stop();
   }
 });
+/* ── DOUBLE-TAP : ceinture et bretelles ──────────────────────────
+   Le CSS (`touch-action:manipulation` sur TOUT) suffit normalement.
+   Mais selon les navigateurs, un double-tap qui tombe sur le fond de
+   page peut encore déclencher le zoom. On le neutralise ici — et
+   UNIQUEMENT là : dès que le doigt touche un bouton, un lien, un
+   champ ou un canevas de jeu, on ne touche à rien, pour ne surtout
+   pas perturber les défis qui demandent des appuis rapides. */
+(function noDoubleTapZoom(){
+  const INTERACTIF = "button, a, input, textarea, select, label, canvas, [role='button']";
+  let lastT = 0, lastX = 0, lastY = 0;
+  document.addEventListener("touchend", e=>{
+    const now = Date.now();
+    const tch = e.changedTouches && e.changedTouches[0];
+    const x = tch ? tch.clientX : 0, y = tch ? tch.clientY : 0;
+    const prochesDansLeTemps = now - lastT < 330;
+    const memeEndroit = Math.abs(x - lastX) < 40 && Math.abs(y - lastY) < 40;
+    lastT = now; lastX = x; lastY = y;
+    if(!prochesDansLeTemps || !memeEndroit) return;
+    /* sur un élément interactif : on ne fait RIEN (le CSS s'en charge,
+       et on ne risque pas d'avaler un appui de jeu) */
+    if(e.target && e.target.closest && e.target.closest(INTERACTIF)) return;
+    e.preventDefault();
+  }, { passive:false });
+  /* et le double-clic de bureau, tant qu'on y est */
+  document.addEventListener("dblclick", e=>{
+    if(e.target && e.target.closest && e.target.closest(INTERACTIF)) return;
+    e.preventDefault();
+  }, { passive:false });
+})();
+
 /* pas de menu "enregistrer l'image" en plein combat */
 document.addEventListener("contextmenu", e=>{
   if(e.target.tagName === "CANVAS") e.preventDefault();
@@ -19236,7 +19267,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v94</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v95</p>`);
     wire();
   }
   function wire(){

@@ -62,6 +62,31 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v95) — le double-tap ne zoome plus
+
+Un double-tap continuait de zoomer la page. La cause : **`touch-action`
+n'est pas une propriété héritée en CSS**. Elle était posée sur `html, body`,
+ce qui ne couvre que les taps atterrissant *directement* sur eux — dès qu'on
+tapait sur un titre, une carte, une grille ou n'importe quel conteneur, on
+retombait sur le comportement par défaut et le navigateur rétablissait le
+double-tap-pour-zoomer. Et la balise `user-scalable=no` ne sert à rien :
+Firefox comme Safari l'ignorent volontairement, pour des raisons
+d'accessibilité.
+
+La règle est maintenant appliquée à **tous** les éléments. Les canevas qui
+ont besoin de `touch-action:none` (menu 3D, bornes d'arcade, cube, pochoir…)
+le déclarent avec un sélecteur plus spécifique : ils gardent la priorité.
+
+`manipulation` ne supprime **que** le double-tap : le défilement et le
+pincer-pour-zoomer restent disponibles.
+
+Une sécurité en JavaScript s'ajoute pour les navigateurs récalcitrants, mais
+elle ne s'active **jamais** sur un bouton, un lien, un champ ou un canevas de
+jeu — histoire de ne surtout pas avaler un appui dans les défis qui demandent
+des tapes rapides (Le Simon, notamment).
+
+sw v94→v95.
+
 ## Nouveautés (v94) — FLUIDITÉ : 120 images/seconde
 
 Deux problèmes bien distincts se cachaient derrière « ça rame parfois ».
