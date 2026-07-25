@@ -24,9 +24,17 @@ Le plus simple : **Netlify Drop** (https://app.netlify.com/drop) → glisse le d
 
 Ouvre `qr-codes.html` (réseau conseillé pour les polices ; les QR eux-mêmes se génèrent sans réseau), bouton Imprimer. 13 cartes aux couleurs du jeu : les 8 pièces avec leur invader pixel, les 2 balises coop LV_07A/LV_07B (loin l'une de l'autre), et les 3 mini-balises spotting LV_03A/B/C (à cacher aux endroits de tes photos). Le code en clair sous chaque QR est le plan B (saisie manuelle). Plastifie ou couvre d'adhésif transparent.
 
-## Le code secret (dans le jeu)
+## Les codes secrets (dans le jeu)
 
-Tape `ULYSSE` dans la saisie manuelle du scanner : ça débloque la **prochaine pièce non flashée**, avec l'animation normale. C'est le plan C si un QR est perdu ou arraché — à répéter autant de fois que nécessaire. Le mot se change dans `CONFIG.codeTriche`.
+Tous se tapent dans la **saisie manuelle du scanner** (onglet Flash, champ sous la caméra).
+
+| Code | Effet | Se change dans |
+|---|---|---|
+| `ULYSSE` | Débloque la **prochaine pièce non flashée**, avec l'animation normale. Le plan C si un QR est perdu ou arraché — à répéter autant de fois que nécessaire. | `CONFIG.codeTriche` |
+| `INVADER` | **Révèle le code final** : les 8 chiffres s'inscrivent tout seuls dans le terminal et l'onglet CODE s'ouvre. Il ne reste qu'à appuyer sur ✓ → dernier flash → **cinématique de fin**. | `CONFIG.codeRevele` |
+| `0000` | Efface toute la progression (double confirmation) et relance depuis le début, cinématique d'intro comprise. | `CONFIG.codeReset` |
+
+⚠ `INVADER` est le **plan de secours du jour J** : si un défi bloque, si un QR a disparu ou si le temps manque, il donne accès à la fin du jeu sans rien casser. Il ne touche pas à la sauvegarde — la partie reste exactement dans l'état où elle est, seul le code est dévoilé. Garde-le pour toi jusqu'au moment où tu en as besoin.
 
 ## Tester le jeu sans rien poser
 
@@ -53,6 +61,23 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `SHAPES.portrait` + `PALETTES.portrait` | le portrait pixel de ton père (LV_08, peint au pochoir) — grille de lettres, une lettre = une couleur ; un visage 12×12 d'exemple montre le format. `LAYER_NAMES` (dans LV_08) nomme chaque couche de couleur |
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
+
+## Nouveautés (v89) — le code `INVADER`
+
+Un troisième code secret, à taper dans la saisie manuelle du scanner :
+**`INVADER` révèle le code final**. Les 8 chiffres s'inscrivent tout seuls
+dans le terminal, l'onglet CODE s'ouvre, et il ne reste qu'à appuyer sur ✓ →
+dernier flash → la cinématique de fin.
+
+C'est le filet de sécurité du jour J : si un défi bloque, si un QR a disparu
+ou si le temps manque, ton père voit quand même la fin du jeu. Le code ne
+touche **pas** à la sauvegarde — la partie reste exactement dans l'état où
+elle est, seul le code est dévoilé. (Au passage : la saisie manuelle
+acceptait 6 caractères maximum, elle en accepte 12 — `INVADER` en fait 7.)
+
+Le mot se change dans `CONFIG.codeRevele`. Parcours vérifié de bout en bout
+au navigateur : saisie → code pré-rempli → ✓ → dernier flash → cinématique
+de fin, zéro erreur console. sw v88→v89.
 
 ## Nouveautés (v88) — LA CINÉMATIQUE DE FIN (13 plans)
 

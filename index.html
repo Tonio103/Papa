@@ -2236,7 +2236,7 @@ button.b2{ color:#04231d !important; }
     </div>
     <div id="scan-msg"></div>
     <div id="manual">
-      <input id="manual-in" placeholder="LV_0X" maxlength="6" autocomplete="off">
+      <input id="manual-in" placeholder="LV_0X" maxlength="12" autocomplete="off">
       <button id="btn-manual">OK</button>
     </div>
   </div>
@@ -2601,6 +2601,13 @@ const CONFIG = {
   // Chaque saisie débloque la PROCHAINE pièce non flashée — le
   // secours si un QR est perdu, arraché ou illisible au soleil.
   codeTriche: "ULYSSE",                 // À PERSONNALISER
+
+  // Code secret ULTIME : tapé dans la saisie manuelle du scanner, il
+  // RÉVÈLE le code final (les 8 fragments), l'inscrit tout seul dans le
+  // terminal et ouvre l'onglet CODE. Il ne reste qu'à valider : dernier
+  // flash, puis la cinématique de fin. Le plan de secours si un défi
+  // bloque ou si le temps manque le jour J.
+  codeRevele: "INVADER",                // À PERSONNALISER
 
   // Code secret de remise à zéro : tapé dans la saisie manuelle du
   // scanner, il efface toute la progression (avec double confirmation)
@@ -3871,6 +3878,24 @@ function handleCode(raw){
     clearTimeout(resetArmTimer);
     resetArmTimer = setTimeout(()=>{ resetArmedScan = false; }, 6000);
     restartScanSoon();
+    return;
+  }
+  /* code ULTIME → révèle le code final, le compose tout seul dans le
+     terminal et bascule sur l'onglet CODE. Il ne reste qu'à valider :
+     dernier flash, puis la cinématique de fin. */
+  if(CONFIG.codeRevele && code === CONFIG.codeRevele.toUpperCase()){
+    Scanner.stop();
+    AudioFX.fragment();
+    /* on ne touche PAS à la sauvegarde : c'est une simple révélation,
+       la partie en cours reste exactement dans l'état où elle est */
+    buildFinalInputs();
+    finalEntry = CODE_FINAL.split("");
+    show("final-screen");
+    renderFinalCells();
+    const fm = $("#final-msg");
+    fm.textContent = "CODE RÉVÉLÉ — appuie sur ✓";
+    fm.style.color = "var(--jaune)";
+    try{ navigator.vibrate && navigator.vibrate([20, 60, 20]); }catch(e){}
     return;
   }
   /* code secret → débloque la prochaine pièce verrouillée */
@@ -14642,7 +14667,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v88</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v89</p>`);
     wire();
   }
   function wire(){
