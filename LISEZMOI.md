@@ -62,6 +62,25 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v93) — les petits pins ne flottent plus sur les maisons
+
+Les pins des falaises étaient bien dessinés mais mal placés : on en trouvait
+un peu partout **sur les façades**, comme posés en l'air. Deux causes :
+
+1. **Un problème d'ordre de dessin.** Dans le plan de la cavale, la falaise
+   était peinte *après* le village du fond — donc ses pins atterrissaient
+   par-dessus les maisons. La falaise est un arrière-plan : elle passe
+   maintenant avant tout ce qui est devant elle.
+2. **Ils étaient plantés à des abscisses fixes** réparties sur toute la
+   largeur du massif, y compris là où la crête redescend au niveau du pied.
+   Résultat : des arbres semés au hasard, sans relief sous eux. Ils ne sont
+   désormais posés que **sur les vrais sommets** (une condition de hauteur
+   les supprime ailleurs), resserrés autour du point culminant, et collés
+   pile sur la ligne de crête.
+
+Testé de bout en bout sur les deux cinématiques, zéro erreur console.
+sw v92→v93.
+
 ## Nouveautés (v92) — correctifs de rendu (le coureur volait, les maisons se répétaient)
 
 Trois vrais défauts repérés sur photo, corrigés :

@@ -7691,21 +7691,31 @@ const Cinematic = (()=>{
       c.beginPath(); c.ellipse(ex, ey, 5 + (ei%4)*2.5, 2 + (ei%3), 0, 0, 7); c.fill();
     }
     c.restore();
-    /* pins accrochés à la crête */
+    /* PINS DE CRÊTE — uniquement sur les sommets, et posés pile sur
+       la ligne de crête. Ailleurs (là où le massif redescend au pied)
+       ils donnaient l'impression d'arbres semés au hasard en l'air. */
+    const footY = base - H*.012*k;           // le niveau du « pied » du massif
     CLIFFS.forEach(f=>{
-      const fx = (f.x - pan*.35)*W, fw = f.w*W;
+      const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
       for(let pi = 0; pi < f.pins; pi++){
-        const px = fx + fw*(.24 + pi*.2);
+        /* resserrés autour du sommet du massif, pas étalés sur toute
+           sa largeur */
+        const u = .38 + (pi - (f.pins - 1)/2)*.11 + Math.sin(f.seed + pi)*.03;
+        const px = fx + fw*u;
         if(px < -20 || px > W + 20) continue;
-        const py = crestAt(px) + 2;          // plantés SUR la crête
-        const ps = Math.max(4, H*.016*k);
-        c.fillStyle = shade(rock, -.5);
-        /* un pin d'Alep : tronc penché, trois étages de branches */
-        c.fillRect(px - .5, py - ps*.55, 1, ps*.55);
+        const cy = crestAt(px);
+        /* pas d'arbre si on n'est pas franchement au-dessus du pied :
+           c'est cette condition qui les empêche de flotter n'importe où */
+        if(footY - cy < fh*.4) continue;
+        const py = cy + 1.5;                 // les racines mordent dans la crête
+        const ps = Math.max(3.5, H*.014*k);
+        c.fillStyle = shade(rock, -.52);
+        /* un pin d'Alep : tronc fin, trois étages de branches */
+        c.fillRect(px - .5, py - ps*.5, 1, ps*.5);
         for(let L = 0; L < 3; L++){
-          const ly = py - ps*(.5 + L*.24), lw = ps*(.42 - L*.1);
+          const ly = py - ps*(.46 + L*.22), lw = ps*(.4 - L*.1);
           c.beginPath();
-          c.moveTo(px - lw, ly); c.lineTo(px, ly - ps*.26); c.lineTo(px + lw, ly);
+          c.moveTo(px - lw, ly); c.lineTo(px, ly - ps*.24); c.lineTo(px + lw, ly);
           c.closePath(); c.fill();
         }
       }
@@ -9481,14 +9491,17 @@ const Cinematic = (()=>{
         if(!ROOFS) ROOFS = buildRoofs();
         drawSky("#141032", "#38294e", .9, .1, { glow:.85, clouds:.28 });
         nightPlane(t, 0); satellite(t, 5);
+        const pan = ease(clamp01(p)) * 2.6;
+        /* LA FALAISE D'ABORD : c'est le fond de décor. Si on la
+           dessine après le village, ses pins se plantent sur les
+           façades et donnent l'impression de flotter. */
+        drawCliffs(H*.52, .8, "#241c40", pan*.3, .5);
         drawCity(cityFar, H*.5, .5, "#0c0c26", .2, .05 + p*.10);
         billboard(W*.72, H*.30, 60, 32, "#2BE4D0", t);       // panneau sur un toit lointain
         fogBank(H*.66, t, "#8aa0d8", .05, .05);              // brume entre les toits
         /* deux projecteurs d'hélico qui fouillent le ciel et les toits */
         searchlight(W*.24 + Math.sin(t*.5)*W*.1, -18, Math.PI*.5, t*1.05, "#dCE8ff", .9, H*1.25);
         searchlight(W*.76 + Math.cos(t*.6)*W*.1, -18, Math.PI*.5, t*.85 + 1.3, "#ffe0d0", 1.1, H*1.25);
-        const pan = ease(clamp01(p)) * 2.6;
-        drawCliffs(H*.58, .8, "#241c40", pan*.3, .55);
         bellTower(W*.72 - pan*W*.4, H*.62, Math.min(W,H)/520, "#171436", t, true);
         drawRoofs(ROOFS, pan*.55, H, "#131130", t);   // toits d'arrière-plan (parallaxe)
         drawRoofs(ROOFS, pan, H, "#1c1940", t);        // toits du premier plan
@@ -19020,7 +19033,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v92</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v93</p>`);
     wire();
   }
   function wire(){
