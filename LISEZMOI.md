@@ -62,6 +62,51 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v92) — correctifs de rendu (le coureur volait, les maisons se répétaient)
+
+Trois vrais défauts repérés sur photo, corrigés :
+
+**Le coureur volait.** Dans le plan de la cavale, il courait en l'air très
+au-dessus des toits. La fonction qui cherche la hauteur du toit sous ses
+pieds comparait une abscisse *monde* à une abscisse *écran* : elle se calait
+donc sur une maison qui n'était pas sous lui. En prime, elle calculait la
+pente du toit avec l'ancienne formule. Les deux sont corrigés — il court
+maintenant sur le faîtage, avec son ombre au sol — et il a été remis à
+l'échelle des maisons.
+
+**Les maisons se répétaient à l'identique.** Elles avaient toutes le même ton
+de pierre, la même tuile, et des largeurs trop proches. Maintenant chaque
+maison a **sa** pierre et **sa** tuile (tons franchement écartés), des
+largeurs et hauteurs bien plus contrastées, un décalage de texture qui lui
+est propre, une ombre portée de sa voisine, et — au hasard — une fissure, un
+store de commerce rayé, une porte cintrée, un nombre variable de jardinières
+posées à des endroits différents. Deux façades voisines ne se ressemblent
+plus.
+
+**Les invaders étaient des aplats posés sur l'image.** Ce sont des carreaux
+de céramique collés au ciment : ils ont maintenant une **ombre portée** qui
+les décolle du mur, un **joint** entre les tesselles, un **biseau** (lumière
+en haut à gauche, ombre en bas à droite), un **éclat d'émail**, et une pose
+« à la main » légèrement irrégulière.
+
+Deux défauts trouvés en corrigeant :
+
+- **Le grand mur de la tournée** était fait de rectangles dessinés à la main,
+  tous identiques, et chaque pièce était posée sur un panneau noir plat. Il
+  utilise maintenant la vraie texture de brique, avec des flaques de lumière
+  de lampadaire qui défilent, une couvertine de pierre en haut et l'ombre du
+  sol en bas ; le panneau noir est remplacé par un léger renfoncement.
+- **Une bande violette à bords droits** traversait le plan de la cavale :
+  quand les massifs des falaises sortaient du cadre, leur silhouette se
+  refermait en ligne droite. La crête est maintenant échantillonnée le long
+  de l'écran, et les pins sont plantés dessus.
+
+Au passage, la brume ne fait plus une bande nette (trois nappes de tailles et
+de vitesses différentes) et la lune est moins brûlante.
+
+Testé de bout en bout : les deux cinématiques, les huit décors de défi, zéro
+erreur console. sw v91→v92.
+
 ## Nouveautés (v91) — LE DÉCOR VIVANT DES DÉFIS
 
 Jusqu'ici, les huit défis se jouaient sur un aplat sombre, tous identiques.
