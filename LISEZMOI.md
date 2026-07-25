@@ -62,6 +62,64 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v94) — FLUIDITÉ : 120 images/seconde
+
+Deux problèmes bien distincts se cachaient derrière « ça rame parfois ».
+
+### 1. L'animation était calée sur les IMAGES, pas sur le temps
+
+Beaucoup d'éléments avançaient d'un cran à chaque image dessinée. Conséquence :
+sur un écran **120 Hz** (iPhone Pro), toute la cinématique se déroulait **deux
+fois trop vite** ; et dès que l'appareil peinait, tout ralentissait au lieu de
+sauter des images. D'où cette impression de vitesse qui change tout le temps.
+
+Tout est passé au **temps réel** : la pluie, les braises, la voiture, les
+étincelles, les coulures, la fumée, les confettis, les feux d'artifice, ainsi
+que les 21 animations du décor des défis. La cinématique dure maintenant
+exactement le même temps sur n'importe quel écran, à n'importe quelle
+cadence.
+
+*(Les jeux d'action — La Cavale, la borne d'arcade, le casse-briques, le
+serpent — utilisaient déjà un pas de temps fixe : leur difficulté ne
+dépendait pas de l'écran. Vérifié.)*
+
+### 2. Le décor était intégralement redessiné à chaque image
+
+Une façade de village, c'est deux dégradés, une texture de pierre tuilée, une
+toiture tuilée, une génoise, des fenêtres à volets avec leur halo, des
+jardinières, une porte cintrée, une treille, un balcon… multiplié par une
+quarantaine de maisons, **soixante fois par seconde**. Idem pour le ciel (le
+dégradé, la Voie lactée et ses 90 poussières, la lune) et pour les murs de
+briques.
+
+Or **rien de tout ça ne bouge** : seul le travelling change. Chaque maison,
+chaque mur et le fond du ciel sont désormais peints **une seule fois** dans
+leur propre image, puis simplement recollés. Seuls la fumée des cheminées, le
+linge qui bat, le chat, les étoiles qui scintillent et les nuages sont
+redessinés.
+
+Mesuré au navigateur : sur les plans de village, le travail par image passe
+de **~200 ms à moins de 1 ms**. Les halos lumineux (lampadaires, guirlandes,
+fenêtres allumées, boules de pétanque…) sont eux aussi pré-rendus au lieu
+d'être recalculés en dégradé radial à chaque fois.
+
+### 3. Plus aucun à-coup au changement de plan
+
+Mettre quarante maisons en cache d'un coup, c'est une image à 130 ms — un
+hoquet visible. La mise en cache est donc **étalée** : quelques millisecondes
+par image, et en attendant sa vraie image une maison est représentée par une
+silhouette simple (invisible : les plans démarrent au noir).
+
+### 4. Une qualité qui s'adapte toute seule
+
+Le jeu mesure en continu la durée de ses images. S'il n'y arrive pas, il
+retire d'abord ce qui coûte cher et se voit le moins — le grain argentique,
+puis la frange du bloom, le bokeh, le premier plan des défis, la densité de
+la pluie — et remet tout dès qu'il a de la marge. Sur un vieux téléphone le
+jeu s'allège au lieu de saccader ; sur un récent, il donne tout.
+
+sw v93→v94.
+
 ## Nouveautés (v93) — les petits pins ne flottent plus sur les maisons
 
 Les pins des falaises étaient bien dessinés mais mal placés : on en trouvait
