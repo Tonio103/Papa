@@ -7385,10 +7385,11 @@ const Cinematic = (()=>{
   function buildCity(n, hMin, hMax){
     const out = []; let x = -.06, i = 0;
     while(x < 1.72){
-      const bw = .13 + Math.random()*.17;
+      const bw = .1 + Math.random()*.24;
       /* on écrase un peu : une maison de village fait 2 ou 3 niveaux,
-         jamais une tour. La hauteur est bornée par la largeur. */
-      const bh = Math.min(hMin + Math.random()*(hMax - hMin), bw*1.15);
+         jamais une tour. La hauteur est bornée par la largeur, mais
+         avec assez de marge pour que deux voisines diffèrent vraiment. */
+      const bh = Math.min(hMin + Math.random()*(hMax - hMin)*1.35, bw*1.5);
       const floors = Math.max(1, Math.min(3, Math.round(bh/.058)));
       const cols = Math.max(2, Math.min(4, Math.round(bw/.045)));
       const wins = [];
@@ -7415,7 +7416,11 @@ const Cinematic = (()=>{
         door:  Math.random() < .55,               // porte cintrée
         lamp:  Math.random() < .3,                // lanterne de façade
         sign:  Math.random() < .16,               // enseigne de commerce
-        tone:  (Math.random() - .5)*.07,
+        /* le ton de la pierre ET celui de la tuile changent d'une
+           maison à l'autre : sans ça, une rangée de maisons du même
+           gabarit se lit comme un copier-coller */
+        tone:  (Math.random() - .5)*.2,
+        tuTone:(Math.random() - .5)*.26,
         seed:  i++,
       });
       x += bw - .012 - Math.random()*.014;   // les maisons se touchent, comme au village
@@ -7435,6 +7440,7 @@ const Cinematic = (()=>{
       const top = base - bh;                      // haut des MURS
       const rh  = Math.max(4, Math.min(bw*b.pitch, H*.075*k));   // pan de toit, pente douce
       const facade = shade(stone, b.tone);
+      const tuileB = shade(tuile, b.tuTone == null ? 0 : b.tuTone);
 
       /* ── LES MURS : calcaire, éclairé à droite (la lune/le soleil) */
       const g = c.createLinearGradient(bx, 0, bx + bw, 0);
@@ -7468,7 +7474,7 @@ const Cinematic = (()=>{
         c.lineTo(bx + bw + 3, top);
       }
       c.closePath();
-      c.fillStyle = shade(tuile, b.tone); c.fill();
+      c.fillStyle = tuileB; c.fill();
       /* les tuiles elles-mêmes */
       if(roofTile && bw > 22 && rh > 5){
         c.save(); c.clip(); c.globalAlpha = .5;
@@ -7486,13 +7492,13 @@ const Cinematic = (()=>{
       c.restore();
       c.restore();
       /* faîtage (tuiles de crête) */
-      c.fillStyle = shade(tuile, .16);
+      c.fillStyle = shade(tuileB, .16);
       if(b.hip) c.fillRect(bx + bw*.26, top - rh - 2, bw*.48, 3.5);
       else { c.beginPath(); c.arc(bx + bw*.5, top - rh, 3, Math.PI, 0); c.fill(); }
       /* génoise : la double rangée de tuiles sous le débord, marque
          de fabrique des maisons du sud */
-      c.fillStyle = shade(tuile, -.18); c.fillRect(bx - 4, top - 1, bw + 8, 3);
-      c.fillStyle = shade(tuile, .04);  c.fillRect(bx - 2.5, top + 2, bw + 5, 2.5);
+      c.fillStyle = shade(tuileB, -.18); c.fillRect(bx - 4, top - 1, bw + 8, 3);
+      c.fillStyle = shade(tuileB, .04);  c.fillRect(bx - 2.5, top + 2, bw + 5, 2.5);
       c.fillStyle = "rgba(20,10,4,.25)"; c.fillRect(bx - 2.5, top + 4.5, bw + 5, 1.5);
 
       /* ── CHEMINÉES ── */
@@ -7505,7 +7511,7 @@ const Cinematic = (()=>{
         c.fillStyle = "rgba(255,240,210,.1)"; c.fillRect(cx + cw - 1, cy, 1, hgt);
         c.fillStyle = "rgba(20,12,6,.3)";     c.fillRect(cx, cy, 1, hgt);
         /* le chapeau de tuiles */
-        c.fillStyle = shade(tuile, .06); c.fillRect(cx - 1.4, cy - 2.2, cw + 2.8, 2.6);
+        c.fillStyle = shade(tuileB, .06); c.fillRect(cx - 1.4, cy - 2.2, cw + 2.8, 2.6);
       };
       if(b.chim)  chimney(.7,  Math.max(3.5, Math.min(9, rh*.7)));
       if(b.chim2) chimney(.26, Math.max(3,   Math.min(7, rh*.5)));
@@ -7513,7 +7519,7 @@ const Cinematic = (()=>{
       if(b.dorm && rh > 12){
         const dx = bx + bw*.42, dw = Math.max(8, bw*.16), dy = top - rh*.52;
         c.fillStyle = shade(facade, .04); c.fillRect(dx, dy, dw, rh*.42);
-        c.fillStyle = shade(tuile, .1);
+        c.fillStyle = shade(tuileB, .1);
         c.beginPath(); c.moveTo(dx - 2, dy); c.lineTo(dx + dw/2, dy - 5); c.lineTo(dx + dw + 2, dy); c.closePath(); c.fill();
         c.fillStyle = winA > .04 && (b.seed % 3 === 0) ? "rgba(255,206,130,.8)" : "rgba(60,60,90,.5)";
         c.fillRect(dx + 2, dy + 3, dw - 4, rh*.24);
@@ -7648,14 +7654,25 @@ const Cinematic = (()=>{
     if(!CLIFFS) CLIFFS = buildCliffs();
     const rock = mixHexS(col, "#7d6a52", .4);
     c.save(); c.globalAlpha = a == null ? 1 : a;
-    /* la masse : une ligne de crête continue */
-    c.beginPath(); c.moveTo(-10, base + 40);
-    CLIFFS.forEach((f, i)=>{
-      const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
-      if(i === 0) c.lineTo(fx, base - fh*.4);
-      c.quadraticCurveTo(fx + fw*.22, base - fh*1.05, fx + fw*.5, base - fh*.88);
-      c.quadraticCurveTo(fx + fw*.78, base - fh*.7, fx + fw, base - fh*.5);
-    });
+    /* LA CRÊTE : on l'échantillonne le long de l'écran plutôt que de
+       relier des massifs qui peuvent être hors champ — sinon la
+       silhouette se referme en ligne droite et forme une bande. */
+    const crestAt = (sx)=>{
+      let y = base - H*.012*k;              // hauteur de pied par défaut
+      CLIFFS.forEach(f=>{
+        const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
+        if(sx < fx || sx > fx + fw) return;
+        const u = (sx - fx)/fw;             // 0→1 le long du massif
+        /* un profil bombé : montée franche, sommet, descente douce */
+        const prof = Math.sin(Math.PI*Math.pow(u, .78));
+        y = Math.min(y, base - fh*(.35 + prof*.65));
+      });
+      return y;
+    };
+    c.beginPath();
+    c.moveTo(-10, base + 40);
+    c.lineTo(-10, crestAt(-10));
+    for(let sx = -10; sx <= W + 10; sx += 8) c.lineTo(sx, crestAt(sx));
     c.lineTo(W + 10, base + 40); c.closePath();
     const gg = c.createLinearGradient(0, base - H*.2*k, 0, base + 10);
     gg.addColorStop(0, shade(rock, .1)); gg.addColorStop(1, shade(rock, -.3));
@@ -7676,9 +7693,11 @@ const Cinematic = (()=>{
     c.restore();
     /* pins accrochés à la crête */
     CLIFFS.forEach(f=>{
-      const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
+      const fx = (f.x - pan*.35)*W, fw = f.w*W;
       for(let pi = 0; pi < f.pins; pi++){
-        const px = fx + fw*(.24 + pi*.2), py = base - fh*(.82 - pi*.04);
+        const px = fx + fw*(.24 + pi*.2);
+        if(px < -20 || px > W + 20) continue;
+        const py = crestAt(px) + 2;          // plantés SUR la crête
         const ps = Math.max(4, H*.016*k);
         c.fillStyle = shade(rock, -.5);
         /* un pin d'Alep : tronc penché, trois étages de branches */
@@ -8381,17 +8400,65 @@ const Cinematic = (()=>{
     c.restore();
   }
   /* une mosaïque : n premières tesselles de la forme */
+  /* UNE VRAIE MOSAÏQUE — les invaders de Space Invader sont des
+     carreaux de céramique collés au ciment sur un mur. Donc : une
+     ombre portée sous la pièce entière, un joint entre les tesselles,
+     un biseau (lumière en haut à gauche, ombre en bas à droite), un
+     léger désalignement à la main et un éclat brillant sur l'émail.
+     Sans ça, ça ressemble à des rectangles posés sur l'image. */
   function mosaic(shapeName, col, x, y, cs, n){
     const shape = SHAPES[shapeName];
+    const grout = Math.max(.6, cs*.1);          // le joint de ciment
+    const t2 = cs - grout;                       // la tesselle elle-même
+    const bev = Math.max(.7, cs*.11);            // le biseau du carreau
+    /* 1) L'OMBRE PORTÉE de la pièce sur le mur : c'est elle qui la
+       « décolle » du fond et lui donne son épaisseur. */
+    let i0 = 0;
+    c.save();
+    c.fillStyle = "rgba(0,0,0,.34)";
+    shape.forEach((row, gy)=>[...row].forEach((ch, gx)=>{
+      if(ch === "." || ch === " ") return;
+      if(i0++ >= n) return;
+      c.fillRect(x + gx*cs + bev*1.1, y + gy*cs + bev*1.4, t2, t2);
+    }));
+    c.restore();
+    /* 2) LES TESSELLES */
     let i = 0;
     shape.forEach((row, gy)=>[...row].forEach((ch, gx)=>{
       if(ch === "." || ch === " ") return;
       if(i++ >= n) return;
-      const X = x + gx*cs, Y = y + gy*cs;
-      c.fillStyle = shade(col, ((gx*7+gy*13)%5-2)*.04);
-      c.fillRect(X, Y, cs-1, cs-1);
-      c.fillStyle = "rgba(255,255,255,.3)"; c.fillRect(X, Y, cs-1, 2);
-      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(X, Y+cs-3, cs-1, 2);
+      /* pose à la main : chaque carreau est très légèrement décalé */
+      const jx = (((gx*7 + gy*13) % 5) - 2)*(cs*.012);
+      const jy = (((gx*11 + gy*5) % 5) - 2)*(cs*.012);
+      const X = x + gx*cs + jx, Y = y + gy*cs + jy;
+      const v = ((gx*7 + gy*13) % 5 - 2)*.045;
+      /* le corps du carreau */
+      c.fillStyle = shade(col, v);
+      c.fillRect(X, Y, t2, t2);
+      /* le biseau : lumière en haut/gauche, ombre en bas/droite */
+      c.fillStyle = "rgba(255,255,255,.34)";
+      c.beginPath();
+      c.moveTo(X, Y); c.lineTo(X + t2, Y);
+      c.lineTo(X + t2 - bev, Y + bev); c.lineTo(X + bev, Y + bev);
+      c.closePath(); c.fill();
+      c.beginPath();
+      c.moveTo(X, Y); c.lineTo(X, Y + t2);
+      c.lineTo(X + bev, Y + t2 - bev); c.lineTo(X + bev, Y + bev);
+      c.closePath(); c.fill();
+      c.fillStyle = "rgba(0,0,0,.38)";
+      c.beginPath();
+      c.moveTo(X + t2, Y); c.lineTo(X + t2, Y + t2);
+      c.lineTo(X + t2 - bev, Y + t2 - bev); c.lineTo(X + t2 - bev, Y + bev);
+      c.closePath(); c.fill();
+      c.beginPath();
+      c.moveTo(X, Y + t2); c.lineTo(X + t2, Y + t2);
+      c.lineTo(X + t2 - bev, Y + t2 - bev); c.lineTo(X + bev, Y + t2 - bev);
+      c.closePath(); c.fill();
+      /* l'éclat de l'émail, en haut à gauche */
+      if(((gx*3 + gy*7) % 4) !== 0){
+        c.fillStyle = "rgba(255,255,255,.42)";
+        c.fillRect(X + bev*1.3, Y + bev*1.3, t2*.22, t2*.16);
+      }
     }));
   }
   const cells = shapeName=>{
@@ -8622,7 +8689,9 @@ const Cinematic = (()=>{
   function buildRoofs(){
     const out = []; let x = -0.2;
     while(x < 3.4){
-      const w = .16 + Math.random()*.15, h = .28 + Math.random()*.24;
+      /* largeurs et hauteurs franchement contrastées : un village,
+         ce sont des maisons de tailles très différentes, accolées */
+      const w = .1 + Math.random()*.26, h = .22 + Math.random()*.34;
       out.push({
         x, w, h,
         pitch:   .2 + Math.random()*.1,         // pente (fraction de la largeur)
@@ -8633,8 +8702,17 @@ const Cinematic = (()=>{
         dorm:    Math.random() < .28,
         laundry: Math.random() < .38,
         aerial:  Math.random() < .3,
-        pots:    Math.random() < .4,            // pots de fleurs sur la génoise
+        pots:    Math.random() < .55,           // pots de fleurs sur la génoise
+        nPots:   1 + (Math.random()*3|0),       // …mais pas toujours le même nombre
+        potOff:  Math.random(),                 // ni au même endroit
         cat:     Math.random() < .12,
+        awning:  Math.random() < .22,           // un store de commerce
+        arch:    Math.random() < .3,            // une porte cintrée au rez
+        crack:   Math.random() < .35,           // une fissure dans la façade
+        /* CHAQUE MAISON A SA PIERRE ET SA TUILE : c'est ce qui casse
+           l'effet « même maison copiée dix fois » */
+        tone:    (Math.random() - .5)*.16,
+        tuTone:  (Math.random() - .5)*.2,
         seed:    Math.random()*7,
         litWins: Array.from({length: 3 + (Math.random()*4|0)},
           ()=>[Math.random(), .12 + Math.random()*.6, Math.random() < .18]),
@@ -8643,37 +8721,62 @@ const Cinematic = (()=>{
     }
     return out;
   }
-  /* hauteur du FAÎTE à une abscisse donnée (la course marche dessus) */
+  /* hauteur du FAÎTE à une abscisse donnée (le coureur marche dessus).
+     `worldX` est en coordonnées MONDE (comme b.x), pas en coordonnées
+     écran : on compare les deux dans le même repère, sinon le coureur
+     se cale sur la hauteur d'une maison qui n'est pas sous ses pieds. */
   function roofYAt(list, pan, worldX){
     let y = H*.72;
     list.forEach(b=>{
-      const bx = (b.x - pan);
-      if(worldX >= bx && worldX < bx + b.w) y = H*(1 - b.h) - b.pitch*H*.5;
+      if(worldX < b.x || worldX >= b.x + b.w) return;
+      const bw = b.w*W;
+      /* exactement le même calcul que drawRoofs, sinon ça décroche */
+      const rh = Math.max(5, Math.min(bw*b.pitch, H*.075));
+      y = H*(1 - b.h) - rh;
     });
     return y;
   }
   function drawRoofs(list, pan, base, col, t){
     t = t || 0;
-    const stone = stoneOf(col), tuile = tileOf(col);
-    list.forEach(b=>{
+    const stone0 = stoneOf(col), tuile0 = tileOf(col);
+    list.forEach((b, bi)=>{
       const bx = (b.x - pan)*W, bw = b.w*W, by = H*(1 - b.h);
       if(bx > W + 40 || bx + bw < -40) return;
       const rh = Math.max(5, Math.min(bw*b.pitch, H*.075));
+      /* chaque maison a SA pierre et SA tuile */
+      const stone = shade(stone0, b.tone), tuile = shade(tuile0, b.tuTone);
 
       /* ── LA FAÇADE DE PIERRE ── */
       const fg = c.createLinearGradient(bx, 0, bx + bw, 0);
-      fg.addColorStop(0, shade(stone, -.18));
+      fg.addColorStop(0, shade(stone, -.24));
       fg.addColorStop(.7, stone);
-      fg.addColorStop(1, shade(stone, .14));
+      fg.addColorStop(1, shade(stone, .16));
       c.fillStyle = fg; c.fillRect(bx, by, bw, H - by);
       if(stoneTile){
-        c.save(); c.beginPath(); c.rect(bx, by, bw, H - by); c.clip(); c.globalAlpha = .2;
-        for(let yy = by; yy < H; yy += stoneTile.h) for(let xx = bx; xx < bx + bw; xx += stoneTile.w)
-          c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
+        c.save(); c.beginPath(); c.rect(bx, by, bw, H - by); c.clip(); c.globalAlpha = .42;
+        /* le décalage de la texture change d'une maison à l'autre :
+           deux façades voisines n'ont jamais le même appareillage */
+        const ox = (b.seed*37) % stoneTile.w, oy = (b.seed*23) % stoneTile.h;
+        for(let yy = by - oy; yy < H; yy += stoneTile.h)
+          for(let xx = bx - ox; xx < bx + bw; xx += stoneTile.w)
+            c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
         c.restore(); c.globalAlpha = 1;
       }
-      c.fillStyle = "rgba(255,240,214,.07)"; c.fillRect(bx + bw - 2.5, by, 2.5, H - by);
-      c.fillStyle = "rgba(18,10,4,.16)";     c.fillRect(bx, by, 1.6, H - by);
+      /* L'OMBRE PORTÉE de la maison voisine : c'est elle qui sépare
+         visuellement deux façades collées */
+      { const sg = c.createLinearGradient(bx, 0, bx + Math.min(26, bw*.4), 0);
+        sg.addColorStop(0, "rgba(10,6,2,.45)"); sg.addColorStop(1, "rgba(10,6,2,0)");
+        c.fillStyle = sg; c.fillRect(bx, by, Math.min(26, bw*.4), H - by); }
+      c.fillStyle = "rgba(255,240,214,.1)"; c.fillRect(bx + bw - 2.5, by, 2.5, H - by);
+      c.fillStyle = "rgba(18,10,4,.3)";     c.fillRect(bx, by, 1.6, H - by);
+      /* une fissure qui serpente, sur certaines façades */
+      if(b.crack){
+        c.strokeStyle = "rgba(20,12,6,.34)"; c.lineWidth = 1.1;
+        let kx = bx + bw*(.2 + (b.seed % 1)*.5), ky = by + 6;
+        c.beginPath(); c.moveTo(kx, ky);
+        for(let k = 0; k < 6; k++){ kx += Math.sin(b.seed + k*1.7)*7; ky += (H - by)/7; c.lineTo(kx, ky); }
+        c.stroke();
+      }
 
       /* ── LES FENÊTRES À VOLETS ── */
       b.litWins.forEach(([wx, wy, cold], wi)=>{
@@ -8762,8 +8865,9 @@ const Cinematic = (()=>{
 
       /* ── POTS DE FLEURS sur la génoise ── */
       if(b.pots){
-        for(let k = 0; k < 3; k++){
-          const px = bx + 10 + k*(bw*.3);
+        for(let k = 0; k < b.nPots; k++){
+          const px = bx + 8 + (b.potOff*bw*.3) + k*(bw*.26);
+          if(px > bx + bw - 10) continue;
           c.fillStyle = "#8a4f30"; c.fillRect(px, by + 5, 6, 5);
           c.fillStyle = "#3f6b38";
           c.beginPath(); c.ellipse(px + 3, by + 4, 4.4, 2.6, 0, 0, 7); c.fill();
@@ -8796,6 +8900,45 @@ const Cinematic = (()=>{
         c.beginPath(); c.moveTo(ax, by - rh); c.lineTo(ax, ay);
         c.moveTo(ax - 7, ay + 4); c.lineTo(ax + 7, ay + 4);
         c.moveTo(ax - 5, ay + 9); c.lineTo(ax + 5, ay + 9); c.stroke();
+      }
+      /* ── UN STORE DE COMMERCE au rez-de-chaussée ── */
+      if(b.awning && bw > 50){
+        const ay = H - Math.max(30, (H - by)*.28), aw = bw*.62, ax = bx + bw*.19;
+        const wob = Math.sin(t*1.1 + b.seed)*1.4;
+        const c1 = (bi % 3 === 0) ? "#b8452f" : (bi % 3 === 1 ? "#2f6a7a" : "#4a7a3a");
+        c.beginPath();
+        c.moveTo(ax - 4, ay);
+        c.quadraticCurveTo(ax + aw*.5, ay - 8 + wob, ax + aw + 4, ay);
+        c.lineTo(ax + aw + 4, ay + 11);
+        c.quadraticCurveTo(ax + aw*.5, ay + 3 + wob, ax - 4, ay + 11);
+        c.closePath();
+        c.fillStyle = c1; c.fill();
+        c.save(); c.clip();
+        c.fillStyle = "rgba(245,236,216,.85)";
+        for(let st2 = 0; st2 < 8; st2 += 2) c.fillRect(ax - 4 + st2*(aw/8), ay - 12, aw/8, 26);
+        c.restore();
+        c.fillStyle = "rgba(0,0,0,.22)";
+        c.beginPath();
+        c.moveTo(ax - 4, ay + 6);
+        c.quadraticCurveTo(ax + aw*.5, ay - 2 + wob, ax + aw + 4, ay + 6);
+        c.lineTo(ax + aw + 4, ay + 11);
+        c.quadraticCurveTo(ax + aw*.5, ay + 3 + wob, ax - 4, ay + 11);
+        c.closePath(); c.fill();
+      }
+      /* ── UNE PORTE CINTRÉE au pied de la façade ── */
+      if(b.arch && bw > 40){
+        const dw = Math.max(10, bw*.16), dx = bx + bw*(.3 + (b.seed % 1)*.35), dh = 26;
+        c.fillStyle = "rgba(16,9,4,.55)";
+        c.beginPath(); c.moveTo(dx - 1.5, H); c.lineTo(dx - 1.5, H - dh + dw*.5);
+        c.arc(dx + dw/2, H - dh + dw*.5, dw/2 + 1.5, Math.PI, 0);
+        c.lineTo(dx + dw + 1.5, H); c.closePath(); c.fill();
+        c.fillStyle = "#59391f";
+        c.beginPath(); c.moveTo(dx, H); c.lineTo(dx, H - dh + dw*.5);
+        c.arc(dx + dw/2, H - dh + dw*.5, dw/2, Math.PI, 0);
+        c.lineTo(dx + dw, H); c.closePath(); c.fill();
+        c.fillStyle = "rgba(0,0,0,.32)"; c.fillRect(dx + dw/2 - .5, H - dh + dw*.5, 1, dh - dw*.5);
+        c.fillStyle = shade(stone, .24);
+        c.fillRect(dx + dw/2 - 2, H - dh + dw*.5 - dw/2 - 1.5, 4, 3.4);
       }
       /* ── UN CHAT sur le faîtage ── */
       if(b.cat) drawCat(bx + bw*.5, by - rh - 1, .9, t + b.seed);
@@ -8989,12 +9132,26 @@ const Cinematic = (()=>{
   }
 
   /* banc de brume qui rampe (volumes doux qui dérivent) */
+  /* une nappe de brume : plusieurs bancs de tailles différentes qui
+     dérivent à des vitesses différentes. Un seul rang d'ellipses de
+     même taille donnait une bande à bords nets, très artificielle. */
   function fogBank(y, t, col, a, speed){
     c.save(); c.globalCompositeOperation = "lighter";
-    for(let i=0;i<4;i++){ const x = ((i*.3 + t*(speed||.03)) % 1.3)*W - W*.15, r = 90 + i*30;
-      const g = c.createRadialGradient(x, y + Math.sin(t*.5+i)*10, 6, x, y, r);
-      g.addColorStop(0, hexA(col || "#9aa0c8", (a||.05))); g.addColorStop(1, hexA(col || "#9aa0c8", 0));
-      c.fillStyle = g; c.beginPath(); c.ellipse(x, y, r, r*.5, 0, 0, 7); c.fill(); }
+    const C = col || "#9aa0c8", A0 = a || .05;
+    for(let L = 0; L < 3; L++){
+      const sp = (speed || .03)*(.5 + L*.4);
+      const ry = y + (L - 1)*14 + Math.sin(t*.35 + L)*7;
+      for(let i = 0; i < 5; i++){
+        const x = (((i*.27 + L*.11 + t*sp) % 1.4) - .2)*W;
+        const r = (70 + i*26 + L*40);
+        const g = c.createRadialGradient(x, ry + Math.sin(t*.5 + i + L)*8, 4, x, ry, r);
+        g.addColorStop(0, hexA(C, A0*(1 - L*.22)));
+        g.addColorStop(.55, hexA(C, A0*.4*(1 - L*.22)));
+        g.addColorStop(1, hexA(C, 0));
+        c.fillStyle = g;
+        c.beginPath(); c.ellipse(x, ry, r, r*(.28 + L*.08), 0, 0, 7); c.fill();
+      }
+    }
     c.restore();
   }
 
@@ -9353,16 +9510,16 @@ const Cinematic = (()=>{
           c.fillRect(bx2, by2, 7, 3); c.fillRect(bx2+1, by2+wing, 5, 2); c.fillRect(bx2+5, by2+wing, 5, 2);
         }
         /* le coureur : posé sur le toit sous lui, foulée + bonds */
-        const rsx = W*.44, scl = Math.min(W,H)/150;
+        const rsx = W*.44, scl = Math.min(W,H)/245;
         const ry = roofYAt(ROOFS, pan, pan + rsx/W);
-        const hop = Math.abs(Math.sin(t*7)) * H*.03;
+        const hop = Math.abs(Math.sin(t*7)) * H*.018;
         /* son ombre projetée sur le toit */
         c.save(); c.globalAlpha = .3; c.fillStyle = "#000";
-        c.beginPath(); c.ellipse(rsx, ry, 16, 4, 0, 0, 7); c.fill(); c.restore(); c.globalAlpha = 1;
+        c.beginPath(); c.ellipse(rsx, ry, 12, 3.2, 0, 0, 7); c.fill(); c.restore(); c.globalAlpha = 1;
         /* traînée de vitesse derrière lui (échos fantômes) */
         c.save(); c.globalCompositeOperation = "lighter";
         for(let i=1;i<=3;i++){ c.globalAlpha = .13/i;
-          perso(rsx - i*12, ry - hop, scl, "run", t - i*.03, 1); }
+          perso(rsx - i*9, ry - hop, scl, "run", t - i*.03, 1); }
         c.restore(); c.globalAlpha = 1;
         perso(rsx, ry - hop, scl, "run", t, 1);
         if(t > 1.5) once("cavaleWhoosh", ()=>AudioFX.whoosh && AudioFX.whoosh());
@@ -9390,11 +9547,37 @@ const Cinematic = (()=>{
         waterTower((W*.2 - (pan*.6*W)%(W*1.4) + W*1.4)%(W*1.4), H*.44, .9, "#0c0c26");
         billboard((W*.7 - (pan*.6*W)%(W*1.4)), H*.14, 58, 30, "#FFD23F", t);
         neon(W*.5 - (pan*.12*W)%W, H*.20, "★ LES VANS ★", "#ff3f7f", t);
-        /* le grand mur du fond qui court sur tout le plan */
-        c.fillStyle = "#1b1836"; c.fillRect(0, H*.30, W, H*.50);
-        c.fillStyle = "rgba(0,0,0,.16)";
-        for(let y=H*.30; y<H*.80; y+=15){ const sh = Math.round(y/15)%2 ? 17 : 0;
-          for(let x=-34-(pan*.5*W)%34; x<W; x+=34) c.fillRect(x+sh, y, 32, 13); }
+        /* LE GRAND MUR : la vraie texture de brique, qui défile avec
+           le travelling, éclairée par les lampadaires de la rue */
+        { const wy = H*.30, wh = H*.50;
+          c.fillStyle = "#1b1836"; c.fillRect(0, wy, W, wh);
+          if(wallTile){
+            c.save(); c.beginPath(); c.rect(0, wy, W, wh); c.clip();
+            const ox = (pan*.5*W) % wallTile.w;
+            for(let yy = wy; yy < wy + wh; yy += wallTile.h)
+              for(let xx = -ox - wallTile.w; xx < W + wallTile.w; xx += wallTile.w)
+                c.drawImage(wallTile.img, xx, yy, wallTile.w, wallTile.h);
+            c.restore();
+          }
+          /* trois flaques de lumière de lampadaire, qui défilent aussi */
+          c.save(); c.globalCompositeOperation = "lighter";
+          for(let L = 0; L < 3; L++){
+            const lx = ((L*.42 - pan*.5 + 2) % 1.26)*W - W*.13;
+            const lg2 = c.createRadialGradient(lx, wy + wh*.22, 8, lx, wy + wh*.5, W*.3);
+            lg2.addColorStop(0, "rgba(255,224,170,.16)");
+            lg2.addColorStop(1, "rgba(255,224,170,0)");
+            c.fillStyle = lg2; c.fillRect(lx - W*.3, wy, W*.6, wh);
+          }
+          c.restore();
+          /* le haut du mur : une couvertine de pierre + son ombre */
+          c.fillStyle = "#2a2450"; c.fillRect(0, wy - 5, W, 7);
+          c.fillStyle = "rgba(255,240,214,.1)"; c.fillRect(0, wy - 5, W, 1.6);
+          c.fillStyle = "rgba(0,0,0,.35)"; c.fillRect(0, wy + 2, W, 5);
+          /* le bas : l'ombre du sol qui remonte sur la brique */
+          const bgY = c.createLinearGradient(0, wy + wh - H*.1, 0, wy + wh);
+          bgY.addColorStop(0, "rgba(6,4,16,0)"); bgY.addColorStop(1, "rgba(6,4,16,.6)");
+          c.fillStyle = bgY; c.fillRect(0, wy + wh - H*.1, W, H*.1);
+        }
         neonSign((W*.9 - (pan*.5*W)%(W*1.3)), H*.36, "arrow", "#2BE4D0", t);
         c.fillStyle = "#0d0d22"; c.fillRect(0, H*.80, W, H);
         fogBank(H*.82, t, "#9fb4ff", .04, .04);
@@ -9405,7 +9588,18 @@ const Cinematic = (()=>{
           const cs = Math.min(W,H)*.026, ww = cs*8;
           if(sx < -ww-40 || sx > W+40) return;
           const wallY = H*.34, wallH = H*.42;
-          c.fillStyle = "#141130"; c.fillRect(sx-10, wallY, ww+20, wallH);   // panneau
+          /* pas de panneau noir posé sur le mur : juste un très léger
+             renfoncement, comme une travée un peu plus à l'ombre */
+          { const rg = c.createLinearGradient(sx - 12, 0, sx + ww + 12, 0);
+            rg.addColorStop(0, "rgba(8,5,20,.34)");
+            rg.addColorStop(.16, "rgba(8,5,20,.1)");
+            rg.addColorStop(.84, "rgba(8,5,20,.1)");
+            rg.addColorStop(1, "rgba(8,5,20,.34)");
+            c.fillStyle = rg; c.fillRect(sx - 12, wallY, ww + 24, wallH);
+            /* les deux montants de pierre de la travée */
+            c.fillStyle = "rgba(255,238,206,.05)";
+            c.fillRect(sx - 12, wallY, 2, wallH);
+            c.fillRect(sx + ww + 10, wallY, 2, wallH); }
           const rp = clamp01((pan - (w.vx - .68)) / .30);                    // progression du tag
           if(rp <= 0) return;
           once("tour"+i, ()=>{});                                            // marqueur
@@ -18826,7 +19020,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v91</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v92</p>`);
     wire();
   }
   function wire(){
