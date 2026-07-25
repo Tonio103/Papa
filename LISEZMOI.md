@@ -62,6 +62,48 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v91) — LE DÉCOR VIVANT DES DÉFIS
+
+Jusqu'ici, les huit défis se jouaient sur un aplat sombre, tous identiques.
+Maintenant **chaque défi a son décor animé**, peint au canevas derrière la
+zone de jeu — et un second calque qui passe **devant**, pour la profondeur.
+
+| Défi | Son décor |
+|---|---|
+| **LV_01 · La Palette** | l'atelier du peintre : palette qui tourne, pots et pinceaux, taches séchées sur le mur, gouttes qui tombent et éclaboussent, nuanciers qui flottent, et un **chevalet qui se peint tout seul** coup de pinceau après coup de pinceau |
+| **LV_02 · Le Binaire** | la salle des machines : pluie de 0 et de 1, circuit imprimé dont les pistes s'allument par impulsions, **bandeau de relais qui claquent** (étiquetés 128, 64, 32…), bande perforée qui défile, oscilloscope, LED |
+| **LV_03 · Le Spotting** | une ruelle des Vans : mur de pierre, rai de lumière poussiéreux, **loupe qui balaie** le mur en l'agrandissant, invaders cachés qui se révèlent puis se rendorment, la calade qui descend, un chat qui traverse |
+| **LV_04 · Rubikcubisme** | l'espace des cubes : damier isométrique qui ondule, cubes qui flottent, **un cube maître qui tourne une face toutes les 2,4 s**, une étagère de cubes résolus |
+| **LV_05 · Le Simon** | une scène de concert : quatre quadrants qui respirent à contretemps, ondes concentriques, notes qui montent, **égaliseur** qui suit le rythme, projecteurs qui balaient, batterie et amplis en silhouette, **mains levées du public** |
+| **LV_06 · La Cavale** | les toits des Vans qui défilent (tout le décor du village réutilisé), martinets, chauves-souris, **projecteur qui balaie** et la silhouette du coureur au loin |
+| **LV_07 · La Coop** | deux radars qui se cherchent, chacun avec son balayage et ses échos ; **deux talkies-walkies** qui émettent, une jauge de signal au centre, le lien pointillé entre A et B |
+| **LV_08 · Le Pochoir** | le mur de pierre éclairé en biais, brume de peinture, coulures fraîches, **un pochoir qu'on décolle** en révélant la peinture, une échelle, les bombes alignées au pied du mur |
+
+**Le décor réagit au jeu.** Un bon coup déclenche l'effet de son univers : ça
+**éclabousse** dans La Palette, ça fait **claquer un relais** dans Le Binaire,
+ça **allume un quadrant** dans Le Simon, ça **pulvérise** dans Le Pochoir, ça
+**pose un cube** dans Rubikcubisme, ça **pingue** dans les défis radar. Une
+erreur envoie une onde rouge et secoue la scène. Et plus la **série** de bons
+coups est longue, plus le décor s'emballe : un liseré pulse sur les bords, les
+gerbes grossissent.
+
+**Un lever de rideau** ouvre chaque défi en 1,4 s (le jeu est jouable
+immédiatement, c'est purement décoratif) : la giclée de peinture, le moniteur
+qui s'allume, la mise au point de la loupe, les cubes qui se rangent, les
+quatre couleurs en cascade, le projecteur qui balaie, les radars qui
+s'accrochent, le nuage de bombe qui traverse.
+
+Côté technique : tout l'atelier des Vans (village, falaises, toits, pierre,
+personnages, feux d'artifice) est désormais **partagé** entre les cinématiques
+et les décors de défi — d'où la ruelle du Spotting et les toits de La Cavale,
+qui sont exactement ceux des cinématiques. Zéro image, hors-ligne intact. Le
+décor respecte « mouvement réduit » (une seule image fixe) et se coupe tout
+seul quand on quitte l'écran.
+
+Testé de bout en bout : les huit décors rendus et capturés, les réactions
+déclenchées, les huit défis toujours jouables, les deux cinématiques
+inchangées, zéro erreur console. sw v90→v91.
+
 ## Nouveautés (v90) — LES VANS, POUR DE VRAI (+ vrais feux d'artifice)
 
 Le décor des deux cinématiques ne ressemblait pas aux Vans : c'était une
