@@ -5199,90 +5199,1019 @@ const Cinematic = (()=>{
 
   /* ── LA VILLE (rendu illustré : façades dégradées, fenêtres qui
      brillent, arêtes éclairées par la lune, toits habités) ── */
-  function buildCity(n, hMin, hMax){
-    const out = []; let x = 0;
-    while(x < 1.55){                                   // en fractions d'écran
-      const bw = .055 + Math.random()*.10, bh = hMin + Math.random()*(hMax - hMin);
-      const cols = Math.max(2, Math.round(bw/.024));
-      const rows = Math.max(2, Math.round(bh/.05));
-      const wins = [];
-      for(let r=0;r<rows;r++) for(let ci=0;ci<cols;ci++){
-        const wx = .016 + ci*(bw-.032)/Math.max(1,cols-1);
-        const wy = .05 + r*(bh-.08)/Math.max(1,rows-1);
-        wins.push([wx, wy, Math.random()<.24, Math.random()<.16]);   // x,y,allumée,cyan
+  /* ══════════════════════════════════════════════════════════════
+     LES VANS — la vraie ville, pas une mégapole
+     ──────────────────────────────────────────────────────────────
+     Le décor ne doit pas ressembler à une skyline dystopique : Les
+     Vans, c'est un village cévenol. Des maisons de pierre calcaire
+     serrées, des toits de tuiles romanes, des volets peints, des
+     platanes sur la place, un clocher, le Chassezac en contrebas et
+     les falaises du Bois de Païolive à l'horizon.
+     Tout ce qui suit remplace le vocabulaire « immeubles » par ce
+     vocabulaire-là, en gardant exactement les mêmes signatures :
+     les plans des deux cinématiques changent de visage d'un coup.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* mélange deux couleurs hex (k = 0 → a, 1 → b) */
+  function mixHex(a, b, k){
+    const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+    const m = (sh)=>Math.round((((A>>sh)&255)*(1-k) + ((B>>sh)&255)*k));
+    return `rgb(${m(16)},${m(8)},${m(0)})`;
+  }
+  /* même chose mais renvoie un hex (pour repasser dans shade()) */
+  function mixHexS(a, b, k){
+    const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+    const m = (sh)=>Math.max(0, Math.min(255, Math.round((((A>>sh)&255)*(1-k) + ((B>>sh)&255)*k))));
+    return "#" + ((1<<24) + (m(16)<<16) + (m(8)<<8) + m(0)).toString(16).slice(1);
+  }
+  /* la pierre du pays : on réchauffe la teinte du plan vers le calcaire */
+  const stoneOf = col => mixHexS(col, "#b09872", .55);
+  /* la tuile romane : terre cuite, plus chaude et plus rouge */
+  const tileOf  = col => mixHexS(col, "#a34a24", .52);
+
+  /* ── TEXTURE : moellons de calcaire (tuile raccordable) ────────
+     Des pierres irrégulières posées en assises, avec un joint clair
+     et une variation de ton par pierre. Pré-rendue une seule fois. */
+  let stoneTile = null;
+  function makeStoneTile(){
+    const RH = 11, tw = 96, th = RH*8;
+    const g = document.createElement("canvas"); g.width = tw*2; g.height = th*2;
+    const x = g.getContext("2d"); x.scale(2, 2);
+    x.fillStyle = "#8d7a5e"; x.fillRect(0, 0, tw, th);
+    let row = 0;
+    for(let y = 0; y < th; y += RH, row++){
+      /* largeurs de pierre pseudo-aléatoires mais déterministes */
+      let bx = -((row*17) % 26);
+      while(bx < tw){
+        const bw = 14 + ((row*7 + bx*3) % 5)*5;
+        const v = ((((Math.round(bx)*5 + row*11) % 9) - 4)) * .028;
+        x.fillStyle = shade("#9c8362", v);
+        rrectOn(x, bx + 1, y + 1, bw - 2, RH - 2, 1.6); x.fill();
+        /* pierre éclairée en haut, ombrée en bas */
+        x.fillStyle = "rgba(255,246,224,.16)"; x.fillRect(bx + 2, y + 1, bw - 4, 1);
+        x.fillStyle = "rgba(60,42,24,.28)";    x.fillRect(bx + 2, y + RH - 2, bw - 4, 1);
+        /* un éclat de silex de temps en temps */
+        if(((row*3 + bx) % 7) === 0){
+          x.fillStyle = "rgba(70,56,38,.22)";
+          x.fillRect(bx + 4 + (bx % 5), y + 4, 3, 2);
+        }
+        bx += bw;
       }
-      out.push({ x, w:bw, h:bh, wins, ant: Math.random()<.35, tank: Math.random()<.3,
-        ac: Math.random()<.4, tone: (Math.random()-.5)*.05 });
-      x += bw + .005 + Math.random()*.012;
+    }
+    return { img:g, w:tw, h:th };
+  }
+  /* rrect sur un contexte quelconque (les textures sont hors écran) */
+  function rrectOn(x, px, py, w, h, r){
+    r = Math.min(r, Math.abs(w)/2, Math.abs(h)/2);
+    x.beginPath();
+    x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r);
+    x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r);
+    x.arcTo(px, py, px + w, py, r); x.closePath();
+  }
+
+  /* ── TEXTURE : tuiles romaines (canal), raccordable ────────────
+     Des demi-cylindres alternés, rangée décalée : le motif typique
+     des toits du sud. Pré-rendue une fois puis tuilée. */
+  let roofTile = null;
+  function makeRoofTile(){
+    const TW = 7, TH = 5, tw = TW*12, th = TH*14;
+    const g = document.createElement("canvas"); g.width = tw*2; g.height = th*2;
+    const x = g.getContext("2d"); x.scale(2, 2);
+    x.fillStyle = "#8e3f22"; x.fillRect(0, 0, tw, th);
+    for(let row = 0, y = 0; y < th; y += TH, row++){
+      const off = row % 2 ? TW/2 : 0;
+      for(let bx = -TW; bx < tw; bx += TW){
+        const X = bx + off, v = ((((Math.round(X)*3 + row*7) % 7) - 3)) * .05;
+        /* le canal : un dégradé bombé, clair au sommet */
+        const gr = x.createLinearGradient(X, 0, X + TW, 0);
+        gr.addColorStop(0, shade("#7a3018", v));
+        gr.addColorStop(.42, shade("#c05a2c", v));
+        gr.addColorStop(.78, shade("#a3441f", v));
+        gr.addColorStop(1, shade("#6b2a14", v));
+        x.fillStyle = gr;
+        x.beginPath();
+        x.moveTo(X, y + TH); x.lineTo(X, y + 2.5);
+        x.quadraticCurveTo(X + TW/2, y - 1.5, X + TW, y + 2.5);
+        x.lineTo(X + TW, y + TH); x.closePath(); x.fill();
+        /* le recouvrement de la rangée du dessus */
+        x.fillStyle = "rgba(50,20,10,.3)";
+        x.beginPath(); x.moveTo(X, y + 2.5);
+        x.quadraticCurveTo(X + TW/2, y - 1.5, X + TW, y + 2.5);
+        x.quadraticCurveTo(X + TW/2, y + 1.2, X, y + 2.5); x.closePath(); x.fill();
+        /* mousse / lichen sur quelques tuiles */
+        if(((row*5 + bx) % 11) === 0){
+          x.fillStyle = "rgba(110,130,70,.22)";
+          x.fillRect(X + 2, y + TH - 4, TW - 4, 3);
+        }
+      }
+    }
+    return { img:g, w:tw, h:th };
+  }
+
+  /* ── LE VILLAGE : génération ───────────────────────────────────
+     Même signature que l'ancienne ville : buildCity(n, hMin, hMax).
+     Une maison = un corps de pierre + un toit de tuiles à deux
+     pentes ou à croupe, des rangées de fenêtres à volets, parfois
+     une porte cintrée, une lucarne, un balcon en fer, une treille. */
+  function buildCity(n, hMin, hMax){
+    const out = []; let x = -.06, i = 0;
+    while(x < 1.72){
+      const bw = .13 + Math.random()*.17;
+      /* on écrase un peu : une maison de village fait 2 ou 3 niveaux,
+         jamais une tour. La hauteur est bornée par la largeur. */
+      const bh = Math.min(hMin + Math.random()*(hMax - hMin), bw*1.15);
+      const floors = Math.max(1, Math.min(3, Math.round(bh/.058)));
+      const cols = Math.max(2, Math.min(4, Math.round(bw/.045)));
+      const wins = [];
+      for(let r = 0; r < floors; r++) for(let ci = 0; ci < cols; ci++){
+        wins.push({
+          u: cols === 1 ? .5 : (.18 + ci*(.64/(cols-1))),   // position sur la largeur
+          v: (r + .62)/floors,                              // position sur la hauteur
+          lit: Math.random() < .3,
+          warm: Math.random() < .82,                        // ampoule chaude ou télé bleutée
+          shut: Math.random() < .78,                        // a des volets
+          open: Math.random() < .55,                        // volets ouverts
+          arch: r === 0 && Math.random() < .3,              // fenêtre cintrée au rez
+        });
+      }
+      out.push({
+        x, w:bw, h:bh, floors, wins,
+        hip:   Math.random() < .35,               // toit à croupe (4 pentes)
+        pitch: .19 + Math.random()*.09,           // pente (fraction de la largeur)
+        chim:  Math.random() < .72,               // cheminée
+        chim2: Math.random() < .22,               // deuxième cheminée
+        dorm:  Math.random() < .3,                // lucarne
+        vine:  Math.random() < .3,                // treille / vigne vierge
+        balc:  Math.random() < .28,               // balcon en fer forgé
+        door:  Math.random() < .55,               // porte cintrée
+        lamp:  Math.random() < .3,                // lanterne de façade
+        sign:  Math.random() < .16,               // enseigne de commerce
+        tone:  (Math.random() - .5)*.07,
+        seed:  i++,
+      });
+      x += bw - .012 - Math.random()*.014;   // les maisons se touchent, comme au village
     }
     return out;
   }
+
+  /* ── LE VILLAGE : rendu ────────────────────────────────────────
+     drawCity(list, base, k, col, winA, pan, haze) — signature
+     inchangée pour que TOUS les plans en profitent d'un coup. */
   function drawCity(list, base, k, col, winA, pan, haze){
     haze = haze || 0;
+    const stone = stoneOf(col), tuile = tileOf(col);
     list.forEach(b=>{
       const bx = (b.x - pan)*W, bw = b.w*W, bh = b.h*H*k;
-      if(bx > W + 50 || bx + bw < -50) return;
-      const top = base - bh, facade = shade(col, b.tone);
-      /* façade dégradée : bord droit éclairé par la lune, bord gauche à l'ombre */
+      if(bx > W + 60 || bx + bw < -60) return;
+      const top = base - bh;                      // haut des MURS
+      const rh  = Math.max(4, Math.min(bw*b.pitch, H*.075*k));   // pan de toit, pente douce
+      const facade = shade(stone, b.tone);
+
+      /* ── LES MURS : calcaire, éclairé à droite (la lune/le soleil) */
       const g = c.createLinearGradient(bx, 0, bx + bw, 0);
-      g.addColorStop(0, shade(facade, -.14)); g.addColorStop(.72, facade); g.addColorStop(1, shade(facade, .12));
+      g.addColorStop(0, shade(facade, -.2));
+      g.addColorStop(.62, facade);
+      g.addColorStop(1, shade(facade, .16));
       c.fillStyle = g; c.fillRect(bx, top, bw, bh);
-      c.fillStyle = "rgba(255,240,220,.06)"; c.fillRect(bx + bw - 2, top, 2, bh);   // liseré éclairé
-      c.fillStyle = "rgba(0,0,0,.28)"; c.fillRect(bx, top, 2, bh);                  // arête ombrée
-      /* parapet du toit */
-      c.fillStyle = shade(facade, -.22); c.fillRect(bx, top, bw, 3);
-      c.fillStyle = "rgba(255,255,255,.06)"; c.fillRect(bx, top, bw, 1);
-      /* accessoires de toit (silhouette + petit relief) */
-      if(b.tank){ c.fillStyle = shade(facade, .05); c.fillRect(bx + bw*.18, top - H*.03, 15, H*.03);
-        c.fillStyle = shade(facade, -.25); c.fillRect(bx + bw*.18, top - H*.03, 15, 2); }
-      if(b.ac){ c.fillStyle = shade(facade, -.1); c.fillRect(bx + bw*.6, top - 6, 12, 6);
-        c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(bx + bw*.6 + 2, top - 4, 8, 2); }
-      if(b.ant){ c.fillStyle = shade(facade, -.35); c.fillRect(bx + bw*.5 - 1, top - H*.028, 2, H*.028);
-        c.fillStyle = "#ff5b5b"; c.fillRect(bx + bw*.5 - 1.5, top - H*.028 - 2, 3, 2); }   // feu d'obstacle
-      /* fenêtres : allumées = pixels vifs (le bloom les fait rayonner) ;
-         éteintes = léger reflet froid du ciel */
-      const lim = b.h * k;
-      b.wins.forEach(([wx, wy, lit, cyan])=>{
-        if(wy >= lim) return;
-        const wX = bx + wx*W, wY = top + wy*H;
-        if(lit && winA > .04){ c.fillStyle = cyan ? "#9fd6ff" : "#ffd28c"; c.fillRect(wX, wY, 4, 5);
-          c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(wX, wY, 4, 1); }
-        else { c.fillStyle = "rgba(130,150,200,.09)"; c.fillRect(wX, wY, 4, 5); }
+      /* texture de moellons, très discrète (elle se lit surtout de près) */
+      if(stoneTile && bw > 26 && bh > 20){
+        c.save(); c.beginPath(); c.rect(bx, top, bw, bh); c.clip(); c.globalAlpha = .2;
+        for(let yy = top; yy < top + bh; yy += stoneTile.h)
+          for(let xx = bx; xx < bx + bw; xx += stoneTile.w)
+            c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
+        c.restore(); c.globalAlpha = 1;
+      }
+      /* arêtes : chaîne d'angle claire à droite, ombre portée à gauche */
+      c.fillStyle = "rgba(255,238,206,.09)"; c.fillRect(bx + bw - 2.5, top, 2.5, bh);
+      c.fillStyle = "rgba(20,12,6,.16)";     c.fillRect(bx, top, 1.6, bh);
+
+      /* ── LA TOITURE : tuiles romanes, débord de toit, faîtage ── */
+      c.save();
+      c.beginPath();
+      if(b.hip){                                   // toit à croupe
+        c.moveTo(bx - 3, top);
+        c.lineTo(bx + bw*.26, top - rh);
+        c.lineTo(bx + bw*.74, top - rh);
+        c.lineTo(bx + bw + 3, top);
+      } else {                                     // deux pentes
+        c.moveTo(bx - 3, top);
+        c.lineTo(bx + bw*.5, top - rh);
+        c.lineTo(bx + bw + 3, top);
+      }
+      c.closePath();
+      c.fillStyle = shade(tuile, b.tone); c.fill();
+      /* les tuiles elles-mêmes */
+      if(roofTile && bw > 22 && rh > 5){
+        c.save(); c.clip(); c.globalAlpha = .5;
+        for(let yy = top - rh - 2; yy < top + 3; yy += roofTile.h*.5)
+          for(let xx = bx - 6; xx < bx + bw + 6; xx += roofTile.w*.5)
+            c.drawImage(roofTile.img, xx, yy, roofTile.w*.5, roofTile.h*.5);
+        c.restore(); c.globalAlpha = 1;
+      }
+      /* versant gauche à l'ombre */
+      c.save(); c.clip();
+      const sg = c.createLinearGradient(bx, 0, bx + bw, 0);
+      sg.addColorStop(0, "rgba(30,14,6,.4)"); sg.addColorStop(.55, "rgba(30,14,6,0)");
+      sg.addColorStop(1, "rgba(255,220,170,.14)");
+      c.fillStyle = sg; c.fillRect(bx - 6, top - rh - 2, bw + 12, rh + 4);
+      c.restore();
+      c.restore();
+      /* faîtage (tuiles de crête) */
+      c.fillStyle = shade(tuile, .16);
+      if(b.hip) c.fillRect(bx + bw*.26, top - rh - 2, bw*.48, 3.5);
+      else { c.beginPath(); c.arc(bx + bw*.5, top - rh, 3, Math.PI, 0); c.fill(); }
+      /* génoise : la double rangée de tuiles sous le débord, marque
+         de fabrique des maisons du sud */
+      c.fillStyle = shade(tuile, -.18); c.fillRect(bx - 4, top - 1, bw + 8, 3);
+      c.fillStyle = shade(tuile, .04);  c.fillRect(bx - 2.5, top + 2, bw + 5, 2.5);
+      c.fillStyle = "rgba(20,10,4,.25)"; c.fillRect(bx - 2.5, top + 4.5, bw + 5, 1.5);
+
+      /* ── CHEMINÉES ── */
+      const chimney = (u, hgt)=>{
+        const cx = bx + bw*u, cw = Math.max(3.4, Math.min(9, bw*.075));
+        /* le toit à cette abscisse : la souche part de la pente, pas du sol */
+        const roofY = top - rh*(1 - Math.abs(u - .5)*2*(b.hip ? .6 : 1));
+        const cy = roofY - hgt;
+        c.fillStyle = shade(facade, .06); c.fillRect(cx, cy, cw, hgt + 2);
+        c.fillStyle = "rgba(255,240,210,.1)"; c.fillRect(cx + cw - 1, cy, 1, hgt);
+        c.fillStyle = "rgba(20,12,6,.3)";     c.fillRect(cx, cy, 1, hgt);
+        /* le chapeau de tuiles */
+        c.fillStyle = shade(tuile, .06); c.fillRect(cx - 1.4, cy - 2.2, cw + 2.8, 2.6);
+      };
+      if(b.chim)  chimney(.7,  Math.max(3.5, Math.min(9, rh*.7)));
+      if(b.chim2) chimney(.26, Math.max(3,   Math.min(7, rh*.5)));
+      /* ── LUCARNE ── */
+      if(b.dorm && rh > 12){
+        const dx = bx + bw*.42, dw = Math.max(8, bw*.16), dy = top - rh*.52;
+        c.fillStyle = shade(facade, .04); c.fillRect(dx, dy, dw, rh*.42);
+        c.fillStyle = shade(tuile, .1);
+        c.beginPath(); c.moveTo(dx - 2, dy); c.lineTo(dx + dw/2, dy - 5); c.lineTo(dx + dw + 2, dy); c.closePath(); c.fill();
+        c.fillStyle = winA > .04 && (b.seed % 3 === 0) ? "rgba(255,206,130,.8)" : "rgba(60,60,90,.5)";
+        c.fillRect(dx + 2, dy + 3, dw - 4, rh*.24);
+      }
+
+      /* ── LES FENÊTRES À VOLETS ── */
+      const ww = Math.max(3.5, bw*.1), wh = Math.max(5, bh*.13);
+      b.wins.forEach(w=>{
+        const wX = bx + w.u*bw - ww/2, wY = base - w.v*bh - wh/2;
+        if(wY < top + 2) return;
+        /* l'embrasure */
+        c.fillStyle = "rgba(20,12,6,.45)"; c.fillRect(wX - 1, wY - 1, ww + 2, wh + 2);
+        /* la vitre */
+        if(w.lit && winA > .04){
+          c.fillStyle = w.warm ? "#ffcf8a" : "#a8d0ff";
+          c.fillRect(wX, wY, ww, wh);
+          c.fillStyle = "rgba(255,255,255,.4)"; c.fillRect(wX, wY, ww, 1);
+          /* la lumière déborde un peu sur la pierre */
+          c.save(); c.globalCompositeOperation = "lighter";
+          const lg = c.createRadialGradient(wX + ww/2, wY + wh/2, 1, wX + ww/2, wY + wh/2, ww*2.4);
+          lg.addColorStop(0, w.warm ? "rgba(255,190,110,.22)" : "rgba(150,200,255,.18)");
+          lg.addColorStop(1, "rgba(0,0,0,0)");
+          c.fillStyle = lg; c.fillRect(wX - ww*2, wY - ww*2, ww*5, wh + ww*4); c.restore();
+        } else {
+          c.fillStyle = "rgba(40,46,72,.55)"; c.fillRect(wX, wY, ww, wh);
+          c.fillStyle = "rgba(150,175,220,.1)"; c.fillRect(wX, wY, ww, wh*.4);
+        }
+        /* les croisillons */
+        c.fillStyle = "rgba(20,12,6,.35)";
+        c.fillRect(wX + ww/2 - .4, wY, .8, wh); c.fillRect(wX, wY + wh*.45, ww, .8);
+        /* LES VOLETS — bleu lavande ou vert olive, la couleur du pays */
+        if(w.shut){
+          const sc = (b.seed + Math.round(w.u*10)) % 2 ? "#4a6a86" : "#5a6e4a";
+          const sw = w.open ? ww*.42 : ww*.52;
+          [-1, 1].forEach(sd=>{
+            const sx = sd < 0 ? wX - sw - .6 : wX + ww + .6;
+            const rx = w.open ? sx : (sd < 0 ? wX : wX + ww - sw);
+            c.fillStyle = shade(sc, sd < 0 ? -.14 : .06);
+            c.fillRect(rx, wY - .6, sw, wh + 1.2);
+            c.fillStyle = "rgba(0,0,0,.22)";                        // lames
+            for(let ly = wY; ly < wY + wh; ly += 2.2) c.fillRect(rx, ly, sw, .7);
+            c.fillStyle = "rgba(255,240,210,.12)"; c.fillRect(rx, wY - .6, sw, .8);
+          });
+        }
+        /* jardinière de géraniums sur quelques appuis */
+        if((b.seed + Math.round(w.v*10)) % 4 === 0 && ww > 4){
+          c.fillStyle = "#6b4a2e"; c.fillRect(wX - .5, wY + wh, ww + 1, 1.8);
+          c.fillStyle = "#c0392b";
+          for(let gi = 0; gi < 3; gi++) c.fillRect(wX + gi*(ww/3), wY + wh - 1.2, 1.6, 1.6);
+          c.fillStyle = "#3e6b3a"; c.fillRect(wX, wY + wh - .2, ww, 1);
+        }
       });
-      if(haze > 0){ c.fillStyle = `rgba(34,38,78,${haze})`; c.fillRect(bx, top, bw, bh + 1); }
+
+      /* ── PORTE CINTRÉE AU REZ ── */
+      if(b.door && bh > 30){
+        const dw = Math.max(6, bw*.15), dx = bx + bw*.5 - dw/2, dh = Math.max(10, bh*.2);
+        c.fillStyle = "rgba(20,12,6,.5)";
+        c.beginPath(); c.moveTo(dx - 1, base); c.lineTo(dx - 1, base - dh + dw*.5);
+        c.arc(dx + dw/2, base - dh + dw*.5, dw/2 + 1, Math.PI, 0);
+        c.lineTo(dx + dw + 1, base); c.closePath(); c.fill();
+        c.fillStyle = "#5c3d24";
+        c.beginPath(); c.moveTo(dx, base); c.lineTo(dx, base - dh + dw*.5);
+        c.arc(dx + dw/2, base - dh + dw*.5, dw/2, Math.PI, 0);
+        c.lineTo(dx + dw, base); c.closePath(); c.fill();
+        c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(dx + dw/2 - .4, base - dh + dw*.5, .8, dh - dw*.5);
+        c.fillStyle = "#c8a86a"; c.beginPath(); c.arc(dx + dw*.72, base - dh*.45, .9, 0, 7); c.fill();
+        /* la clé de voûte */
+        c.fillStyle = shade(facade, .2); c.fillRect(dx + dw/2 - 1.6, base - dh + dw*.5 - dw/2 - 1, 3.2, 3);
+      }
+      /* ── LANTERNE DE FAÇADE ── */
+      if(b.lamp && winA > .04){
+        const lx = bx + bw*.82, ly = base - bh*.34;
+        c.save(); c.globalCompositeOperation = "lighter";
+        const lg = c.createRadialGradient(lx, ly, 1, lx, ly, 22);
+        lg.addColorStop(0, "rgba(255,200,120,.3)"); lg.addColorStop(1, "rgba(255,200,120,0)");
+        c.fillStyle = lg; c.beginPath(); c.arc(lx, ly, 22, 0, 7); c.fill(); c.restore();
+        c.fillStyle = "#2a2418"; c.fillRect(lx - 2.2, ly - 3, 4.4, 5.4);
+        c.fillStyle = "#ffd694"; c.fillRect(lx - 1.4, ly - 2.2, 2.8, 4);
+        c.fillStyle = "#2a2418"; c.fillRect(lx - 3, ly - 4.4, 6, 1.4);
+      }
+      /* ── TREILLE / VIGNE VIERGE qui grimpe ── */
+      if(b.vine){
+        c.save(); c.globalAlpha = .8;
+        const vx = bx + bw*.1;
+        c.strokeStyle = "#3f5a32"; c.lineWidth = 1.4;
+        c.beginPath(); c.moveTo(vx, base);
+        for(let s2 = 1; s2 <= 6; s2++) c.lineTo(vx + Math.sin(s2*1.7 + b.seed)*7, base - s2*(bh/7));
+        c.stroke();
+        c.fillStyle = "#4e6d38";
+        for(let s2 = 0; s2 < 12; s2++){
+          const ly2 = base - (s2/12)*bh*.9, lx2 = vx + Math.sin(s2*1.3 + b.seed)*9;
+          c.beginPath(); c.ellipse(lx2, ly2, 3.2, 2.4, s2, 0, 7); c.fill();
+        }
+        c.restore(); c.globalAlpha = 1;
+      }
+      /* ── BALCON EN FER FORGÉ ── */
+      if(b.balc && bh > 40){
+        const byy = base - bh*.52, bxx = bx + bw*.2, bww = bw*.6;
+        c.fillStyle = shade(facade, -.28); c.fillRect(bxx - 2, byy, bww + 4, 1.8);
+        c.strokeStyle = "rgba(25,22,18,.85)"; c.lineWidth = .9;
+        for(let ri = 0; ri <= 7; ri++){
+          const rx2 = bxx + ri*(bww/7);
+          c.beginPath(); c.moveTo(rx2, byy); c.lineTo(rx2, byy - 6); c.stroke();
+        }
+        c.beginPath(); c.moveTo(bxx - 1, byy - 6); c.lineTo(bxx + bww + 1, byy - 6); c.stroke();
+      }
+      /* ── ENSEIGNE DE COMMERCE (boulangerie, café de la place…) ── */
+      if(b.sign && bw > 44){
+        const sy = base - bh*.22;
+        c.fillStyle = "#25406a"; rrect(bx + bw*.18, sy, bw*.64, 7, 1.6); c.fill();
+        c.fillStyle = "rgba(255,224,150,.75)";
+        for(let li = 0; li < 5; li++) c.fillRect(bx + bw*.24 + li*(bw*.11), sy + 2.4, bw*.055, 2.2);
+      }
+      if(haze > 0){ c.fillStyle = `rgba(58,48,74,${haze})`; c.fillRect(bx - 4, top - rh - 6, bw + 8, bh + rh + 8); }
     });
   }
-  function drawSky(top, bottom, moonA, moonY){
-    /* dégradé de ciel enrichi : voûte sombre → lueur d'horizon */
-    const g = c.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, top); g.addColorStop(.55, shade(bottom, .04)); g.addColorStop(1, bottom);
-    c.fillStyle = g; c.fillRect(0, 0, W, H);
-    /* voile de la Voie lactée, oblique et diffus */
-    c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = moonA;
-    const mw = c.createLinearGradient(0, 0, W, H*.5);
-    mw.addColorStop(0, "rgba(80,90,160,0)"); mw.addColorStop(.5, "rgba(120,130,200,.05)"); mw.addColorStop(1, "rgba(80,90,160,0)");
-    c.fillStyle = mw; c.fillRect(0, 0, W, H*.6); c.restore();
-    /* étoiles de tailles variées qui scintillent */
-    stars.forEach(s=>{
-      c.globalAlpha = (.25 + Math.sin(performance.now()/700 + s[3])*.28) * moonA;
-      c.fillStyle = s[2] > 1.6 ? "#fff" : "#cfe0ff";
-      c.fillRect(s[0]*W, s[1]*H, s[2], s[2]);
+
+  /* ── LES FALAISES : la barre calcaire qui ferme l'horizon ──────
+     (le Bois de Païolive, les serres cévenoles). Strates, éboulis,
+     pins accrochés dans la pente. */
+  let CLIFFS = null;
+  function buildCliffs(){
+    const out = []; let x = -.15;
+    while(x < 1.3){
+      out.push({ x, w:.16 + Math.random()*.2, h:.1 + Math.random()*.12,
+        notch: Math.random() < .5, pins: 2 + (Math.random()*3|0), seed: Math.random()*7 });
+      x += .1 + Math.random()*.12;
+    }
+    return out;
+  }
+  function drawCliffs(base, k, col, pan, a){
+    if(!CLIFFS) CLIFFS = buildCliffs();
+    const rock = mixHexS(col, "#7d6a52", .4);
+    c.save(); c.globalAlpha = a == null ? 1 : a;
+    /* la masse : une ligne de crête continue */
+    c.beginPath(); c.moveTo(-10, base + 40);
+    CLIFFS.forEach((f, i)=>{
+      const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
+      if(i === 0) c.lineTo(fx, base - fh*.4);
+      c.quadraticCurveTo(fx + fw*.22, base - fh*1.05, fx + fw*.5, base - fh*.88);
+      c.quadraticCurveTo(fx + fw*.78, base - fh*.7, fx + fw, base - fh*.5);
     });
+    c.lineTo(W + 10, base + 40); c.closePath();
+    const gg = c.createLinearGradient(0, base - H*.2*k, 0, base + 10);
+    gg.addColorStop(0, shade(rock, .1)); gg.addColorStop(1, shade(rock, -.3));
+    c.fillStyle = gg; c.fill();
+    /* strates horizontales (le calcaire se lit en couches) */
+    c.save(); c.clip();
+    c.strokeStyle = "rgba(255,238,206,.07)"; c.lineWidth = 1.2;
+    for(let sy = base - H*.19*k; sy < base; sy += Math.max(5, H*.018*k)){
+      c.beginPath(); c.moveTo(-10, sy);
+      c.quadraticCurveTo(W*.5, sy + Math.sin(sy*.06)*4, W + 10, sy + 2); c.stroke();
+    }
+    /* éboulis au pied */
+    c.fillStyle = "rgba(30,22,14,.28)";
+    for(let ei = 0; ei < 26; ei++){
+      const ex = ((ei*0.041 + 0.02) % 1.02)*W, ey = base - Math.abs(Math.sin(ei*2.3))*H*.012*k;
+      c.beginPath(); c.ellipse(ex, ey, 5 + (ei%4)*2.5, 2 + (ei%3), 0, 0, 7); c.fill();
+    }
+    c.restore();
+    /* pins accrochés à la crête */
+    CLIFFS.forEach(f=>{
+      const fx = (f.x - pan*.35)*W, fw = f.w*W, fh = f.h*H*k;
+      for(let pi = 0; pi < f.pins; pi++){
+        const px = fx + fw*(.24 + pi*.2), py = base - fh*(.82 - pi*.04);
+        const ps = Math.max(4, H*.016*k);
+        c.fillStyle = shade(rock, -.5);
+        /* un pin d'Alep : tronc penché, trois étages de branches */
+        c.fillRect(px - .5, py - ps*.55, 1, ps*.55);
+        for(let L = 0; L < 3; L++){
+          const ly = py - ps*(.5 + L*.24), lw = ps*(.42 - L*.1);
+          c.beginPath();
+          c.moveTo(px - lw, ly); c.lineTo(px, ly - ps*.26); c.lineTo(px + lw, ly);
+          c.closePath(); c.fill();
+        }
+      }
+    });
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* ── LIGNES DE CRÊTE lointaines, en aplats dégradés ──────────── */
+  function drawRidges(base, col, pan, layers){
+    layers = layers || 3;
+    for(let L = layers; L >= 1; L--){
+      const amp = H*.035*L, y0 = base - H*.012*L;
+      c.beginPath(); c.moveTo(-10, base + 20);
+      for(let xx = -10; xx <= W + 10; xx += 14){
+        const u = (xx/W) + pan*.12*L;
+        const yy = y0 - (Math.sin(u*3.1 + L)*0.5 + Math.sin(u*7.7 + L*2)*0.3 + Math.sin(u*1.7)*0.2)*amp;
+        c.lineTo(xx, yy);
+      }
+      c.lineTo(W + 10, base + 20); c.closePath();
+      c.fillStyle = hexA(mixHexS(col, "#5a4a68", .3), .28 + (layers - L)*.16);
+      c.fill();
+    }
+  }
+
+  /* ── LE CHASSEZAC : la rivière en contrebas, avec ses galets ─── */
+  function riverChassezac(y, t, glow, depth){
+    depth = depth || H - y;
+    const g = c.createLinearGradient(0, y, 0, y + depth);
+    g.addColorStop(0, "rgba(46,66,86,.85)"); g.addColorStop(1, "rgba(16,24,44,.95)");
+    c.fillStyle = g; c.fillRect(0, y, W, depth);
+    /* les rides de courant */
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i = 0; i < 22; i++){
+      const ry = y + 4 + (i/22)*depth;
+      const rw = 16 + (i%5)*14 + Math.sin(t*1.4 + i)*8;
+      const rx = ((i*0.137 + t*0.012*(1 + i%3)) % 1.1)*W;
+      c.fillStyle = hexA(glow || "#a8c8e8", .05 + Math.abs(Math.sin(t*.9 + i))*.05);
+      c.beginPath(); c.ellipse(rx, ry, rw, 1.5, 0, 0, 7); c.fill();
+    }
+    c.restore();
+    /* galets qui émergent */
+    for(let i = 0; i < 9; i++){
+      const gx = W*(.06 + i*.108), gy = y + 8 + (i%4)*(depth*.16);
+      c.fillStyle = "rgba(120,110,96,.5)";
+      c.beginPath(); c.ellipse(gx, gy, 7 + (i%3)*4, 2.6 + (i%2)*1.4, 0, 0, 7); c.fill();
+      c.fillStyle = "rgba(255,240,210,.1)";
+      c.beginPath(); c.ellipse(gx - 1, gy - .8, 4 + (i%3)*2, 1.2, 0, 0, 7); c.fill();
+      /* le remous en aval du galet */
+      c.save(); c.globalCompositeOperation = "lighter";
+      c.fillStyle = "rgba(200,225,255,.07)";
+      c.beginPath(); c.ellipse(gx + 9, gy + 1, 8 + Math.sin(t*3 + i)*3, 1.4, 0, 0, 7); c.fill();
+      c.restore();
+    }
+  }
+
+  /* ── LE PONT DE PIERRE sur le Chassezac ───────────────────────── */
+  function stoneBridge(x, y, w, hgt, col, t){
+    const stone = stoneOf(col);
+    c.save();
+    /* le tablier */
+    c.fillStyle = shade(stone, -.06); c.fillRect(x, y - hgt*.28, w, hgt*.28);
+    c.fillStyle = shade(stone, .14);  c.fillRect(x, y - hgt*.28, w, 2.5);
+    /* les arches */
+    const nA = 3, aw = w/nA;
+    for(let i = 0; i < nA; i++){
+      const ax = x + i*aw + aw*.12, aww = aw*.76;
+      c.save(); c.globalCompositeOperation = "destination-out";
+      c.beginPath(); c.moveTo(ax, y);
+      c.lineTo(ax, y - hgt*.34);
+      c.arc(ax + aww/2, y - hgt*.34, aww/2, Math.PI, 0);
+      c.lineTo(ax + aww, y); c.closePath(); c.fill();
+      c.restore();
+      /* le claveau clair de l'arche */
+      c.strokeStyle = shade(stone, .18); c.lineWidth = 2;
+      c.beginPath(); c.arc(ax + aww/2, y - hgt*.34, aww/2, Math.PI, 0); c.stroke();
+    }
+    /* le parapet ajouré */
+    c.fillStyle = shade(stone, .08);
+    for(let px = x + 3; px < x + w - 3; px += 9) c.fillRect(px, y - hgt*.42, 4, hgt*.15);
+    c.restore();
+  }
+
+  /* ── LES PLATANES de la place : troncs marbrés, houppier dense ── */
+  function planeTree(x, groundY, s, t, col, phase){
+    const sway = Math.sin(t*.55 + (phase || 0))*.02;
+    c.save(); c.translate(x, groundY); c.scale(s, s); c.rotate(sway*.35);
+    /* ombre au sol */
+    c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, 1, 26, 5, 0, 0, 7); c.fill();
+    /* tronc : le platane a une écorce en plaques claires */
+    const tg = c.createLinearGradient(-7, 0, 7, 0);
+    tg.addColorStop(0, "#4a4438"); tg.addColorStop(.5, "#7d7362"); tg.addColorStop(1, "#3e3a30");
+    c.fillStyle = tg;
+    c.beginPath();
+    c.moveTo(-6, 0); c.quadraticCurveTo(-4.2, -22, -3.4, -40);
+    c.lineTo(3.4, -40); c.quadraticCurveTo(4.2, -22, 6, 0); c.closePath(); c.fill();
+    c.fillStyle = "rgba(215,205,180,.28)";                      // plaques d'écorce
+    [[-3,-9,4,5],[1,-18,4.5,6],[-4,-26,3.6,5],[2,-33,3.4,4]].forEach(([px,py,pw,ph])=>{
+      c.beginPath(); c.ellipse(px, py, pw, ph, .2, 0, 7); c.fill(); });
+    /* charpentière : trois branches maîtresses */
+    c.strokeStyle = "#57503f"; c.lineWidth = 3.4; c.lineCap = "round";
+    [[-1, -20], [1, -14], [0, -1]].forEach(([dx, dy], i)=>{
+      const sd = i === 1 ? 1 : -1;
+      c.beginPath(); c.moveTo(dx, -38 + dy*0);
+      c.quadraticCurveTo(sd*11, -46, sd*20 + dx, -52 - i*3); c.stroke();
+    });
+    /* houppier : des amas de feuillage superposés */
+    const leafA = mixHexS(col || "#2a3a24", "#4e7038", .55);
+    const leafB = mixHexS(col || "#2a3a24", "#6f9048", .5);
+    const BLOBS = [[0,-62,26,17],[-19,-56,18,12],[19,-56,18,12],[-10,-70,17,11],[11,-70,17,11],[0,-76,13,8]];
+    BLOBS.forEach(([bx2, by2, rw, rh], i)=>{
+      const wob = Math.sin(t*.9 + i*1.4 + (phase||0))*1.6;
+      c.fillStyle = i % 2 ? leafA : leafB;
+      c.beginPath(); c.ellipse(bx2 + wob, by2, rw, rh, 0, 0, 7); c.fill();
+    });
+    /* lumière qui accroche le dessus du houppier */
+    c.fillStyle = "rgba(255,232,170,.16)";
+    c.beginPath(); c.ellipse(2, -74, 14, 6, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(-16, -60, 9, 4, 0, 0, 7); c.fill();
+    /* quelques feuilles détachées qui tombent */
+    c.fillStyle = hexA(leafB, .7);
+    for(let i = 0; i < 3; i++){
+      const fy = ((t*9 + i*23) % 60) - 58;
+      const fx = Math.sin(t*1.3 + i*2)*13 + i*7 - 8;
+      c.save(); c.translate(fx, fy); c.rotate(t*2 + i);
+      c.beginPath(); c.ellipse(0, 0, 2.4, 1.4, 0, 0, 7); c.fill(); c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── CYPRÈS : la verticale sombre du paysage méditerranéen ────── */
+  function cypress(x, groundY, s, t, col, phase){
+    const sway = Math.sin(t*.8 + (phase||0))*.025;
+    c.save(); c.translate(x, groundY); c.scale(s, s); c.rotate(sway);
+    c.fillStyle = "rgba(0,0,0,.28)"; c.beginPath(); c.ellipse(0, 1, 9, 2.6, 0, 0, 7); c.fill();
+    const g = c.createLinearGradient(-7, 0, 7, 0);
+    g.addColorStop(0, mixHexS(col || "#1e2c1c", "#1a2e18", .5));
+    g.addColorStop(.6, mixHexS(col || "#1e2c1c", "#2e4a24", .6));
+    g.addColorStop(1, mixHexS(col || "#1e2c1c", "#16240f", .5));
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(0, -58);
+    c.quadraticCurveTo(7.5, -34, 5.5, 0); c.lineTo(-5.5, 0);
+    c.quadraticCurveTo(-7.5, -34, 0, -58); c.closePath(); c.fill();
+    c.fillStyle = "rgba(255,236,180,.1)";
+    c.beginPath(); c.moveTo(2, -52); c.quadraticCurveTo(6, -30, 4.6, -3);
+    c.lineTo(2.6, -3); c.quadraticCurveTo(3.6, -30, 2, -52); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  /* ── OLIVIER : tronc noueux, feuillage argenté ────────────────── */
+  function oliveTree(x, groundY, s, t, phase){
+    c.save(); c.translate(x, groundY); c.scale(s, s);
+    c.fillStyle = "rgba(0,0,0,.26)"; c.beginPath(); c.ellipse(0, 1, 18, 3.6, 0, 0, 7); c.fill();
+    c.fillStyle = "#5a5040";
+    c.beginPath(); c.moveTo(-5, 0);
+    c.quadraticCurveTo(-2, -12, -4, -22); c.lineTo(2, -22);
+    c.quadraticCurveTo(3, -12, 5, 0); c.closePath(); c.fill();
+    c.strokeStyle = "#4a4234"; c.lineWidth = 2; c.lineCap = "round";
+    [-1, 1].forEach(sd=>{ c.beginPath(); c.moveTo(0, -20); c.quadraticCurveTo(sd*9, -26, sd*14, -30); c.stroke(); });
+    const leaf = "#8fa07a";
+    [[0,-32,17,10],[-13,-28,11,7],[13,-28,11,7],[0,-38,11,6]].forEach(([bx2,by2,rw,rh], i)=>{
+      c.fillStyle = i % 2 ? leaf : "#7a8c66";
+      c.beginPath(); c.ellipse(bx2 + Math.sin(t + i)*1.2, by2, rw, rh, 0, 0, 7); c.fill();
+    });
+    c.fillStyle = "rgba(220,232,200,.2)";
+    c.beginPath(); c.ellipse(1, -37, 8, 3.4, 0, 0, 7); c.fill();
+    c.restore();
+  }
+
+  /* ── LE CLOCHER de l'église, repère du village ─────────────────
+     Tour carrée en pierre, abat-sons, horloge, flèche de tuiles. */
+  function bellTower(x, base, s, col, t, lit){
+    const stone = stoneOf(col), tuile = tileOf(col);
+    c.save(); c.translate(x, base); c.scale(s, s);
+    /* le fût */
+    const g = c.createLinearGradient(-16, 0, 16, 0);
+    g.addColorStop(0, shade(stone, -.2)); g.addColorStop(.65, stone); g.addColorStop(1, shade(stone, .16));
+    c.fillStyle = g; c.fillRect(-16, -96, 32, 96);
+    if(stoneTile){
+      c.save(); c.beginPath(); c.rect(-16, -96, 32, 96); c.clip(); c.globalAlpha = .22;
+      for(let yy = -96; yy < 0; yy += stoneTile.h) for(let xx = -16; xx < 16; xx += stoneTile.w)
+        c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
+      c.restore(); c.globalAlpha = 1;
+    }
+    /* chaînes d'angle */
+    c.fillStyle = shade(stone, .2);
+    for(let yy = -94; yy < -2; yy += 9){ c.fillRect(-16, yy, 5, 5); c.fillRect(11, yy + 4, 5, 5); }
+    /* corniche */
+    c.fillStyle = shade(stone, .1); c.fillRect(-19, -74, 38, 4);
+    c.fillStyle = "rgba(20,12,6,.3)"; c.fillRect(-19, -70, 38, 2);
+    /* les baies d'abat-son (les ouvertures des cloches) */
+    [-8, 8].forEach(bxx=>{
+      c.fillStyle = "rgba(14,10,20,.85)";
+      c.beginPath(); c.moveTo(bxx - 5, -44); c.lineTo(bxx - 5, -60);
+      c.arc(bxx, -60, 5, Math.PI, 0); c.lineTo(bxx + 5, -44); c.closePath(); c.fill();
+      c.strokeStyle = "rgba(50,40,28,.7)"; c.lineWidth = .8;
+      for(let ly = -58; ly < -45; ly += 3){ c.beginPath(); c.moveTo(bxx - 5, ly); c.lineTo(bxx + 5, ly + 1.5); c.stroke(); }
+      /* la cloche qui se devine dans l'ombre */
+      c.fillStyle = "rgba(150,120,60,.45)";
+      c.beginPath(); c.moveTo(bxx - 3, -50); c.quadraticCurveTo(bxx, -58, bxx + 3, -50); c.closePath(); c.fill();
+    });
+    /* l'horloge */
+    c.fillStyle = "#e8dfc6"; c.beginPath(); c.arc(0, -84, 8.2, 0, 7); c.fill();
+    c.strokeStyle = "#3a3020"; c.lineWidth = 1.2; c.beginPath(); c.arc(0, -84, 8.2, 0, 7); c.stroke();
+    c.fillStyle = "#3a3020";
+    for(let hi = 0; hi < 12; hi++){
+      const a = hi/12*Math.PI*2;
+      c.fillRect(Math.cos(a)*6.6 - .5, -84 + Math.sin(a)*6.6 - .5, 1, 1);
+    }
+    /* aiguilles figées sur une heure de nuit */
+    c.strokeStyle = "#2a2418"; c.lineWidth = 1.5; c.lineCap = "round";
+    c.beginPath(); c.moveTo(0, -84); c.lineTo(0, -89.4); c.stroke();
+    c.lineWidth = 1.1;
+    c.beginPath(); c.moveTo(0, -84); c.lineTo(3.6, -81.6); c.stroke();
+    if(lit){ c.save(); c.globalCompositeOperation = "lighter";
+      const cg = c.createRadialGradient(0, -84, 2, 0, -84, 30);
+      cg.addColorStop(0, "rgba(255,220,150,.3)"); cg.addColorStop(1, "rgba(255,220,150,0)");
+      c.fillStyle = cg; c.beginPath(); c.arc(0, -84, 30, 0, 7); c.fill(); c.restore(); }
+    /* la flèche de tuiles + la croix */
+    c.fillStyle = shade(tuile, .04);
+    c.beginPath(); c.moveTo(-19, -96); c.lineTo(0, -126); c.lineTo(19, -96); c.closePath(); c.fill();
+    c.fillStyle = "rgba(30,14,6,.35)";
+    c.beginPath(); c.moveTo(-19, -96); c.lineTo(0, -126); c.lineTo(0, -96); c.closePath(); c.fill();
+    c.strokeStyle = "#3a3428"; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(0, -126); c.lineTo(0, -136); c.moveTo(-4, -132); c.lineTo(4, -132); c.stroke();
+    /* le coq qui tourne dans le vent */
+    c.save(); c.translate(0, -138); c.rotate(Math.sin(t*.4)*.25);
+    c.fillStyle = "#c8a24a";
+    c.beginPath(); c.moveTo(-3.4, 0); c.quadraticCurveTo(0, -4, 4.4, -1.4);
+    c.quadraticCurveTo(1.6, 0, 3, 2.6); c.quadraticCurveTo(-1, 2, -3.4, 0); c.closePath(); c.fill();
+    c.restore();
+    c.restore();
+  }
+
+  /* ── LA FONTAINE de la place, qui coule vraiment ──────────────── */
+  function fountain(x, groundY, s, t, col){
+    const stone = stoneOf(col);
+    c.save(); c.translate(x, groundY); c.scale(s, s);
+    /* la vasque */
+    c.fillStyle = shade(stone, -.16);
+    c.beginPath(); c.ellipse(0, 0, 26, 7, 0, 0, 7); c.fill();
+    c.fillStyle = shade(stone, .06); c.fillRect(-26, -9, 52, 9);
+    c.beginPath(); c.ellipse(0, -9, 26, 7, 0, 0, 7); c.fill();
+    /* l'eau dans la vasque */
+    c.fillStyle = "rgba(90,140,170,.6)";
+    c.beginPath(); c.ellipse(0, -8.4, 22, 5.4, 0, 0, 7); c.fill();
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i = 0; i < 4; i++){
+      c.fillStyle = `rgba(190,225,255,${(.08 + Math.abs(Math.sin(t*2 + i))*.08).toFixed(3)})`;
+      c.beginPath(); c.ellipse(Math.sin(t + i*2)*10, -8.4 + i, 12 - i*2, 1.4, 0, 0, 7); c.fill();
+    }
+    c.restore();
+    /* la colonne centrale */
+    c.fillStyle = shade(stone, .02); c.fillRect(-5, -34, 10, 26);
+    c.fillStyle = shade(stone, .18); c.fillRect(-8, -38, 16, 5);
+    c.fillStyle = "rgba(20,12,6,.28)"; c.fillRect(-5, -34, 2.5, 26);
+    /* les mascarons et leurs jets */
+    [-1, 1].forEach(sd=>{
+      c.fillStyle = shade(stone, .12);
+      c.beginPath(); c.arc(sd*5, -28, 3.2, 0, 7); c.fill();
+      c.save(); c.globalCompositeOperation = "lighter";
+      c.strokeStyle = "rgba(200,232,255,.5)"; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(sd*7, -27.5);
+      c.quadraticCurveTo(sd*14, -24, sd*15.5, -9); c.stroke();
+      /* les éclaboussures */
+      for(let i = 0; i < 5; i++){
+        const sp = ((t*2.4 + i*.31) % 1);
+        c.fillStyle = `rgba(210,238,255,${(.5*(1-sp)).toFixed(3)})`;
+        c.beginPath(); c.arc(sd*(15.5 + sp*5), -8 + sp*3, 1.1, 0, 7); c.fill();
+      }
+      c.restore();
+    });
+    /* la mousse humide au pied */
+    c.fillStyle = "rgba(70,110,60,.35)";
+    c.beginPath(); c.ellipse(-18, -1, 8, 2.6, 0, 0, 7); c.ellipse(20, 0, 6, 2, 0, 0, 7); c.fill();
+    c.restore();
+  }
+
+  /* ── LE MARCHÉ du samedi : bâches rayées sur la place ─────────── */
+  function marketStalls(base, t, pan, n){
+    n = n || 4;
+    const COLS = [["#c94f4f","#f2e6d2"], ["#3f7a9c","#f2e6d2"], ["#4e8a52","#f7efe0"], ["#c9903f","#f7efe0"]];
+    for(let i = 0; i < n; i++){
+      const sx = ((i*.26 - pan*.6 + 1.2) % 1.35)*W - W*.1;
+      const sw = W*.2, sh = H*.05;
+      const [ca, cb] = COLS[i % COLS.length];
+      c.save();
+      /* les pieds */
+      c.fillStyle = "rgba(30,24,18,.75)";
+      c.fillRect(sx + 3, base - sh, 2.4, sh); c.fillRect(sx + sw - 5, base - sh, 2.4, sh);
+      /* l'étal */
+      c.fillStyle = "#6b4a30"; c.fillRect(sx, base - sh*.6, sw, 3);
+      /* les cageots */
+      for(let k = 0; k < 3; k++){
+        c.fillStyle = k % 2 ? "#8a6a44" : "#7a5c3a";
+        c.fillRect(sx + 6 + k*(sw*.28), base - sh*.6 - 6, sw*.22, 6);
+        c.fillStyle = ["#c0392b", "#d98a2b", "#5a8a3a"][k % 3];
+        for(let f = 0; f < 3; f++)
+          c.fillRect(sx + 8 + k*(sw*.28) + f*4, base - sh*.6 - 8.5, 3, 3);
+      }
+      /* la bâche rayée, qui ondule */
+      const wob = Math.sin(t*1.3 + i)*1.6;
+      c.beginPath();
+      c.moveTo(sx - 4, base - sh);
+      c.quadraticCurveTo(sx + sw*.5, base - sh - 9 + wob, sx + sw + 4, base - sh);
+      c.lineTo(sx + sw + 4, base - sh - 3);
+      c.quadraticCurveTo(sx + sw*.5, base - sh - 12 + wob, sx - 4, base - sh - 3);
+      c.closePath();
+      c.fillStyle = ca; c.fill();
+      c.save(); c.clip();
+      c.fillStyle = cb;
+      for(let st2 = 0; st2 < 7; st2 += 2) c.fillRect(sx - 4 + st2*(sw/7), base - sh - 14, sw/7, 14);
+      c.restore();
+      /* la frange */
+      c.fillStyle = "rgba(0,0,0,.2)";
+      c.beginPath();
+      c.moveTo(sx - 4, base - sh);
+      c.quadraticCurveTo(sx + sw*.5, base - sh - 9 + wob, sx + sw + 4, base - sh);
+      c.lineTo(sx + sw + 4, base - sh + 2.5);
+      c.quadraticCurveTo(sx + sw*.5, base - sh - 6.5 + wob, sx - 4, base - sh + 2.5);
+      c.closePath(); c.fill();
+      c.restore();
+    }
+  }
+
+  /* ── TERRASSES en pierre sèche + vignes (les faïsses cévenoles) ─ */
+  function terraces(base, k, col, pan, rows){
+    rows = rows || 3;
+    const stone = stoneOf(col);
+    for(let r = 0; r < rows; r++){
+      const ty = base - r*H*.035*k;
+      c.fillStyle = shade(stone, -.16 - r*.04);
+      c.fillRect(0, ty, W, H*.02*k);
+      c.fillStyle = "rgba(255,240,210,.06)"; c.fillRect(0, ty, W, 1.2);
+      /* les moellons du mur */
+      c.fillStyle = "rgba(20,12,6,.2)";
+      for(let sx = -((r*13 + pan*300) % 18); sx < W; sx += 18) c.fillRect(sx, ty, 1, H*.02*k);
+      /* les ceps alignés sur la terrasse */
+      c.strokeStyle = shade("#3e5a30", -r*.06); c.lineWidth = 1.6;
+      for(let vx = 12 - ((pan*260 + r*9) % 26); vx < W; vx += 26){
+        c.beginPath(); c.moveTo(vx, ty); c.lineTo(vx, ty - H*.014*k); c.stroke();
+        c.fillStyle = mixHexS(col, "#4e7038", .5);
+        c.beginPath(); c.ellipse(vx, ty - H*.016*k, 4.4, 2.6, 0, 0, 7); c.fill();
+      }
+    }
+  }
+
+  /* ── GARRIGUE : buissons de thym, genêts, cistes au premier plan ─ */
+  function garrigue(base, t, col, n){
+    n = n || 12;
+    for(let i = 0; i < n; i++){
+      const gx = W*((i*0.089 + 0.03) % 1.02), gs = 5 + (i % 4)*3;
+      const wob = Math.sin(t*1.1 + i)*.8;
+      c.fillStyle = hexA(mixHexS(col || "#2a3a22", "#54603a", .5), .85);
+      c.beginPath();
+      c.ellipse(gx + wob, base - gs*.4, gs, gs*.6, 0, 0, 7); c.fill();
+      c.fillStyle = "rgba(220,214,170,.14)";
+      c.beginPath(); c.ellipse(gx + wob - gs*.2, base - gs*.7, gs*.5, gs*.24, 0, 0, 7); c.fill();
+      /* fleurs de genêt */
+      if(i % 3 === 0){
+        c.fillStyle = "rgba(240,200,80,.6)";
+        for(let f = 0; f < 4; f++)
+          c.fillRect(gx + wob - gs*.6 + f*(gs*.4), base - gs*.8 - (f%2)*2, 1.6, 1.6);
+      }
+    }
+  }
+
+  /* ── LAVANDE : une rangée de touffes bleues qui ondulent ──────── */
+  function lavenderRow(base, t, n, a){
+    n = n || 22;
+    c.save(); c.globalAlpha = a == null ? 1 : a;
+    for(let i = 0; i < n; i++){
+      const lx = W*(i/(n-1))*1.04 - W*.02;
+      const wob = Math.sin(t*1.6 + i*.7)*1.4;
+      c.fillStyle = "#4a5a3a";
+      c.beginPath(); c.ellipse(lx, base, 5.5, 2.6, 0, 0, 7); c.fill();
+      for(let s2 = 0; s2 < 5; s2++){
+        const sx = lx - 4 + s2*2, sy = base - 4 - (s2 % 2)*2;
+        c.strokeStyle = "#4a5a3a"; c.lineWidth = .8;
+        c.beginPath(); c.moveTo(sx, base); c.lineTo(sx + wob*.5, sy); c.stroke();
+        c.fillStyle = "#7a6cb0";
+        c.beginPath(); c.ellipse(sx + wob*.5, sy - 2, 1.2, 3, wob*.06, 0, 7); c.fill();
+        c.fillStyle = "rgba(190,180,240,.5)";
+        c.beginPath(); c.ellipse(sx + wob*.5 - .3, sy - 3.4, .7, 1.4, 0, 0, 7); c.fill();
+      }
+    }
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* ── LES MARTINETS : ils tournoient au-dessus du village à la
+     tombée du jour, en criant. Bien plus « Les Vans » que des
+     pigeons de grande ville. ───────────────────────────────────── */
+  function swifts(cx, cy, t, n, spread){
+    n = n || 9; spread = spread || 1;
+    c.save(); c.strokeStyle = "rgba(24,18,34,.75)"; c.lineWidth = 1.5; c.lineCap = "round";
+    for(let i = 0; i < n; i++){
+      const ph = i*1.9, sp = .6 + (i % 3)*.22;
+      const rx = W*.28*spread*(.5 + (i % 4)*.18), ry = H*.09*spread*(.5 + (i % 3)*.2);
+      const a = t*sp + ph;
+      const bx = cx + Math.cos(a)*rx, by = cy + Math.sin(a*1.4)*ry;
+      const tilt = Math.cos(a)*.6;
+      const sz = 4.5 + (i % 3);
+      c.save(); c.translate(bx, by); c.rotate(tilt);
+      /* la silhouette en faux : ailes en arc, très reconnaissable */
+      c.beginPath();
+      c.moveTo(-sz, -sz*.5); c.quadraticCurveTo(-sz*.2, sz*.25, 0, 0);
+      c.quadraticCurveTo(sz*.2, sz*.25, sz, -sz*.5); c.stroke();
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(0, sz*.55); c.stroke();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── CIGALES : un frémissement de chaleur + des points qui vibrent
+     (on ne les voit pas, on les « sent ») ───────────────────────── */
+  function heatShimmer(y, hgt, t, a){
+    c.save(); c.globalAlpha = a == null ? .06 : a;
+    c.globalCompositeOperation = "lighter";
+    for(let i = 0; i < 14; i++){
+      const sy = y + (i/14)*hgt;
+      c.fillStyle = "rgba(255,225,180,.5)";
+      c.beginPath();
+      c.ellipse(W*.5 + Math.sin(t*2.2 + i)*W*.3, sy, W*.32, 1.2, 0, 0, 7); c.fill();
+    }
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* ── NUAGES : bandes douces qui dérivent, jamais menaçantes ───── */
+  let CLOUDS = null;
+  function buildClouds(){
+    return Array.from({length: 9}, (_, i)=>({
+      x: Math.random()*1.4 - .2, y: .05 + Math.random()*.26,
+      w: .22 + Math.random()*.34, h: .014 + Math.random()*.022,
+      v: .004 + Math.random()*.01, blobs: 4 + (Math.random()*4|0), seed: Math.random()*7,
+    }));
+  }
+  function drawClouds(t, a, colTop, colBot){
+    if(!CLOUDS) CLOUDS = buildClouds();
+    if(a <= 0) return;
+    c.save(); c.globalAlpha = a;
+    CLOUDS.forEach(cl=>{
+      const cx = (((cl.x + t*cl.v) % 1.5) + 1.5) % 1.5 - .25;
+      const X = cx*W, Y = cl.y*H, CW = cl.w*W, CH = cl.h*H;
+      const g = c.createLinearGradient(X, Y - CH, X, Y + CH);
+      g.addColorStop(0, colTop || "rgba(255,214,170,.34)");
+      g.addColorStop(.55, "rgba(150,130,170,.16)");
+      g.addColorStop(1, colBot || "rgba(90,80,130,.1)");
+      /* trois passes concentriques : le bord se dissout au lieu de
+         se découper — un nuage n'a jamais de contour net */
+      for(let pass = 0; pass < 3; pass++){
+        const k = 1 + pass*.45;
+        c.globalAlpha = a*(pass === 0 ? .55 : pass === 1 ? .3 : .16);
+        c.fillStyle = g;
+        c.beginPath();
+        for(let b = 0; b < cl.blobs; b++){
+          const bx = X + (b/(cl.blobs-1) - .5)*CW;
+          const rr = CH*(1.1 - Math.abs(b/(cl.blobs-1) - .5)*.8);
+          c.ellipse(bx, Y + Math.sin(b + cl.seed)*CH*.2,
+            CW/cl.blobs*.85*k, rr*k, 0, 0, 7);
+        }
+        c.fill();
+      }
+      c.globalAlpha = a;
+      /* le liseré éclairé du dessous (contre-jour d'aube) */
+      c.globalAlpha = a*.5;
+      c.fillStyle = "rgba(255,190,120,.1)";
+      c.beginPath(); c.ellipse(X, Y + CH*.7, CW*.42, CH*.24, 0, 0, 7); c.fill();
+      c.globalAlpha = a;
+    });
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* ── ÉTOILE FILANTE périodique et déterministe ────────────────── */
+  function shootingStar(t, period, phase, len){
+    const u = ((t + (phase||0)) % (period || 6)) / (period || 6);
+    if(u > .12) return;
+    const k = u/.12, L = len || 90;
+    const sx = W*(.15 + k*.55), sy = H*(.06 + k*.2);
+    c.save(); c.globalCompositeOperation = "lighter";
+    const g = c.createLinearGradient(sx, sy, sx - L, sy - L*.36);
+    const a = Math.sin(k*Math.PI);
+    g.addColorStop(0, `rgba(255,244,214,${(a*.95).toFixed(3)})`);
+    g.addColorStop(1, "rgba(255,244,214,0)");
+    c.strokeStyle = g; c.lineWidth = 2.2; c.lineCap = "round";
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx - L, sy - L*.36); c.stroke();
+    c.fillStyle = `rgba(255,255,240,${a.toFixed(3)})`;
+    c.beginPath(); c.arc(sx, sy, 1.8, 0, 7); c.fill();
+    c.restore();
+  }
+  /* ── LE CIEL DE L'ARDÈCHE ──────────────────────────────────────
+     Pas un ciel de dystopie : un ciel de campagne, très étoilé
+     (aucune pollution lumineuse dans les Cévennes), avec la Voie
+     lactée bien visible, une lueur chaude qui monte de l'horizon,
+     des nuages qui dérivent et, de temps en temps, une étoile
+     filante. C'est le ciel sous lequel on regarde les invaders. */
+  function drawSky(top, bottom, moonA, moonY, opt){
+    opt = opt || {};
+    const T = performance.now()/1000;
+    /* 1) LE DÉGRADÉ : voûte profonde → chaleur d'horizon */
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, top);
+    g.addColorStop(.42, mixHex(top, bottom, .55));
+    g.addColorStop(.78, shade(bottom, .05));
+    g.addColorStop(1, bottom);
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+
+    /* 2) LA LUEUR D'HORIZON : la chaleur du jour qui s'attarde
+       au-dessus des collines — c'est ce qui enlève tout le côté
+       « ville morte » du ciel d'origine */
+    if(opt.glow !== 0){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const hz = c.createLinearGradient(0, H*.42, 0, H*.9);
+      hz.addColorStop(0, "rgba(255,150,90,0)");
+      hz.addColorStop(.6, `rgba(255,150,90,${(.055*(opt.glow == null ? 1 : opt.glow)).toFixed(3)})`);
+      hz.addColorStop(1, `rgba(255,190,120,${(.1*(opt.glow == null ? 1 : opt.glow)).toFixed(3)})`);
+      c.fillStyle = hz; c.fillRect(0, H*.42, W, H*.5);
+      c.restore();
+    }
+
+    /* 3) LA VOIE LACTÉE : une écharpe oblique, granuleuse, avec ses
+       nuages sombres — dans les Cévennes, on la voit vraiment */
+    c.save(); c.globalCompositeOperation = "lighter"; c.globalAlpha = moonA;
+    c.translate(W*.5, H*.28); c.rotate(-.42); c.translate(-W*.5, -H*.28);
+    const mw = c.createLinearGradient(0, H*.1, 0, H*.46);
+    mw.addColorStop(0, "rgba(90,100,170,0)");
+    mw.addColorStop(.35, "rgba(150,160,220,.07)");
+    mw.addColorStop(.5, "rgba(200,205,245,.09)");
+    mw.addColorStop(.65, "rgba(150,160,220,.07)");
+    mw.addColorStop(1, "rgba(90,100,170,0)");
+    c.fillStyle = mw; c.fillRect(-W*.4, H*.1, W*1.8, H*.36);
+    /* les poussières d'étoiles dans la bande */
+    for(let i = 0; i < 90; i++){
+      const dx = ((i*97) % 1000)/1000*W*1.8 - W*.4;
+      const dy = H*.14 + ((i*61) % 1000)/1000*H*.28;
+      c.fillStyle = `rgba(230,235,255,${(.06 + ((i*13)%7)/7*.1).toFixed(3)})`;
+      c.fillRect(dx, dy, 1, 1);
+    }
+    /* les nébuleuses sombres qui découpent la bande */
+    c.globalCompositeOperation = "source-over";
+    c.fillStyle = hexA(top, .16);
+    [[.24,.22,.05,.012],[.56,.32,.04,.01],[.8,.24,.045,.011]].forEach(([u,v,rw,rh])=>{
+      c.beginPath(); c.ellipse(u*W*1.8 - W*.4, H*.14 + v*H*.28, rw*W, rh*H, .3, 0, 7); c.fill();
+    });
+    c.restore(); c.globalAlpha = 1;
+
+    /* 4) LES ÉTOILES : tailles variées, scintillement désaccordé,
+       et une pointe de couleur (bleutée / dorée) */
+    stars.forEach(s=>{
+      const tw = .25 + Math.sin(T*1.4 + s[3])*.28;
+      c.globalAlpha = Math.max(0, tw) * moonA;
+      c.fillStyle = s[2] > 1.6 ? "#ffffff" : (s[3] % 2 > 1 ? "#ffe6c0" : "#cfe0ff");
+      c.fillRect(s[0]*W, s[1]*H, s[2], s[2]);
+      /* les plus grosses ont une petite croix de diffraction */
+      if(s[2] > 1.7 && tw > .35){
+        c.globalAlpha = (tw - .35)*moonA*.7;
+        c.fillRect(s[0]*W - 2, s[1]*H + s[2]/2 - .5, s[2] + 4, 1);
+        c.fillRect(s[0]*W + s[2]/2 - .5, s[1]*H - 2, 1, s[2] + 4);
+      }
+    });
+    c.globalAlpha = 1;
+
+    /* 5) UNE ÉTOILE FILANTE de temps en temps */
+    if(moonA > .4 && opt.shoot !== 0) shootingStar(T, 9, opt.shootPh || 0);
+
+    /* 6) LA LUNE : disque nacré, mers, halo et terminateur doux */
     c.globalAlpha = moonA;
-    /* la lune : disque nacré + mers + halo (le bloom ajoute l'auréole) */
     const mx = W*.74, my = H*(moonY != null ? moonY : .16), mr = Math.min(W,H)*.05;
     c.save();
-    const halo = c.createRadialGradient(mx, my, mr*.4, mx, my, mr*4);
-    halo.addColorStop(0, "rgba(244,240,214,.35)"); halo.addColorStop(1, "rgba(244,240,214,0)");
+    const halo = c.createRadialGradient(mx, my, mr*.4, mx, my, mr*3.6);
+    halo.addColorStop(0, "rgba(248,244,220,.18)");
+    halo.addColorStop(.35, "rgba(230,225,200,.06)");
+    halo.addColorStop(1, "rgba(244,240,214,0)");
     c.globalCompositeOperation = "lighter"; c.fillStyle = halo;
-    c.beginPath(); c.arc(mx, my, mr*4, 0, 7); c.fill(); c.restore();
+    c.beginPath(); c.arc(mx, my, mr*3.6, 0, 7); c.fill(); c.restore();
     const mg = c.createRadialGradient(mx - mr*.3, my - mr*.3, mr*.2, mx, my, mr);
-    mg.addColorStop(0, "#fdfbe8"); mg.addColorStop(1, "#d9d3a8");
+    mg.addColorStop(0, "#f6f2dc"); mg.addColorStop(.7, "#e2dcb8"); mg.addColorStop(1, "#bdb590");
     c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, 7); c.fill();
-    c.fillStyle = "rgba(180,175,140,.35)";
-    c.beginPath(); c.arc(mx + mr*.3, my - mr*.2, mr*.18, 0, 7); c.arc(mx - mr*.25, my + mr*.3, mr*.13, 0, 7);
-    c.arc(mx + mr*.1, my + mr*.35, mr*.1, 0, 7); c.fill();
+    /* les mers lunaires */
+    c.fillStyle = "rgba(176,170,136,.34)";
+    c.beginPath();
+    c.arc(mx + mr*.3, my - mr*.2, mr*.19, 0, 7);
+    c.arc(mx - mr*.26, my + mr*.3, mr*.14, 0, 7);
+    c.arc(mx + mr*.12, my + mr*.36, mr*.1, 0, 7);
+    c.arc(mx - mr*.34, my - mr*.28, mr*.08, 0, 7);
+    c.fill();
+    /* quelques cratères clairs */
+    c.fillStyle = "rgba(255,252,232,.3)";
+    c.beginPath(); c.arc(mx - mr*.1, my - mr*.5, mr*.07, 0, 7);
+    c.arc(mx + mr*.5, my + mr*.12, mr*.05, 0, 7); c.fill();
     c.globalAlpha = 1;
+
+    /* 7) LES NUAGES, en dernier : ils passent devant les étoiles */
+    if(opt.clouds !== 0) drawClouds(T, opt.clouds == null ? .3 : opt.clouds,
+      opt.cloudTop || hexA(shade(bottom, .3), .5),
+      opt.cloudBot || hexA(shade(top, -.1), .45));
   }
   /* rectangle arrondi (tracé seul ; le caller remplit ou trace) */
   function rrect(x, y, w, h, r){
@@ -5616,60 +6545,191 @@ const Cinematic = (()=>{
   /* silhouette de toits qui défile (pour la cavale) : renvoie la
      hauteur du toit à un x donné, pour poser le coureur dessus */
   let ROOFS = null;
+  /* ── LES TOITS DU VILLAGE (plan de la cavale sur les toits) ────
+     Plus de terrasses en béton : des pans de tuiles inclinés, des
+     génoises, des cheminées de pierre, du linge tendu, des chats.
+     Chaque bâtiment a une pente et un sens de pente : la course se
+     lit comme un vrai enchaînement de toitures cévenoles. */
   function buildRoofs(){
     const out = []; let x = -0.2;
-    while(x < 3.2){ const w = .18 + Math.random()*.16, h = .30 + Math.random()*.22;
-      out.push({ x, w, h, chimney: Math.random()<.5, tank: Math.random()<.4,
-        dish: Math.random()<.45, laundry: Math.random()<.4, aerial: Math.random()<.55,
-        litWins: Array.from({length: 3 + (Math.random()*4|0)}, ()=>[Math.random(), .1+Math.random()*.7, Math.random()<.2]) });
-      x += w; }
+    while(x < 3.4){
+      const w = .16 + Math.random()*.15, h = .28 + Math.random()*.24;
+      out.push({
+        x, w, h,
+        pitch:   .2 + Math.random()*.1,         // pente (fraction de la largeur)
+        dir:     Math.random() < .5 ? -1 : 1,   // sens de la pente
+        hip:     Math.random() < .3,            // à croupe (donc plat au faîte)
+        chimney: Math.random() < .62,
+        chim2:   Math.random() < .25,
+        dorm:    Math.random() < .28,
+        laundry: Math.random() < .38,
+        aerial:  Math.random() < .3,
+        pots:    Math.random() < .4,            // pots de fleurs sur la génoise
+        cat:     Math.random() < .12,
+        seed:    Math.random()*7,
+        litWins: Array.from({length: 3 + (Math.random()*4|0)},
+          ()=>[Math.random(), .12 + Math.random()*.6, Math.random() < .18]),
+      });
+      x += w;
+    }
     return out;
   }
+  /* hauteur du FAÎTE à une abscisse donnée (la course marche dessus) */
   function roofYAt(list, pan, worldX){
     let y = H*.72;
-    list.forEach(b=>{ const bx = (b.x - pan); if(worldX >= bx && worldX < bx + b.w) y = H*(1 - b.h); });
+    list.forEach(b=>{
+      const bx = (b.x - pan);
+      if(worldX >= bx && worldX < bx + b.w) y = H*(1 - b.h) - b.pitch*H*.5;
+    });
     return y;
   }
   function drawRoofs(list, pan, base, col, t){
     t = t || 0;
+    const stone = stoneOf(col), tuile = tileOf(col);
     list.forEach(b=>{
       const bx = (b.x - pan)*W, bw = b.w*W, by = H*(1 - b.h);
-      if(bx > W + 30 || bx + bw < -30) return;
-      /* façade dégradée (arête droite éclairée) comme la ville */
+      if(bx > W + 40 || bx + bw < -40) return;
+      const rh = Math.max(5, Math.min(bw*b.pitch, H*.075));
+
+      /* ── LA FAÇADE DE PIERRE ── */
       const fg = c.createLinearGradient(bx, 0, bx + bw, 0);
-      fg.addColorStop(0, shade(col, -.12)); fg.addColorStop(.75, col); fg.addColorStop(1, shade(col, .14));
+      fg.addColorStop(0, shade(stone, -.18));
+      fg.addColorStop(.7, stone);
+      fg.addColorStop(1, shade(stone, .14));
       c.fillStyle = fg; c.fillRect(bx, by, bw, H - by);
-      c.fillStyle = "rgba(255,240,220,.05)"; c.fillRect(bx + bw - 2, by, 2, H - by);   // liseré éclairé
-      c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(bx, by, 2, H - by);                  // arête ombrée
-      c.fillStyle = "rgba(255,255,255,.05)"; c.fillRect(bx, by, bw, 2);                 // parapet
-      /* fenêtres allumées sur la façade */
-      b.litWins.forEach(([wx, wy, cyan])=>{
-        c.fillStyle = cyan ? "rgba(120,220,255,.5)" : "rgba(255,214,150,.4)";
-        c.fillRect(bx + wx*(bw-8) + 3, by + wy*(H - by), 4, 5);
+      if(stoneTile){
+        c.save(); c.beginPath(); c.rect(bx, by, bw, H - by); c.clip(); c.globalAlpha = .2;
+        for(let yy = by; yy < H; yy += stoneTile.h) for(let xx = bx; xx < bx + bw; xx += stoneTile.w)
+          c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
+        c.restore(); c.globalAlpha = 1;
+      }
+      c.fillStyle = "rgba(255,240,214,.07)"; c.fillRect(bx + bw - 2.5, by, 2.5, H - by);
+      c.fillStyle = "rgba(18,10,4,.16)";     c.fillRect(bx, by, 1.6, H - by);
+
+      /* ── LES FENÊTRES À VOLETS ── */
+      b.litWins.forEach(([wx, wy, cold], wi)=>{
+        const wX = bx + wx*(bw - 16) + 6, wY = by + 8 + wy*(H - by);
+        c.fillStyle = "rgba(18,10,4,.4)"; c.fillRect(wX - 1, wY - 1, 7, 9);
+        c.fillStyle = cold ? "rgba(150,200,255,.6)" : "rgba(255,206,140,.7)";
+        c.fillRect(wX, wY, 5, 7);
+        c.save(); c.globalCompositeOperation = "lighter";
+        const wg = c.createRadialGradient(wX + 2.5, wY + 3.5, 1, wX + 2.5, wY + 3.5, 16);
+        wg.addColorStop(0, cold ? "rgba(140,190,255,.2)" : "rgba(255,190,110,.24)");
+        wg.addColorStop(1, "rgba(0,0,0,0)");
+        c.fillStyle = wg; c.fillRect(wX - 14, wY - 12, 34, 32); c.restore();
+        /* volets rabattus sur les côtés */
+        const sc = (wi % 2) ? "#42607a" : "#4f6242";
+        c.fillStyle = sc; c.fillRect(wX - 3.4, wY - 1, 3, 9); c.fillRect(wX + 5.4, wY - 1, 3, 9);
+        c.fillStyle = "rgba(0,0,0,.22)";
+        for(let ly = wY; ly < wY + 8; ly += 2.4){ c.fillRect(wX - 3.4, ly, 3, .7); c.fillRect(wX + 5.4, ly, 3, .7); }
       });
-      c.fillStyle = shade(col, -.25);
-      if(b.chimney){ c.fillRect(bx + bw*.72, by - H*.05, 10, H*.05);
-        c.fillStyle = "#2a2740"; c.fillRect(bx + bw*.72 - 2, by - H*.05, 14, 4);
-        /* volute de fumée */
-        c.save(); c.globalAlpha = .12; c.fillStyle = "#8a8ab0";
-        for(let k=0;k<3;k++){ const sy = by - H*.05 - 8 - k*10 - (t*8)%10;
-          c.beginPath(); c.arc(bx + bw*.72 + 5 + Math.sin(t*1.5 + k)*4, sy, 4 + k, 0, 7); c.fill(); }
-        c.restore(); c.fillStyle = shade(col, -.25); }
-      if(b.tank){ c.fillStyle = shade(col, .12); c.fillRect(bx + bw*.18, by - H*.055, 22, H*.055);
-        c.fillRect(bx + bw*.18 + 2, by - H*.075, 18, H*.02);
-        c.fillStyle = shade(col, -.3); c.fillRect(bx + bw*.18 + 3, by - H*.052, 3, H*.05); }   // pied
-      if(b.aerial){ c.strokeStyle = shade(col, -.35); c.lineWidth = 1.4;
-        const ax = bx + bw*.5, ay = by - H*.06;
-        c.beginPath(); c.moveTo(ax, by); c.lineTo(ax, ay);
-        c.moveTo(ax-6, ay+3); c.lineTo(ax+6, ay+3); c.moveTo(ax-4, ay+8); c.lineTo(ax+4, ay+8); c.stroke(); }
-      if(b.dish){ c.fillStyle = shade(col, -.15); const dx = bx + bw*.85, dy = by - 8;
-        c.beginPath(); c.arc(dx, dy, 7, Math.PI*.2, Math.PI*1.2); c.fill();
-        c.strokeStyle = shade(col, -.3); c.lineWidth = 1.2; c.beginPath(); c.moveTo(dx, dy); c.lineTo(dx+4, by); c.stroke(); }
-      if(b.laundry){ const y0 = by - H*.03; c.strokeStyle = "rgba(0,0,0,.4)"; c.lineWidth = 1;
-        c.beginPath(); c.moveTo(bx + 6, y0); c.quadraticCurveTo(bx + bw/2, y0 + 8, bx + bw - 6, y0 - 2); c.stroke();
-        ["#3a3a6a","#5a3a5a","#3a5a5a"].forEach((cc, k)=>{ const lx = bx + 12 + k*14;
-          c.fillStyle = cc; const sway = Math.sin(t*2 + k)*1.5;
-          c.fillRect(lx + sway, y0 + 4, 8, 11); }); }
+
+      /* ── LA GÉNOISE (double rang de tuiles sous le débord) ── */
+      c.fillStyle = shade(tuile, -.16); c.fillRect(bx - 4, by - 1, bw + 8, 3);
+      c.fillStyle = shade(tuile, .04);  c.fillRect(bx - 2.5, by + 2, bw + 5, 2.5);
+      c.fillStyle = "rgba(18,8,2,.24)"; c.fillRect(bx - 2.5, by + 4.5, bw + 5, 1.5);
+
+      /* ── LE PAN DE TUILES ── */
+      const ridgeX = b.hip ? [bx + bw*.28, bx + bw*.72]
+                           : (b.dir < 0 ? [bx + bw*.16, bx + bw*.16] : [bx + bw*.84, bx + bw*.84]);
+      c.save();
+      c.beginPath();
+      c.moveTo(bx - 4, by);
+      c.lineTo(ridgeX[0], by - rh);
+      c.lineTo(ridgeX[1], by - rh);
+      c.lineTo(bx + bw + 4, by);
+      c.closePath();
+      c.fillStyle = shade(tuile, 0); c.fill();
+      if(roofTile && bw > 20 && rh > 4){
+        c.save(); c.clip(); c.globalAlpha = .55;
+        for(let yy = by - rh - 3; yy < by + 2; yy += roofTile.h*.55)
+          for(let xx = bx - 8; xx < bx + bw + 8; xx += roofTile.w*.55)
+            c.drawImage(roofTile.img, xx, yy, roofTile.w*.55, roofTile.h*.55);
+        c.restore(); c.globalAlpha = 1;
+      }
+      /* modelé : versant à l'ombre / versant éclairé */
+      c.save(); c.clip();
+      const sg = c.createLinearGradient(bx, by - rh, bx + bw, by);
+      sg.addColorStop(0, b.dir < 0 ? "rgba(255,220,170,.14)" : "rgba(26,12,4,.4)");
+      sg.addColorStop(1, b.dir < 0 ? "rgba(26,12,4,.4)" : "rgba(255,220,170,.14)");
+      c.fillStyle = sg; c.fillRect(bx - 8, by - rh - 4, bw + 16, rh + 8);
+      c.restore();
+      c.restore();
+      /* faîtage */
+      c.fillStyle = shade(tuile, .18);
+      c.fillRect(Math.min(ridgeX[0], ridgeX[1]) - 2, by - rh - 2.5, Math.abs(ridgeX[1] - ridgeX[0]) + 4, 3.5);
+
+      /* ── CHEMINÉES DE PIERRE + FUMÉE ── */
+      const chim = (u, hgt)=>{
+        const cx = bx + bw*u, cw = Math.max(4, Math.min(11, bw*.075));
+        const cy = by - rh - hgt;
+        c.fillStyle = shade(stone, -.02); c.fillRect(cx, cy, cw, hgt + rh*.7);
+        c.fillStyle = "rgba(255,240,214,.1)"; c.fillRect(cx + cw - 1.4, cy, 1.4, hgt);
+        c.fillStyle = "rgba(18,10,4,.3)";     c.fillRect(cx, cy, 1.2, hgt);
+        c.fillStyle = shade(tuile, -.04); c.fillRect(cx - 1.8, cy - 2.6, cw + 3.6, 3);
+        /* le chapeau de tuiles sur quatre plots */
+        c.fillStyle = shade(tuile, .12); c.fillRect(cx - 2.4, cy - 7, cw + 4.8, 2.2);
+        c.fillStyle = shade(stone, -.2);
+        c.fillRect(cx, cy - 5.2, 1.4, 3); c.fillRect(cx + cw - 1.4, cy - 5.2, 1.4, 3);
+        /* la fumée */
+        c.save(); c.globalAlpha = .1; c.fillStyle = "#c8c4d8";
+        for(let k = 0; k < 4; k++){
+          const sy = cy - 12 - k*11 - ((t*9) % 11);
+          c.beginPath(); c.arc(cx + cw/2 + Math.sin(t*1.2 + k + b.seed)*5, sy, 3.5 + k*1.4, 0, 7); c.fill();
+        }
+        c.restore();
+      };
+      if(b.chimney) chim(.7, Math.max(5, Math.min(16, rh*.9)));
+      if(b.chim2)   chim(.2, Math.max(4, Math.min(11, rh*.6)));
+
+      /* ── LUCARNE ── */
+      if(b.dorm && rh > 10){
+        const dx = bx + bw*.44, dw = Math.max(9, bw*.16), dy = by - rh*.5;
+        c.fillStyle = shade(stone, .04); c.fillRect(dx, dy, dw, rh*.5);
+        c.fillStyle = shade(tuile, .12);
+        c.beginPath(); c.moveTo(dx - 2.5, dy); c.lineTo(dx + dw/2, dy - 6); c.lineTo(dx + dw + 2.5, dy); c.closePath(); c.fill();
+        c.fillStyle = "rgba(255,206,140,.65)"; c.fillRect(dx + 2, dy + 3, dw - 4, rh*.28);
+      }
+
+      /* ── POTS DE FLEURS sur la génoise ── */
+      if(b.pots){
+        for(let k = 0; k < 3; k++){
+          const px = bx + 10 + k*(bw*.3);
+          c.fillStyle = "#8a4f30"; c.fillRect(px, by + 5, 6, 5);
+          c.fillStyle = "#3f6b38";
+          c.beginPath(); c.ellipse(px + 3, by + 4, 4.4, 2.6, 0, 0, 7); c.fill();
+          c.fillStyle = k % 2 ? "#d0503f" : "#e0a03f";
+          c.beginPath(); c.arc(px + 1.6, by + 3, 1.3, 0, 7); c.arc(px + 4.6, by + 3.6, 1.1, 0, 7); c.fill();
+        }
+      }
+
+      /* ── LE LINGE tendu entre deux toits ── */
+      if(b.laundry){
+        const y0 = by - rh - 6;
+        c.strokeStyle = "rgba(0,0,0,.4)"; c.lineWidth = 1;
+        c.beginPath(); c.moveTo(bx + 8, y0);
+        c.quadraticCurveTo(bx + bw/2, y0 + 9, bx + bw - 8, y0 - 3); c.stroke();
+        ["#e6e2d4", "#7a92b0", "#c0a68a", "#8aa07a"].forEach((cc, k)=>{
+          const u = (k + 1)/5;
+          const lx = bx + 8 + u*(bw - 16);
+          const ly = y0 + Math.sin(u*Math.PI)*9 - u*3;
+          const sway = Math.sin(t*2 + k + b.seed)*1.8;
+          c.save(); c.translate(lx, ly); c.rotate(sway*.05);
+          c.fillStyle = cc; c.fillRect(-4, 0, 8, 11);
+          c.fillStyle = "rgba(0,0,0,.14)"; c.fillRect(-4, 7, 8, 4);
+          c.restore();
+        });
+      }
+      /* ── ANTENNE RÂTEAU (le village a quand même la télé) ── */
+      if(b.aerial){
+        const ax = bx + bw*.56, ay = by - rh - H*.05;
+        c.strokeStyle = shade(stone, -.4); c.lineWidth = 1.3;
+        c.beginPath(); c.moveTo(ax, by - rh); c.lineTo(ax, ay);
+        c.moveTo(ax - 7, ay + 4); c.lineTo(ax + 7, ay + 4);
+        c.moveTo(ax - 5, ay + 9); c.lineTo(ax + 5, ay + 9); c.stroke();
+      }
+      /* ── UN CHAT sur le faîtage ── */
+      if(b.cat) drawCat(bx + bw*.5, by - rh - 1, .9, t + b.seed);
     });
   }
 
@@ -5986,9 +7046,9 @@ const Cinematic = (()=>{
 
   /* ── les plans : d = durée (s), subs = [[t, texte]] ── */
   const SCENES = [
-    { d:12, rain:.6, subs:[[1.2,"Les Vans, Ardèche.\n3 heures du matin."],[7,"La ville dort."]],
+    { d:12, rain:.6, subs:[[1.2,"Les Vans, Ardèche.\n3 heures du matin."],[7,"Le village dort."]],
       draw(t, p){
-        drawSky("#0b0b28", "#1e1c46", 1);      // nuit un peu plus lisible
+        drawSky("#141033", "#3a2a4e", 1, null, { glow:.9, clouds:.26 });   // nuit tiède de juin
         satellite(t, 3); nightPlane(t, 1);     // un satellite, un avion très haut
         /* grosse lune claire pour asseoir le plan */
         { c.save(); c.globalCompositeOperation = "lighter";
@@ -5996,10 +7056,25 @@ const Cinematic = (()=>{
           mg.addColorStop(0, "rgba(244,240,214,.4)"); mg.addColorStop(1, "rgba(244,240,214,0)");
           c.fillStyle = mg; c.beginPath(); c.arc(W*.74, H*.15, H*.16, 0, 7); c.fill(); c.restore(); }
         drawWires(t);                          // fils électriques en travers du ciel
+        drawRidges(H*.7, "#241c42", .02 + p*.05, 3);
+        drawCliffs(H*.73, .9, "#2a2246", .02 + p*.05, .8);
         drawCity(cityFar,  H*.74, .55, "#181636", .55, .02 + p*.05);
+        bellTower(W*.18, H*.74, Math.min(W,H)/620, "#181636", t, true);
+        cypress(W*.9, H*.745, Math.min(W,H)/540, t, "#1a2418", 1.2);
         billboard(W*.12, H*.38, 56, 32, "#ff2e88", t);        // panneau publicitaire rétroéclairé
         waterTower(W*.62, H*.74, 1.05, "#1a1840");            // château d'eau
         drawCity(cityNear, H*.80, .85, "#221f48", .8, .04 + p*.09);
+        planeTree(W*.08, H*.81, Math.min(W,H)/520, t, "#1e2a1c", .4);
+        planeTree(W*.93, H*.815, Math.min(W,H)/470, t, "#1e2a1c", 2.1);
+        chestnutTree(W*.66, H*.815, Math.min(W,H)/560, t, "#1c2818", 1.4);
+        /* la place déserte : la terrasse rangée, les boules oubliées */
+        cafeTerrace(W*.3, H*.825, Math.min(W,H)/620, t, "#221f48");
+        petanque(W*.55, H*.83, Math.min(W,H)/560, t);
+        washHouse(W*.86, H*.83, Math.min(W,H)/700, t, "#221f48");
+        /* et les habitants de la nuit */
+        bats(W*.42, H*.3, t, 6);
+        owl(W*.19, H*.79, Math.min(W,H)/380, t);
+        streetLights(H*.6, t, 12);
         distantTrain(H*.66, t, 2);             // un train passe au loin sur le viaduc
         /* phare rouge d'une antenne, au loin, qui clignote */
         { const bx = W*.86, by = H*.5; const on = Math.floor(t*1.2)%2 === 0;
@@ -6025,8 +7100,15 @@ const Cinematic = (()=>{
       } },
     { d:14, rain:1, subs:[[1.5,"Quelqu'un ne dort pas."],[8.5,"Personne ne l'a jamais vu.\nPersonne ne connaît son nom."]],
       draw(t, p){
-        drawSky("#08081e", "#10102a", 1);
+        drawSky("#100c26", "#2a2040", 1, null, { glow:.7, clouds:.2 });
         drawCity(cityFar, H*.42, .4, "#0e0e26", .25, .06);
+        planeTree(W*.5, H*.44, Math.min(W,H)/900, t, "#141c14", .9);
+        /* la ruelle des Vans : des marches, une enseigne, un gecko */
+        calade(W*.32, H*.62, W*.36, H*.3, 7, "#171436");
+        ironSign(W*.08, H*.3, Math.min(W,H)/300, t, "pain", "#2a3f5a");
+        ironSign(W*.78, H*.36, Math.min(W,H)/320, t, "verre", "#3f2a2a");
+        gecko(W*.2, H*.5, Math.min(W,H)/260, t);
+        butterflies(W*.12, H*.34, t, 4, "#f0d8a0");
         brickWall(0, H*.42, W, H*.36, W*.68);                          // le mur, éclairé par le réverbère
         fireEscape(W*.06, H*.44, 3, "#0a0a18");                        // escalier de secours
         graffTag(W*.30, H*.56, .8, "#ff2e88", 2);                      // vieux tags sur le mur
@@ -6109,7 +7191,7 @@ const Cinematic = (()=>{
       } },
     { d:18, subs:[[1,"Cette nuit-là…"],[10.5,"…il a signé\nsa plus grande tournée."]],
       draw(t, p){
-        drawSky("#08081e", "#0e0e26", .8, .075);
+        drawSky("#120e28", "#2e2242", .8, .075, { glow:.6, clouds:.18 });
         nightPlane(t, 6);
         brickWall(0, H*.16, W, H*.62, W*.42);                          // le grand mur, sous le projecteur
         fireEscape(W*.80, H*.20, 3, "#0a0a18");                        // escalier sur le mur
@@ -6171,7 +7253,7 @@ const Cinematic = (()=>{
     { d:11, rain:.5, subs:[[1,"On l'a poursuivi, souvent."],[6.2,"On ne l'a jamais rattrapé."]],
       draw(t, p){
         if(!ROOFS) ROOFS = buildRoofs();
-        drawSky("#0a0a22", "#181640", .9, .1);
+        drawSky("#141032", "#38294e", .9, .1, { glow:.85, clouds:.28 });
         nightPlane(t, 0); satellite(t, 5);
         drawCity(cityFar, H*.5, .5, "#0c0c26", .2, .05 + p*.10);
         billboard(W*.72, H*.30, 60, 32, "#2BE4D0", t);       // panneau sur un toit lointain
@@ -6180,8 +7262,12 @@ const Cinematic = (()=>{
         searchlight(W*.24 + Math.sin(t*.5)*W*.1, -18, Math.PI*.5, t*1.05, "#dCE8ff", .9, H*1.25);
         searchlight(W*.76 + Math.cos(t*.6)*W*.1, -18, Math.PI*.5, t*.85 + 1.3, "#ffe0d0", 1.1, H*1.25);
         const pan = ease(clamp01(p)) * 2.6;
+        drawCliffs(H*.58, .8, "#241c40", pan*.3, .55);
+        bellTower(W*.72 - pan*W*.4, H*.62, Math.min(W,H)/520, "#171436", t, true);
         drawRoofs(ROOFS, pan*.55, H, "#131130", t);   // toits d'arrière-plan (parallaxe)
         drawRoofs(ROOFS, pan, H, "#1c1940", t);        // toits du premier plan
+        bats(W*.7, H*.26, t, 5);
+        owl(W*.86 - ((pan*W*.9) % (W*1.3)), H*.5, Math.min(W,H)/420, t);
         /* nappe lumineuse d'un projecteur qui balaie le sol des toits */
         { const sweepX = W*.5 + Math.sin(t*.9)*W*.45;
           c.save(); c.globalCompositeOperation = "lighter";
@@ -6223,10 +7309,14 @@ const Cinematic = (()=>{
     { d:16, subs:[[1,"Huit murs. Une nuit."],[6.5,"Sa plus belle tournée."],[11,"Et personne ne l'a vu passer."]],
       draw(t, p){
         if(!TOUR) TOUR = buildTour();
-        drawSky("#08081e", "#171436", .85, .09);
+        drawSky("#120e2a", "#332448", .85, .09, { glow:.75, clouds:.22 });
         nightPlane(t, 8); satellite(t, 12);
         const pan = ease(clamp01(p*1.02)) * 2.15;            // travelling vers la droite
+        drawRidges(H*.4, "#1c1636", pan*.06, 2);
         drawCity(cityFar,  H*.44, .5,  "#0d0d26", .22, pan*.10);
+        cypress(W*.05, H*.45, Math.min(W,H)/620, t, "#161e14", .4);
+        cypress(W*.96, H*.45, Math.min(W,H)/700, t, "#161e14", 1.9);
+        streetLights(H*.28, t, 10);
         /* silhouettes défilantes sur les toits (parallaxe lente) */
         waterTower((W*.2 - (pan*.6*W)%(W*1.4) + W*1.4)%(W*1.4), H*.44, .9, "#0c0c26");
         billboard((W*.7 - (pan*.6*W)%(W*1.4)), H*.14, 58, 30, "#FFD23F", t);
@@ -6358,12 +7448,25 @@ const Cinematic = (()=>{
     { d:12, subs:[[1.5,"Au matin, HUIT pièces\nbrillaient sur les murs."],[8,"Huit défis.\nHuit fragments d'un code."]],
       draw(t, p){
         const q = ease(Math.min(1, p*1.6));
-        drawSky(q<.5 ? "#241d4e" : "#3a2c60", "#c96a4e", 1 - q*.8);   // l'aube monte
+        drawSky(q<.5 ? "#2a1f52" : "#4a3468", "#e8895a", 1 - q*.8, null,
+          { glow:1.4, clouds:.5, cloudTop:"rgba(255,196,140,.55)" });   // l'aube monte
         const sun = c.createRadialGradient(W*.3, H*.8, 8, W*.3, H*.8, H*.55);
         sun.addColorStop(0, `rgba(255,170,90,${.35*q})`); sun.addColorStop(1, "rgba(255,170,90,0)");
         c.fillStyle = sun; c.fillRect(0, 0, W, H);
         nightPlane(t, 4);
+        drawRidges(H*.66, "#4a3450", .03, 3);
+        drawCliffs(H*.7, .85, "#5a4450", .03, .75);
         drawCity(cityFar, H*.72, .5, "#1a1430", .12, .03);
+        bellTower(W*.14, H*.725, Math.min(W,H)/560, "#241a3a", t, false);
+        swifts(W*.6, H*.34, t, 9, 1);
+        hotAirBalloon(t, .22 + p*.1, H*.24, Math.min(W,H)/460, ["#c9483f", "#f0c04a", "#f2ece0"]);
+        hotAirBalloon(t + 3, .62 + p*.07, H*.17, Math.min(W,H)/620, ["#3f6a9c", "#f2ece0", "#c9483f"]);
+        planeTree(W*.88, H*.735, Math.min(W,H)/500, t, "#2a3820", 1.6);
+        chestnutTree(W*.34, H*.74, Math.min(W,H)/620, t, "#2a3a1c", .8);
+        /* le marché du samedi qui s'installe sur la place */
+        marketStalls(H*.79, t, .02, 3);
+        /* et le troupeau qui descend de la montagne */
+        flock(H*.8, t, 11, .03, "#e2dccc");
         waterTower(W*.82, H*.72, 1.0, "#1a1430");             // château d'eau au petit matin
         pigeonFlock(W*.5, H*.34, t, 7, Math.min(1, p*1.5));   // envol de pigeons vers le jour
         c.fillStyle = "#251d3e"; c.fillRect(0, H*.72, W, H);
@@ -6409,12 +7512,23 @@ const Cinematic = (()=>{
        l'aube et se relient, une à une, en une figure. ── */
     { d:9, subs:[[1.2,"Huit lumières dans le ciel des Vans."],[5.5,"Il n'en manque qu'une."]],
       draw(t, p){
-        drawSky("#141640", "#3a2c60", 1, .12);
+        drawSky("#1c1846", "#523a64", 1, .12, { glow:1.1, clouds:.4 });
+        drawRidges(H*.88, "#40305e", .01, 3);
+        drawCliffs(H*.92, .55, "#463658", .01, .45);
         { const sun = c.createRadialGradient(W*.5, H*.96, 10, W*.5, H*.96, H*.7);
           sun.addColorStop(0, "rgba(255,170,90,.24)"); sun.addColorStop(1, "rgba(255,170,90,0)");
           c.fillStyle = sun; c.fillRect(0, 0, W, H); }
+        drawRidges(H*.76, "#3a2c56", .02, 3);
+        drawCliffs(H*.8, .8, "#40325a", .02, .6);
         drawCity(cityFar, H*.82, .5, "#1a1636", .1, .02);
+        bellTower(W*.2, H*.825, Math.min(W,H)/560, "#241a3e", t, true);
         drawCity(cityNear, H*.9, .7, "#241a3e", .22, .04 + p*.03);       // toits proches, éveillés
+        planeTree(W*.06, H*.91, Math.min(W,H)/430, t, "#22301c", .7);
+        planeTree(W*.95, H*.915, Math.min(W,H)/400, t, "#22301c", 2.4);
+        cafeTerrace(W*.28, H*.925, Math.min(W,H)/560, t, "#241a3e");
+        streetLights(H*.72, t, 13);
+        /* les premières fusées de la fête votive, au loin */
+        if(p > .35) fwShow(t, .35, [.25, .75], ["#FFD23F", "#2BE4D0", "#FF2E88"], .75);
         c.fillStyle = "#20193a"; c.fillRect(0, H*.90, W, H);
         /* fenêtres qui s'allument une à une : la ville se réveille */
         for(let i=0;i<20;i++){ const on = (i/20) < clamp01(p*1.4);
@@ -7090,6 +8204,14 @@ const Cinematic = (()=>{
     c.fillStyle = "rgba(70,48,26,.8)"; c.textAlign = "center";
     c.font = "900 15px 'Baloo 2', sans-serif"; c.fillText("LES VANS", 0, -92);
     c.font = "italic 700 8px 'Baloo 2', sans-serif"; c.fillText("· ARDÈCHE ·", 0, -80);
+    /* les repères du pays, écrits à la main sur la carte */
+    c.font = "italic 600 7px 'Baloo 2', sans-serif";
+    c.fillStyle = "rgba(60,105,140,.85)";
+    c.save(); c.translate(-46, 52); c.rotate(-.16); c.fillText("le Chassezac", 0, 0); c.restore();
+    c.fillStyle = "rgba(80,58,32,.7)";
+    c.save(); c.translate(78, -30); c.rotate(.1); c.fillText("Bois de Païolive", 0, 0); c.restore();
+    c.save(); c.translate(-72, -96); c.rotate(-.06); c.fillText("place Ollier", 0, 0); c.restore();
+    c.textAlign = "center";
     c.textAlign = "left";
     /* ── l'itinéraire : 8 repères reliés dans l'ordre ── */
     const PTS = [[-84,-52],[-30,-74],[26,-46],[74,-8],[36,26],[-16,58],[-72,30],[0,-8]];
@@ -7441,25 +8563,845 @@ const Cinematic = (()=>{
     });
   }
 
-  /* un feu d'artifice qui éclot (déterministe par graine) */
-  function firework(cx, cy, t, seed, col){
-    const life = ((t + seed) % 4);
-    if(life > 1.6) return;
-    const r = ease(clamp01(life/1.2)) * Math.min(W, H)*.22, a = clamp01(1 - life/1.6);
-    /* la traînée de montée, juste avant l'explosion */
-    if(life < .12){ glowDot(cx, cy + (1 - life/.12)*H*.2, 10, col, .5); }
-    c.save(); c.globalCompositeOperation = "lighter";
-    for(let i=0;i<26;i++){
-      const ang = i/26*Math.PI*2 + seed;
-      const rr = r*(i % 3 === 0 ? .72 : 1);
-      const px = cx + Math.cos(ang)*rr, py = cy + Math.sin(ang)*rr + life*life*34;
-      c.fillStyle = hexA(col, a*.9); c.beginPath(); c.arc(px, py, 2.2, 0, 7); c.fill();
-      c.strokeStyle = hexA(col, a*.28); c.lineWidth = 1.1;
-      c.beginPath(); c.moveTo(cx + Math.cos(ang)*rr*.62, cy + Math.sin(ang)*rr*.62 + life*life*14); c.lineTo(px, py); c.stroke();
+  /* ══════════════════════════════════════════════════════════════
+     FEUX D'ARTIFICE — un vrai moteur, pas trois traits
+     ──────────────────────────────────────────────────────────────
+     Des fusées partent du sol en laissant une traînée, montent,
+     ralentissent, puis éclatent selon leur type : pivoine, saule
+     pleureur, chrysanthème, palmier, anneau, crépitant, cœur,
+     double détonation. Chaque étincelle a sa gravité, sa traînée,
+     sa mort en braise. Le ciel garde la fumée. Un flash blanc très
+     court accompagne chaque détonation.
+     Utilisé dans les DEUX cinématiques.
+     ══════════════════════════════════════════════════════════════ */
+
+  let fwScene = -1;       // index du plan en cours (remise à zéro aux raccords)
+  let FW = [];            // les particules vivantes (fusées + étincelles)
+  let fwSmoke = [];       // les nuages de fumée résiduels
+  let fwFlash = 0;        // éclat blanc plein cadre, décroissant
+  let fwLast = 0;         // horodatage pour le pas de temps
+  const FW_MAX = 620;     // plafond de particules (téléphone oblige)
+
+  const FW_PALETTE = ["#FFD23F", "#FF2E88", "#2BE4D0", "#8fd0ff",
+                      "#ff8a4c", "#b78cff", "#7dff9a", "#ff5a5a"];
+
+  /* ── une fusée qui monte, avec sa gerbe d'échappement ────────── */
+  function fwRocket(x, targetY, col, type, size){
+    if(FW.length > FW_MAX) return;
+    FW.push({
+      k:"r", x, y:H + 6, vx:(Math.random() - .5)*18, vy:-(H - targetY)*1.35,
+      col, type: type || FW_PALETTE.length, size: size || 1,
+      targetY, life:0, trail:[],
+    });
+    once("fwLaunch" + Math.round(x) + Math.round(targetY),
+      ()=>AudioFX.whoosh && AudioFX.whoosh());
+  }
+
+  /* ── l'éclatement : on sème les étincelles selon le type ─────── */
+  function fwBurst(x, y, col, type, size){
+    size = size || 1;
+    const R = Math.min(W, H)*.0016*size;      // vitesse de base
+    const push = (vx, vy, o)=>{
+      if(FW.length > FW_MAX) return;
+      FW.push(Object.assign({
+        k:"s", x, y, vx, vy, col, life:0, max:1.5 + Math.random()*.9,
+        drag:.986, g:26, sz:1.9, trail:[], glow:1, crackle:0,
+      }, o || {}));
+    };
+    const N = type === "crepitant" ? 60 : 42;
+    switch(type){
+      /* PIVOINE : la sphère classique, étincelles régulières */
+      case "pivoine":
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2 + Math.random()*.06;
+          const sp = R*(150 + Math.random()*40);
+          push(Math.cos(a)*sp, Math.sin(a)*sp);
+        }
+        break;
+      /* CHRYSANTHÈME : deux couronnes, la seconde plus lente et plus
+         chaude — c'est ce qui donne la fleur « à cœur » */
+      case "chrysantheme":
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2;
+          push(Math.cos(a)*R*185, Math.sin(a)*R*185, { max:1.9, sz:2.2 });
+        }
+        for(let i = 0; i < N*.6; i++){
+          const a = i/(N*.6)*Math.PI*2 + .3;
+          push(Math.cos(a)*R*95, Math.sin(a)*R*95,
+            { col:"#ffd98a", max:1.3, sz:1.6, glow:1.3 });
+        }
+        break;
+      /* SAULE PLEUREUR : peu de vitesse latérale, longue retombée
+         dorée qui traîne — le plus beau au-dessus d'un village */
+      case "saule":
+        for(let i = 0; i < N*.8; i++){
+          const a = i/(N*.8)*Math.PI*2;
+          const sp = R*(70 + Math.random()*30);
+          push(Math.cos(a)*sp, Math.sin(a)*sp - R*20,
+            { g:52, drag:.994, max:3.1, sz:2.3, col:"#ffd58a" });
+        }
+        break;
+      /* PALMIER : une gerbe qui part vers le haut en éventail */
+      case "palmier":
+        for(let i = 0; i < N*.7; i++){
+          const a = -Math.PI/2 + (i/(N*.7) - .5)*2.1;
+          const sp = R*(140 + Math.random()*70);
+          push(Math.cos(a)*sp, Math.sin(a)*sp, { g:60, max:2.6, sz:2.4 });
+        }
+        break;
+      /* ANNEAU : un cercle net, vu de face */
+      case "anneau":
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2;
+          push(Math.cos(a)*R*160, Math.sin(a)*R*160*.42,
+            { drag:.978, max:1.7, sz:2.1 });
+        }
+        break;
+      /* CRÉPITANT : une nuée de points qui clignotent en mourant */
+      case "crepitant":
+        for(let i = 0; i < N; i++){
+          const a = Math.random()*Math.PI*2, sp = R*(40 + Math.random()*150);
+          push(Math.cos(a)*sp, Math.sin(a)*sp,
+            { max:1 + Math.random()*1.2, sz:1.5, crackle:1 });
+        }
+        break;
+      /* CŒUR : la forme paramétrique, pour le plan d'anniversaire */
+      case "coeur":
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2;
+          const hx = 16*Math.pow(Math.sin(a), 3);
+          const hy = -(13*Math.cos(a) - 5*Math.cos(2*a) - 2*Math.cos(3*a) - Math.cos(4*a));
+          push(hx*R*11, hy*R*11, { max:2.1, sz:2.2, drag:.982 });
+        }
+        break;
+      /* DOUBLE : une petite détonation suivie d'une grande */
+      case "double":
+        for(let i = 0; i < N*.5; i++){
+          const a = i/(N*.5)*Math.PI*2;
+          push(Math.cos(a)*R*80, Math.sin(a)*R*80, { max:1.1, sz:1.7 });
+        }
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2 + .2;
+          push(Math.cos(a)*R*195, Math.sin(a)*R*195,
+            { col:FW_PALETTE[(Math.random()*FW_PALETTE.length)|0], max:2, sz:2.2 });
+        }
+        break;
+      default:
+        for(let i = 0; i < N; i++){
+          const a = i/N*Math.PI*2;
+          const sp = R*(120 + Math.random()*70);
+          push(Math.cos(a)*sp, Math.sin(a)*sp);
+        }
     }
-    /* le flash central */
-    if(life < .3) glowDot(cx, cy, 60*(1 - life/.3), "#ffffff", .35*(1 - life/.3));
+    /* le flash + la fumée + le boum */
+    fwFlash = Math.max(fwFlash, .34*size);
+    fwSmoke.push({ x, y, r: Math.min(W,H)*.05*size, a:.2, v:.5 });
+    once("fwBoom" + Math.round(x) + Math.round(y), ()=>AudioFX.boom && AudioFX.boom());
+  }
+
+  /* ── physique : un pas de temps borné (les onglets endormis
+     renvoient des dt énormes, on les écrête) ──────────────────── */
+  function fwStep(){
+    const now = performance.now();
+    let dt = fwLast ? (now - fwLast)/1000 : .016;
+    fwLast = now;
+    dt = Math.max(.001, Math.min(.033, dt));
+    for(let i = FW.length - 1; i >= 0; i--){
+      const p = FW[i];
+      p.life += dt;
+      if(p.k === "r"){
+        /* la fusée : elle monte, ralentit, éclate au sommet */
+        p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 340*dt;
+        p.trail.push([p.x, p.y]); if(p.trail.length > 5) p.trail.shift();
+        if(p.vy >= -30 || p.y <= p.targetY){
+          fwBurst(p.x, p.y, p.col, p.type, p.size);
+          FW.splice(i, 1); continue;
+        }
+      } else {
+        /* l'étincelle : gravité, frottement, traînée courte */
+        p.x += p.vx*dt; p.y += p.vy*dt;
+        p.vy += p.g*dt;
+        p.vx *= Math.pow(p.drag, dt*60); p.vy *= Math.pow(p.drag, dt*60);
+        p.trail.push([p.x, p.y]); if(p.trail.length > 5) p.trail.shift();
+        if(p.life > p.max){ FW.splice(i, 1); continue; }
+      }
+    }
+    for(let i = fwSmoke.length - 1; i >= 0; i--){
+      const s = fwSmoke[i];
+      s.r += s.v; s.a -= .0016; s.y -= .06;
+      if(s.a <= 0) fwSmoke.splice(i, 1);
+    }
+    if(fwFlash > 0) fwFlash = Math.max(0, fwFlash - dt*2.2);
+  }
+
+  /* ── rendu ───────────────────────────────────────────────────── */
+  function fwDraw(){
+    /* la fumée d'abord, derrière tout */
+    if(fwSmoke.length){
+      c.save();
+      fwSmoke.forEach(s=>{
+        const g = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+        g.addColorStop(0, `rgba(150,140,160,${(s.a*.6).toFixed(3)})`);
+        g.addColorStop(1, "rgba(150,140,160,0)");
+        c.fillStyle = g; c.beginPath(); c.arc(s.x, s.y, s.r, 0, 7); c.fill();
+      });
+      c.restore();
+    }
+    c.save(); c.globalCompositeOperation = "lighter"; c.lineCap = "round";
+    FW.forEach(p=>{
+      if(p.k === "r"){
+        /* la traînée de la fusée, dorée */
+        for(let i = 1; i < p.trail.length; i++){
+          const a = i/p.trail.length;
+          c.strokeStyle = `rgba(255,196,110,${(a*.34).toFixed(3)})`;
+          c.lineWidth = a*2;
+          c.beginPath(); c.moveTo(p.trail[i-1][0], p.trail[i-1][1]);
+          c.lineTo(p.trail[i][0], p.trail[i][1]); c.stroke();
+        }
+        c.fillStyle = "rgba(255,232,180,.9)";
+        c.beginPath(); c.arc(p.x, p.y, 1.8, 0, 7); c.fill();
+        /* les étincelles d'échappement */
+        for(let i = 0; i < 2; i++){
+          c.fillStyle = `rgba(255,180,90,${(.3*Math.random()).toFixed(3)})`;
+          c.beginPath(); c.arc(p.x + (Math.random()-.5)*4, p.y + 4 + Math.random()*7, 1.1, 0, 7); c.fill();
+        }
+        return;
+      }
+      /* l'étincelle : elle s'éteint en changeant de couleur */
+      const u = p.life/p.max, fade = 1 - u;
+      let a = fade*p.glow;
+      if(p.crackle) a *= (Math.sin(p.life*44) > 0 ? 1 : .12);   // le scintillement
+      if(a <= 0.01) return;
+      /* la traînée */
+      for(let i = 1; i < p.trail.length; i++){
+        const ta = (i/p.trail.length)*a*.5;
+        c.strokeStyle = hexA(p.col, ta);
+        c.lineWidth = p.sz*(i/p.trail.length)*.85;
+        c.beginPath(); c.moveTo(p.trail[i-1][0], p.trail[i-1][1]);
+        c.lineTo(p.trail[i][0], p.trail[i][1]); c.stroke();
+      }
+      /* la braise : blanche au début, colorée à la fin */
+      const hot = Math.max(0, 1 - u*6);
+      /* un halo coloré autour de chaque braise : c'est lui qui donne
+         la couleur au ciel (l'étage bloom l'étale ensuite) */
+      c.fillStyle = hexA(p.col, a*.28);
+      c.beginPath(); c.arc(p.x, p.y, p.sz*(1.5 + fade), 0, 7); c.fill();
+      c.fillStyle = hexA(p.col, a);
+      c.beginPath(); c.arc(p.x, p.y, p.sz*(.45 + fade*.45), 0, 7); c.fill();
+      if(hot > .05){
+        c.fillStyle = `rgba(255,252,236,${(hot*a*.8).toFixed(3)})`;
+        c.beginPath(); c.arc(p.x, p.y, p.sz*.34*hot, 0, 7); c.fill();
+      }
+    });
     c.restore();
+    /* le flash de détonation, très court, plein cadre */
+    if(fwFlash > 0.004){
+      c.save(); c.globalCompositeOperation = "lighter";
+      c.fillStyle = `rgba(255,240,214,${(fwFlash*.16).toFixed(3)})`;
+      c.fillRect(0, 0, W, H); c.restore();
+    }
+  }
+
+  /* ── LE SPECTACLE : tire tout seul, à un rythme donné ──────────
+     `rate` = tirs par seconde. `zone` = [xMin, xMax] en fraction. */
+  const FW_KINDS = ["pivoine", "chrysantheme", "saule", "palmier",
+                    "anneau", "crepitant", "double"];
+  let fwNext = 0;
+  function fwShow(t, rate, zone, cols, sizeK){
+    fwStep();
+    if(t >= fwNext){
+      const z = zone || [.12, .88];
+      const x = W*(z[0] + Math.random()*(z[1] - z[0]));
+      const ty = H*(.14 + Math.random()*.26);
+      const pal = cols || FW_PALETTE;
+      fwRocket(x, ty, pal[(Math.random()*pal.length)|0],
+        FW_KINDS[(Math.random()*FW_KINDS.length)|0], (sizeK || 1)*(.8 + Math.random()*.5));
+      fwNext = t + (1/(rate || .8))*(.6 + Math.random()*.8);
+    }
+    fwDraw();
+  }
+  /* remise à zéro du spectacle (au changement de plan) */
+  function fwReset(){ FW = []; fwSmoke = []; fwFlash = 0; fwNext = 0; }
+
+  /* ── un bouquet final : tout part d'un coup ───────────────────── */
+  function fwFinale(cx, cy, cols, n){
+    const pal = cols || FW_PALETTE;
+    for(let i = 0; i < (n || 5); i++){
+      const a = i/(n || 5)*Math.PI*2;
+      fwBurst(cx + Math.cos(a)*W*.24, cy + Math.sin(a)*H*.1,
+        pal[i % pal.length], FW_KINDS[i % FW_KINDS.length], 1.25);
+    }
+  }
+
+  /* ── compat : l'ancien appel déterministe reste valable ───────── */
+  function firework(cx, cy, t, seed, col){
+    const key = "fwOne" + Math.round(seed*10) + Math.floor((t + seed)/4);
+    once(key, ()=>fwRocket(cx, cy, col, FW_KINDS[Math.round(seed*3) % FW_KINDS.length], 1.1));
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     LES VANS, SUITE — la vie du village
+     ──────────────────────────────────────────────────────────────
+     Un décor n'est vivant que par ses détails : le lavoir, la
+     terrasse du café, le terrain de pétanque, les châtaigniers, la
+     montgolfière du petit matin, le troupeau qui descend, la
+     chouette sur la cheminée. Rien de tout ça n'allonge les plans —
+     ça les remplit.
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ── LE LAVOIR : bassin couvert, eau qui miroite ─────────────── */
+  function washHouse(x, groundY, s, t, col){
+    const stone = stoneOf(col), tuile = tileOf(col);
+    c.save(); c.translate(x, groundY); c.scale(s, s);
+    /* les piliers */
+    c.fillStyle = shade(stone, -.08);
+    [-30, -10, 10, 30].forEach(px=>c.fillRect(px, -34, 5, 34));
+    /* le bassin */
+    c.fillStyle = shade(stone, .04); c.fillRect(-34, -10, 68, 10);
+    c.fillStyle = "rgba(70,120,150,.65)"; c.fillRect(-31, -8.5, 62, 7);
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i = 0; i < 5; i++){
+      c.fillStyle = `rgba(190,225,255,${(.06 + Math.abs(Math.sin(t*1.6 + i))*.07).toFixed(3)})`;
+      c.beginPath(); c.ellipse(Math.sin(t*.9 + i*1.6)*22, -6 + i*1.1, 16 - i*2, 1, 0, 0, 7); c.fill();
+    }
+    c.restore();
+    /* la charpente + le toit de tuiles */
+    c.fillStyle = shade(stone, -.16); c.fillRect(-36, -37, 72, 4);
+    c.fillStyle = shade(tuile, 0);
+    c.beginPath(); c.moveTo(-40, -37); c.lineTo(0, -50); c.lineTo(40, -37); c.closePath(); c.fill();
+    if(roofTile){
+      c.save(); c.clip(); c.globalAlpha = .5;
+      for(let yy = -52; yy < -35; yy += roofTile.h*.5)
+        for(let xx = -42; xx < 42; xx += roofTile.w*.5)
+          c.drawImage(roofTile.img, xx, yy, roofTile.w*.5, roofTile.h*.5);
+      c.restore(); c.globalAlpha = 1;
+    }
+    c.fillStyle = "rgba(28,14,6,.34)";
+    c.beginPath(); c.moveTo(-40, -37); c.lineTo(0, -50); c.lineTo(0, -37); c.closePath(); c.fill();
+    c.fillStyle = shade(tuile, .18); c.fillRect(-3, -52, 6, 3);
+    /* le filet d'eau qui alimente le bassin */
+    c.save(); c.globalCompositeOperation = "lighter";
+    c.strokeStyle = "rgba(200,232,255,.45)"; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(-26, -18); c.quadraticCurveTo(-25, -14, -25, -9); c.stroke();
+    c.restore();
+    c.restore();
+  }
+
+  /* ── LA TERRASSE DU CAFÉ : chaises en rotin, guéridons, parasol ─ */
+  function cafeTerrace(x, groundY, s, t, col){
+    c.save(); c.translate(x, groundY); c.scale(s, s);
+    /* les tables */
+    [-26, 4, 34].forEach((tx, i)=>{
+      c.fillStyle = "rgba(0,0,0,.3)";
+      c.beginPath(); c.ellipse(tx, 1, 10, 2.4, 0, 0, 7); c.fill();
+      c.fillStyle = "#3c3a34"; c.fillRect(tx - .8, -13, 1.6, 13);
+      c.fillStyle = "#5a5750";
+      c.beginPath(); c.ellipse(tx, -13, 9, 2.6, 0, 0, 7); c.fill();
+      c.fillStyle = "#6e6a60";
+      c.beginPath(); c.ellipse(tx, -13.8, 9, 2.6, 0, 0, 7); c.fill();
+      /* deux chaises par table */
+      [-9, 9].forEach((sd, k)=>{
+        c.fillStyle = i % 2 ? "#7a5a3a" : "#3f5a6a";
+        c.fillRect(tx + sd - 3.4, -9, 6.8, 1.6);
+        c.fillRect(tx + sd - 3.4, -9, 1.4, 9);
+        c.fillRect(tx + sd + 2, -9, 1.4, 9);
+        c.fillRect(tx + sd + (k ? 2.4 : -3.8), -16, 1.4, 8);   // dossier
+        c.fillStyle = "rgba(255,240,210,.14)"; c.fillRect(tx + sd - 3.4, -9, 6.8, .6);
+      });
+      /* un verre sur la table */
+      c.fillStyle = "rgba(220,240,255,.5)"; c.fillRect(tx + 3, -18, 2.6, 4.4);
+    });
+    /* le parasol */
+    c.fillStyle = "#3c3a34"; c.fillRect(-1, -44, 2, 31);
+    const pg = c.createLinearGradient(-30, -50, 30, -44);
+    pg.addColorStop(0, "#c94f4f"); pg.addColorStop(.5, "#f2e6d2"); pg.addColorStop(1, "#c94f4f");
+    c.fillStyle = pg;
+    c.beginPath(); c.moveTo(-30, -44);
+    c.quadraticCurveTo(0, -58, 30, -44);
+    c.quadraticCurveTo(0, -48, -30, -44); c.closePath(); c.fill();
+    c.fillStyle = "rgba(0,0,0,.18)";
+    c.beginPath(); c.moveTo(-30, -44); c.quadraticCurveTo(0, -48, 30, -44);
+    c.lineTo(30, -42.5); c.quadraticCurveTo(0, -46.5, -30, -42.5); c.closePath(); c.fill();
+    /* la guirlande de la terrasse */
+    c.strokeStyle = "rgba(255,240,210,.3)"; c.lineWidth = .8;
+    c.beginPath(); c.moveTo(-34, -40); c.quadraticCurveTo(0, -34, 34, -40); c.stroke();
+    for(let i = 0; i <= 6; i++){
+      const u = i/6, lx = -34 + u*68, ly = -40 + Math.sin(u*Math.PI)*6;
+      c.save(); c.globalCompositeOperation = "lighter";
+      c.fillStyle = `rgba(255,206,130,${(.5 + Math.sin(t*3 + i)*.3).toFixed(3)})`;
+      c.beginPath(); c.arc(lx, ly, 1.5, 0, 7); c.fill(); c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── LE TERRAIN DE PÉTANQUE : le sable, les boules, le cochonnet ─ */
+  function petanque(x, groundY, s, t){
+    c.save(); c.translate(x, groundY); c.scale(s, s);
+    /* le terrain sablé */
+    c.fillStyle = "rgba(150,128,92,.55)";
+    c.beginPath(); c.ellipse(0, 0, 46, 8, 0, 0, 7); c.fill();
+    c.fillStyle = "rgba(120,100,70,.3)";
+    for(let i = 0; i < 12; i++)
+      c.fillRect(-42 + i*7, -2 + (i % 3), 3, 1);
+    /* le cochonnet */
+    c.fillStyle = "#d8a24a"; c.beginPath(); c.arc(14, -2, 1.8, 0, 7); c.fill();
+    c.fillStyle = "rgba(255,240,200,.5)"; c.beginPath(); c.arc(13.4, -2.6, .7, 0, 7); c.fill();
+    /* les boules, avec leur reflet */
+    [[-18, -1], [-9, 1], [6, -2], [20, 1], [11, 2]].forEach(([bx, by], i)=>{
+      c.fillStyle = "rgba(0,0,0,.34)";
+      c.beginPath(); c.ellipse(bx + 1, by + 2.4, 4.2, 1.4, 0, 0, 7); c.fill();
+      const g = c.createRadialGradient(bx - 1.4, by - 1.6, .4, bx, by, 4.2);
+      g.addColorStop(0, "#e8ecf2"); g.addColorStop(.55, "#9aa2ae"); g.addColorStop(1, "#4e545e");
+      c.fillStyle = g; c.beginPath(); c.arc(bx, by, 4, 0, 7); c.fill();
+      /* les stries de la boule */
+      c.strokeStyle = "rgba(40,44,52,.5)"; c.lineWidth = .5;
+      for(let k = -1; k <= 1; k++){
+        c.beginPath(); c.ellipse(bx, by, 4, 4, 0, -1.2 + k*.5, 1.2 + k*.5); c.stroke();
+      }
+      c.fillStyle = "rgba(255,255,255,.6)";
+      c.beginPath(); c.arc(bx - 1.5, by - 1.7, .9, 0, 7); c.fill();
+    });
+    c.restore();
+  }
+
+  /* ── LE CHÂTAIGNIER : l'arbre des Cévennes, large et bas ──────── */
+  function chestnutTree(x, groundY, s, t, col, phase){
+    const sway = Math.sin(t*.5 + (phase || 0))*.018;
+    c.save(); c.translate(x, groundY); c.scale(s, s); c.rotate(sway*.3);
+    c.fillStyle = "rgba(0,0,0,.3)"; c.beginPath(); c.ellipse(0, 1, 34, 5.5, 0, 0, 7); c.fill();
+    /* le tronc, épais et torsadé */
+    const tg = c.createLinearGradient(-11, 0, 11, 0);
+    tg.addColorStop(0, "#3a3026"); tg.addColorStop(.55, "#5e4e3c"); tg.addColorStop(1, "#2e2620");
+    c.fillStyle = tg;
+    c.beginPath();
+    c.moveTo(-10, 0); c.quadraticCurveTo(-6, -14, -7, -26);
+    c.lineTo(7, -26); c.quadraticCurveTo(6, -14, 10, 0); c.closePath(); c.fill();
+    /* les cannelures de l'écorce */
+    c.strokeStyle = "rgba(20,14,8,.4)"; c.lineWidth = 1;
+    [-5, -1, 3].forEach(cx=>{
+      c.beginPath(); c.moveTo(cx, -2); c.quadraticCurveTo(cx + 2, -14, cx, -25); c.stroke();
+    });
+    /* la charpente */
+    c.strokeStyle = "#4a3e30"; c.lineWidth = 4.4; c.lineCap = "round";
+    [[-1, -20], [1, -22], [0, -26]].forEach(([dx, dy], i)=>{
+      const sd = [-1, 1, 0][i];
+      c.beginPath(); c.moveTo(dx, -24);
+      c.quadraticCurveTo(sd*14, dy - 8, sd*24, dy - 14); c.stroke();
+    });
+    /* le houppier : large, dense, en dôme aplati */
+    const leafA = mixHexS(col || "#26361e", "#3f6030", .6);
+    const leafB = mixHexS(col || "#26361e", "#5a7c3a", .55);
+    [[0,-44,34,16],[-24,-38,20,12],[24,-38,20,12],[-12,-52,20,11],[13,-52,20,11],[0,-58,15,8]]
+      .forEach(([bx, by, rw, rh], i)=>{
+        const wob = Math.sin(t*.8 + i*1.6 + (phase||0))*1.4;
+        c.fillStyle = i % 2 ? leafA : leafB;
+        c.beginPath(); c.ellipse(bx + wob, by, rw, rh, 0, 0, 7); c.fill();
+      });
+    c.fillStyle = "rgba(255,236,180,.14)";
+    c.beginPath(); c.ellipse(1, -56, 15, 6, 0, 0, 7); c.fill();
+    /* les bogues qui pendent */
+    c.fillStyle = "rgba(140,160,90,.7)";
+    [[-16,-40],[8,-44],[22,-36]].forEach(([bx, by])=>{
+      c.beginPath(); c.arc(bx, by, 2.2, 0, 7); c.fill();
+    });
+    c.restore();
+  }
+
+  /* ── LA MONTGOLFIÈRE : elle décolle des Cévennes à l'aube ────── */
+  function hotAirBalloon(t, u, y0, s, cols){
+    const bx = W*(u == null ? ((t*.012) % 1.25) - .12 : u);
+    const by = y0 + Math.sin(t*.4)*8;
+    cols = cols || ["#c9483f", "#f0c04a", "#f2ece0"];
+    c.save(); c.translate(bx, by); c.scale(s, s);
+    /* l'enveloppe : des fuseaux verticaux */
+    for(let i = 0; i < 7; i++){
+      const a0 = -Math.PI/2 + (i/7 - .5)*Math.PI*1.02;
+      const a1 = -Math.PI/2 + ((i+1)/7 - .5)*Math.PI*1.02;
+      c.fillStyle = cols[i % cols.length];
+      c.beginPath();
+      c.moveTo(0, 20);
+      c.quadraticCurveTo(Math.cos(a0)*30, -6, Math.cos(a0)*7, -26);
+      c.lineTo(Math.cos(a1)*7, -26);
+      c.quadraticCurveTo(Math.cos(a1)*30, -6, 0, 20);
+      c.closePath(); c.fill();
+    }
+    /* l'ombre interne + le liseré éclairé */
+    c.fillStyle = "rgba(0,0,0,.16)";
+    c.beginPath(); c.moveTo(0, 20); c.quadraticCurveTo(-30, -6, -7, -26);
+    c.lineTo(0, -26); c.closePath(); c.fill();
+    c.strokeStyle = "rgba(255,224,170,.45)"; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(0, 20); c.quadraticCurveTo(30, -6, 7, -26); c.stroke();
+    /* la nacelle et ses suspentes */
+    c.strokeStyle = "rgba(40,30,20,.8)"; c.lineWidth = .8;
+    [-5, -2, 2, 5].forEach(sx=>{ c.beginPath(); c.moveTo(sx*1.4, 20); c.lineTo(sx, 30); c.stroke(); });
+    c.fillStyle = "#7a5a34"; rrect(-6, 30, 12, 8, 1.6); c.fill();
+    c.fillStyle = "rgba(0,0,0,.25)"; c.fillRect(-6, 35, 12, 3);
+    /* le brûleur qui souffle, par intermittence */
+    if(Math.sin(t*1.7) > .5){
+      c.save(); c.globalCompositeOperation = "lighter";
+      const fg = c.createRadialGradient(0, 25, 1, 0, 25, 14);
+      fg.addColorStop(0, "rgba(255,210,120,.7)"); fg.addColorStop(1, "rgba(255,150,60,0)");
+      c.fillStyle = fg; c.beginPath(); c.arc(0, 25, 14, 0, 7); c.fill(); c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── LE TROUPEAU : la transhumance qui traverse au petit matin ── */
+  function flock(base, t, n, speed, col){
+    n = n || 12;
+    c.save();
+    for(let i = 0; i < n; i++){
+      const u = (((t*(speed || .035) + i*.045) % 1.3) - .15);
+      const sx = u*W, sy = base + Math.sin(i*2.1)*3;
+      const bob = Math.abs(Math.sin(t*6 + i*1.7))*1.4;
+      const sc = .8 + (i % 3)*.12;
+      c.save(); c.translate(sx, sy - bob); c.scale(sc, sc);
+      /* le corps laineux */
+      c.fillStyle = col || "#d8d2c2";
+      c.beginPath(); c.ellipse(0, -5, 6.5, 4.4, 0, 0, 7); c.fill();
+      c.fillStyle = "rgba(255,255,255,.25)";
+      c.beginPath(); c.ellipse(-1.5, -6.5, 4, 2.4, 0, 0, 7); c.fill();
+      /* la tête */
+      c.fillStyle = "#3e3830";
+      c.beginPath(); c.ellipse(6, -6.5, 2.4, 1.9, .3, 0, 7); c.fill();
+      /* les pattes */
+      c.fillStyle = "#3e3830";
+      [-4, -1, 2, 4.6].forEach((lx, k)=>{
+        const kick = Math.sin(t*7 + i + k)*1.1;
+        c.fillRect(lx, -2, 1.1, 2.6 + kick*.4);
+      });
+      c.restore();
+    }
+    /* le chien qui court derrière */
+    const dx = (((t*(speed || .035) - .1) % 1.3) - .15)*W;
+    c.save(); c.translate(dx, base + 1); c.scale(.9, .9);
+    c.fillStyle = "#2e2820";
+    c.beginPath(); c.ellipse(0, -5, 6, 3, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(6, -7.5, 2.4, 2, .4, 0, 7); c.fill();
+    c.fillRect(-6, -6, 1, 3);
+    [-3, 0, 3].forEach((lx, k)=>c.fillRect(lx, -2.5, 1, 3 + Math.sin(t*9 + k)*.6));
+    c.restore();
+    c.restore();
+  }
+
+  /* ── LA CHOUETTE sur la cheminée, qui tourne la tête ─────────── */
+  function owl(x, y, s, t){
+    c.save(); c.translate(x, y); c.scale(s, s);
+    const turn = Math.sin(t*.35) > .6 ? 1 : (Math.sin(t*.35) < -.6 ? -1 : 0);
+    c.fillStyle = "#241d18";
+    c.beginPath(); c.ellipse(0, -6, 5.4, 7, 0, 0, 7); c.fill();          // corps
+    c.beginPath(); c.ellipse(turn*1.6, -14, 5, 4.4, 0, 0, 7); c.fill();  // tête
+    /* les aigrettes */
+    c.beginPath(); c.moveTo(turn*1.6 - 4, -17); c.lineTo(turn*1.6 - 2.6, -20.4); c.lineTo(turn*1.6 - 1.2, -17); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(turn*1.6 + 1.2, -17); c.lineTo(turn*1.6 + 2.6, -20.4); c.lineTo(turn*1.6 + 4, -17); c.closePath(); c.fill();
+    /* les yeux, deux disques d'or */
+    c.fillStyle = "#e8b23a";
+    c.beginPath(); c.arc(turn*1.6 - 2, -14.4, 1.5, 0, 7); c.arc(turn*1.6 + 2, -14.4, 1.5, 0, 7); c.fill();
+    c.fillStyle = "#120e08";
+    c.beginPath(); c.arc(turn*1.6 - 2, -14.4, .7, 0, 7); c.arc(turn*1.6 + 2, -14.4, .7, 0, 7); c.fill();
+    /* le plastron moucheté */
+    c.fillStyle = "rgba(200,180,140,.3)";
+    for(let i = 0; i < 6; i++)
+      c.fillRect(-2.4 + (i % 3)*2, -9 + Math.floor(i/3)*3, 1.2, 1.2);
+    c.restore();
+  }
+
+  /* ── LES CHAUVES-SOURIS du crépuscule ────────────────────────── */
+  function bats(cx, cy, t, n){
+    n = n || 6;
+    c.save(); c.fillStyle = "rgba(18,12,26,.7)";
+    for(let i = 0; i < n; i++){
+      const ph = i*2.3;
+      const bx = cx + Math.sin(t*1.1 + ph)*W*.22 + Math.sin(t*2.7 + ph)*14;
+      const by = cy + Math.cos(t*1.6 + ph)*H*.06 + Math.sin(t*4 + ph)*7;
+      const flap = Math.abs(Math.sin(t*11 + ph));
+      const sz = 4 + (i % 3);
+      c.save(); c.translate(bx, by);
+      c.beginPath();
+      c.moveTo(-sz, -flap*sz*.5);
+      c.quadraticCurveTo(-sz*.45, sz*.4, 0, 0);
+      c.quadraticCurveTo(sz*.45, sz*.4, sz, -flap*sz*.5);
+      c.quadraticCurveTo(sz*.5, -sz*.2, 0, -sz*.25);
+      c.quadraticCurveTo(-sz*.5, -sz*.2, -sz, -flap*sz*.5);
+      c.closePath(); c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── LE GECKO immobile sur le mur chaud ──────────────────────── */
+  function gecko(x, y, s, t){
+    const dash = Math.sin(t*.3) > .93 ? 1 : 0;
+    c.save(); c.translate(x + dash*8, y); c.scale(s, s);
+    c.fillStyle = "rgba(190,175,140,.75)";
+    c.beginPath(); c.ellipse(0, 0, 6, 2.2, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(6.4, -.4, 2.4, 1.6, 0, 0, 7); c.fill();
+    /* la queue enroulée */
+    c.strokeStyle = "rgba(190,175,140,.75)"; c.lineWidth = 1.6; c.lineCap = "round";
+    c.beginPath(); c.moveTo(-5.4, .2); c.quadraticCurveTo(-11, 1.4, -12, -2.4); c.stroke();
+    /* les pattes écartées */
+    c.lineWidth = 1;
+    [[-3, -2.4], [-3, 2.4], [3.4, -2.4], [3.4, 2.4]].forEach(([px, py])=>{
+      c.beginPath(); c.moveTo(px, py*.4); c.lineTo(px + (py > 0 ? 1.4 : -1.4)*0 + 1, py); c.stroke();
+    });
+    c.fillStyle = "#241c14";
+    c.beginPath(); c.arc(7.4, -1, .5, 0, 7); c.fill();
+    c.restore();
+  }
+
+  /* ── PAPILLONS de nuit autour d'une lumière (version village) ─── */
+  function butterflies(cx, cy, t, n, col){
+    n = n || 5;
+    c.save();
+    for(let i = 0; i < n; i++){
+      const ph = i*1.7;
+      const bx = cx + Math.sin(t*.9 + ph)*34 + Math.sin(t*3.1 + ph)*7;
+      const by = cy + Math.cos(t*1.3 + ph)*22 + Math.sin(t*4.4 + ph)*4;
+      const flap = Math.abs(Math.sin(t*9 + ph));
+      c.fillStyle = hexA(col || "#f0d8a0", .55);
+      c.save(); c.translate(bx, by); c.scale(1, .35 + flap*.65);
+      c.beginPath(); c.ellipse(-2, 0, 2.4, 3, -.4, 0, 7); c.fill();
+      c.beginPath(); c.ellipse(2, 0, 2.4, 3, .4, 0, 7); c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  /* ── LES RUELLES EN ESCALIER (calades) ───────────────────────── */
+  function calade(x, y, w, hgt, steps, col){
+    const stone = stoneOf(col);
+    for(let i = 0; i < steps; i++){
+      const sy = y + i*(hgt/steps);
+      c.fillStyle = shade(stone, -.1 - i*.012);
+      c.fillRect(x - i*(w*.02), sy, w + i*(w*.04), hgt/steps);
+      c.fillStyle = "rgba(255,240,214,.09)";
+      c.fillRect(x - i*(w*.02), sy, w + i*(w*.04), 1.4);
+      c.fillStyle = "rgba(18,10,4,.24)";
+      c.fillRect(x - i*(w*.02), sy + hgt/steps - 1.4, w + i*(w*.04), 1.4);
+      /* les galets de la calade */
+      c.fillStyle = "rgba(20,12,6,.14)";
+      for(let g = 0; g < 7; g++)
+        c.fillRect(x + 4 + g*(w/7), sy + 2, 1.2, hgt/steps - 4);
+    }
+  }
+
+  /* ── L'ENSEIGNE EN FER FORGÉ (boulangerie, café…) ─────────────── */
+  function ironSign(x, y, s, t, kind, col){
+    c.save(); c.translate(x, y); c.scale(s, s);
+    /* la potence */
+    c.strokeStyle = "rgba(28,24,20,.9)"; c.lineWidth = 1.6; c.lineCap = "round";
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(16, 0);
+    c.moveTo(0, 0); c.quadraticCurveTo(9, 3, 14, 8); c.stroke();
+    /* le panneau qui balance */
+    const sw = Math.sin(t*.9)*.06;
+    c.save(); c.translate(16, 1); c.rotate(sw);
+    c.strokeStyle = "rgba(28,24,20,.9)"; c.lineWidth = .9;
+    c.beginPath(); c.moveTo(-4, 0); c.lineTo(-4, 4); c.moveTo(4, 0); c.lineTo(4, 4); c.stroke();
+    c.fillStyle = col || "#2a3f5a"; rrect(-9, 4, 18, 12, 1.6); c.fill();
+    c.strokeStyle = "rgba(200,170,90,.8)"; c.lineWidth = .8; rrect(-9, 4, 18, 12, 1.6); c.stroke();
+    /* le pictogramme */
+    c.fillStyle = "rgba(240,220,170,.9)";
+    if(kind === "pain"){
+      c.beginPath(); c.ellipse(0, 10, 6, 3.4, -.2, 0, 7); c.fill();
+      c.strokeStyle = "rgba(120,90,50,.7)"; c.lineWidth = .7;
+      for(let i = -1; i <= 1; i++){ c.beginPath(); c.moveTo(i*3 - 1, 8); c.lineTo(i*3 + 1, 12); c.stroke(); }
+    } else if(kind === "verre"){
+      c.beginPath(); c.moveTo(-3.4, 6); c.lineTo(3.4, 6); c.lineTo(1, 11); c.lineTo(-1, 11); c.closePath(); c.fill();
+      c.fillRect(-2.6, 12, 5.2, 1);
+    } else {
+      /* un invader, forcément */
+      mosaicMid("squid", "#FFD23F", .95);
+      c.translate(0, 10);
+    }
+    c.restore();
+    c.restore();
+  }
+
+  /* ── LE FEU DE CAMP au bord du Chassezac ─────────────────────── */
+  function campfire(x, y, s, t){
+    c.save(); c.translate(x, y); c.scale(s, s);
+    /* le cercle de pierres */
+    c.fillStyle = "#5e5548";
+    for(let i = 0; i < 7; i++){
+      const a = i/7*Math.PI*2;
+      c.beginPath(); c.ellipse(Math.cos(a)*11, Math.sin(a)*3.6, 3.4, 2.2, 0, 0, 7); c.fill();
+    }
+    /* les bûches */
+    c.strokeStyle = "#4a3524"; c.lineWidth = 2.6; c.lineCap = "round";
+    c.beginPath(); c.moveTo(-6, 0); c.lineTo(5, -5); c.moveTo(6, 0); c.lineTo(-5, -5); c.stroke();
+    /* la flamme */
+    c.save(); c.globalCompositeOperation = "lighter";
+    const fh = 14 + Math.sin(t*7)*3;
+    const fg = c.createLinearGradient(0, -fh, 0, 2);
+    fg.addColorStop(0, "rgba(255,240,180,0)");
+    fg.addColorStop(.35, "rgba(255,190,80,.75)");
+    fg.addColorStop(1, "rgba(255,110,40,.9)");
+    c.fillStyle = fg;
+    c.beginPath();
+    c.moveTo(-5, 0);
+    c.quadraticCurveTo(-6 + Math.sin(t*8)*2, -fh*.5, 0, -fh);
+    c.quadraticCurveTo(6 + Math.sin(t*6)*2, -fh*.5, 5, 0);
+    c.closePath(); c.fill();
+    /* le halo au sol */
+    const hg = c.createRadialGradient(0, -2, 2, 0, -2, 34);
+    hg.addColorStop(0, "rgba(255,170,80,.32)"); hg.addColorStop(1, "rgba(255,170,80,0)");
+    c.fillStyle = hg; c.beginPath(); c.arc(0, -2, 34, 0, 7); c.fill();
+    /* les braises qui montent */
+    for(let i = 0; i < 6; i++){
+      const u = ((t*.9 + i*.17) % 1);
+      c.fillStyle = `rgba(255,180,90,${((1-u)*.7).toFixed(3)})`;
+      c.beginPath(); c.arc(Math.sin(t*2 + i*2)*7, -8 - u*30, 1.1*(1-u) + .4, 0, 7); c.fill();
+    }
+    c.restore();
+    c.restore();
+  }
+
+  /* ── LA VIGNE EN PERSPECTIVE : des rangs qui fuient ───────────── */
+  function vineyardRows(base, top, t, col, n){
+    n = n || 9;
+    const vg = mixHexS(col || "#2a3a20", "#4e6b34", .55);
+    for(let i = 0; i < n; i++){
+      const u = i/(n - 1);
+      const y0 = top + (base - top)*Math.pow(u, 1.7);
+      const spread = .06 + u*.94;
+      c.strokeStyle = hexA(vg, .25 + u*.5);
+      c.lineWidth = .8 + u*2.4;
+      c.beginPath();
+      c.moveTo(W*.5 - W*spread*.6, y0);
+      c.quadraticCurveTo(W*.5, y0 + u*4, W*.5 + W*spread*.6, y0);
+      c.stroke();
+      /* les ceps */
+      const step = 10 + u*26;
+      c.fillStyle = hexA(vg, .3 + u*.5);
+      for(let vx = W*.5 - W*spread*.6; vx < W*.5 + W*spread*.6; vx += step){
+        const wob = Math.sin(t*.9 + vx*.02 + i)*1.2;
+        c.beginPath(); c.ellipse(vx + wob, y0 - (1 + u*4), 1.6 + u*3.4, 1 + u*2.4, 0, 0, 7); c.fill();
+      }
+    }
+  }
+
+  /* ── LES GUIRLANDES DE FÊTE tendues en travers de la rue ─────── */
+  function streetLights(y, t, n, cols){
+    cols = cols || ["#FFD23F", "#FF2E88", "#2BE4D0", "#8fd0ff", "#ff8a4c"];
+    const sag = 22;
+    c.save();
+    c.strokeStyle = "rgba(0,0,0,.4)"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-8, y);
+    c.quadraticCurveTo(W*.5, y + sag + Math.sin(t*.8)*3, W + 8, y - 8); c.stroke();
+    for(let i = 0; i <= (n || 14); i++){
+      const u = i/(n || 14);
+      const lx = -8 + u*(W + 16);
+      const ly = y + sag*(1 - Math.pow(2*u - 1, 2)) - u*8 + Math.sin(t*.8)*3*(1 - Math.abs(2*u - 1));
+      const col = cols[i % cols.length];
+      const on = .55 + Math.sin(t*2.4 + i*.9)*.45;
+      c.save(); c.globalCompositeOperation = "lighter";
+      const g = c.createRadialGradient(lx, ly + 5, 1, lx, ly + 5, 16);
+      g.addColorStop(0, hexA(col, .34*on)); g.addColorStop(1, hexA(col, 0));
+      c.fillStyle = g; c.beginPath(); c.arc(lx, ly + 5, 16, 0, 7); c.fill(); c.restore();
+      c.fillStyle = "rgba(30,26,22,.9)"; c.fillRect(lx - 1, ly, 2, 3);
+      c.fillStyle = hexA(col, .5 + on*.5);
+      c.beginPath(); c.ellipse(lx, ly + 5.4, 2.4, 3.2, 0, 0, 7); c.fill();
+    }
+    c.restore();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     FEUX D'ARTIFICE, SUITE — les pièces de spectacle
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ── LA FONTAINE À ÉTINCELLES posée sur le pont ──────────────── */
+  function fwFountain(x, y, t, col, hgt, on){
+    if(on === false) return;
+    c.save(); c.globalCompositeOperation = "lighter";
+    const H0 = hgt || H*.16;
+    for(let i = 0; i < 34; i++){
+      const u = ((t*1.6 + i*.083) % 1);
+      const a = -Math.PI/2 + (((i*37) % 20)/20 - .5)*.5;
+      const sp = (.6 + ((i*13) % 7)/7*.4);
+      const px = x + Math.cos(a)*H0*sp*u*1.1;
+      const py = y + Math.sin(a)*H0*sp*u + u*u*H0*.85;
+      const fade = 1 - u;
+      c.fillStyle = hexA(col || "#ffd58a", fade*.8);
+      c.beginPath(); c.arc(px, py, 1.5*fade + .5, 0, 7); c.fill();
+      if(u < .3){
+        c.fillStyle = `rgba(255,252,236,${(fade*.5).toFixed(3)})`;
+        c.beginPath(); c.arc(px, py, .9, 0, 7); c.fill();
+      }
+    }
+    /* le halo à la base */
+    const g = c.createRadialGradient(x, y, 2, x, y, H0*.5);
+    g.addColorStop(0, hexA(col || "#ffd58a", .28)); g.addColorStop(1, hexA(col || "#ffd58a", 0));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, H0*.5, 0, 7); c.fill();
+    c.restore();
+  }
+
+  /* ── LA ROUE : une couronne qui tourne (le soleil de feu) ────── */
+  function fwWheel(cx, cy, t, r, col, arms){
+    arms = arms || 6;
+    c.save(); c.globalCompositeOperation = "lighter";
+    for(let i = 0; i < arms; i++){
+      const a = t*2.6 + i/arms*Math.PI*2;
+      for(let k = 0; k < 9; k++){
+        const rr = r*(k/9);
+        const px = cx + Math.cos(a - k*.16)*rr;
+        const py = cy + Math.sin(a - k*.16)*rr;
+        const fade = 1 - k/9;
+        c.fillStyle = hexA(col || "#FFD23F", fade*.75);
+        c.beginPath(); c.arc(px, py, 1.4 + fade*1.6, 0, 7); c.fill();
+      }
+    }
+    const g = c.createRadialGradient(cx, cy, 2, cx, cy, r*1.2);
+    g.addColorStop(0, hexA(col || "#FFD23F", .3)); g.addColorStop(1, hexA(col || "#FFD23F", 0));
+    c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r*1.2, 0, 7); c.fill();
+    c.restore();
+  }
+
+  /* ── LE REFLET DU FEU D'ARTIFICE DANS LA RIVIÈRE ─────────────── */
+  function fwReflection(waterY, t, a){
+    if(!FW.length) return;
+    c.save();
+    c.beginPath(); c.rect(0, waterY, W, H - waterY); c.clip();
+    c.globalCompositeOperation = "lighter";
+    c.globalAlpha = a == null ? .3 : a;
+    FW.forEach(p=>{
+      if(p.k === "r") return;
+      const ry = waterY + (waterY - p.y)*.45;
+      if(ry > H) return;
+      const wob = Math.sin(t*3 + p.x*.05)*3;
+      const u = p.life/p.max, fade = 1 - u;
+      c.fillStyle = hexA(p.col, fade*.7);
+      c.beginPath(); c.ellipse(p.x + wob, ry, p.sz*1.6, p.sz*.5, 0, 0, 7); c.fill();
+    });
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  /* ── LES MINES : des gerbes qui partent du sol, sans monter ───── */
+  function fwMine(x, y, col, size){
+    const R = Math.min(W, H)*.0016*(size || 1);
+    for(let i = 0; i < 30; i++){
+      if(FW.length > FW_MAX) return;
+      const a = -Math.PI/2 + (Math.random() - .5)*1.5;
+      const sp = R*(140 + Math.random()*90);
+      FW.push({ k:"s", x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, col,
+        life:0, max:1.7 + Math.random()*.7, drag:.99, g:46, sz:2.1, trail:[], glow:1.1, crackle:0 });
+    }
+    fwFlash = Math.max(fwFlash, .2);
+    fwSmoke.push({ x, y, r: Math.min(W,H)*.03, a:.16, v:.4 });
+  }
+
+  /* ── LE BOUQUET FINAL, version village : mines depuis les toits,
+     fontaines sur le pont, et une pluie de saules au-dessus ────── */
+  function fwGrandFinale(t, groundY, cols){
+    const pal = cols || FW_PALETTE;
+    once("gfMine1", ()=>fwMine(W*.18, groundY, pal[0], 1.2));
+    once("gfMine2", ()=>fwMine(W*.82, groundY, pal[1], 1.2));
+    once("gfMine3", ()=>fwMine(W*.5, groundY, pal[2], 1.4));
+    for(let i = 0; i < 3; i++){
+      once("gfSaule" + i, ()=>fwBurst(W*(.25 + i*.25), H*(.22 + (i % 2)*.08),
+        "#ffd58a", "saule", 1.4));
+    }
+    fwFountain(W*.3, groundY, t, pal[0], H*.13);
+    fwFountain(W*.7, groundY, t, pal[1], H*.13);
   }
 
   /* ═══════════════ LES TREIZE PLANS DE LA FIN ═══════════════ */
@@ -7470,12 +9412,22 @@ const Cinematic = (()=>{
        sur la ville endormie, puis s'élèvent en constellation. */
     { d:9, subs:[[1,"Huit murs. Huit pièces."],[5,"Tu les as toutes retrouvées."]],
       draw(t, p){
-        drawSky("#0c0c2c", "#2a1e4a", 1, .1);
+        drawSky("#151038", "#3e2c54", 1, .1, { glow:.95, clouds:.3 });
         satellite(t, 3); nightPlane(t, 1);
+        drawRidges(H*.78, "#2e2450", .02 + p*.03, 3);
+        drawCliffs(H*.82, .85, "#342a54", .02 + p*.03, .7);
         drawCity(cityFar,  H*.84, .5, "#161334", .45, .02 + p*.03, .12);
+        bellTower(W*.16, H*.845, Math.min(W,H)/560, "#1c1740", t, true);
         drawCity(cityNear, H*.92, .7, "#231d48", .7, .03 + p*.04);
         c.fillStyle = "#1a1638"; c.fillRect(0, H*.92, W, H);
         wetStreet(H*.92, "#8fa8ff");
+        planeTree(W*.07, H*.93, Math.min(W,H)/430, t, "#1e2a1a", .5);
+        planeTree(W*.94, H*.935, Math.min(W,H)/400, t, "#1e2a1a", 2.2);
+        fountain(W*.5, H*.955, Math.min(W,H)/420, t, "#231d48");
+        cafeTerrace(W*.22, H*.955, Math.min(W,H)/520, t, "#231d48");
+        petanque(W*.78, H*.96, Math.min(W,H)/500, t);
+        streetLights(H*.7, t, 12);
+        bats(W*.6, H*.28, t, 5);
         endPiecesGlow(H*.86, clamp01(p*1.3), t);
         if(p > .45) constellation(t, ease(clamp01((p - .45)/.5)));
         drawEmbers("#bcd0ff");
@@ -7509,9 +9461,13 @@ const Cinematic = (()=>{
        par les pièces. Immobile. Il a tout vu. */
     { d:8, subs:[[.8,"Pendant tout ce temps…"],[4.4,"quelqu'un t'a regardé chercher."]],
       draw(t, p){
-        drawSky("#0e0e2e", "#3a2850", 1, .1);
+        drawSky("#171240", "#4a3059", 1, .1, { glow:1, clouds:.34 });
         satellite(t, 1.4);
+        drawRidges(H*.62, "#2a2250", .04 + p*.05, 3);
+        drawCliffs(H*.66, .8, "#302650", .04 + p*.05, .6);
         drawCity(cityFar,  H*.7, .55, "#171436", .5, .04 + p*.05, .14);
+        bellTower(W*.83, H*.705, Math.min(W,H)/620, "#1c1740", t, true);
+        swifts(W*.45, H*.4, t, 8, 1.1);
         drawCity(cityNear, H*.8, .8, "#221c46", .7, .06 + p*.08);
         endPiecesGlow(H*.66, 1, t);
         fogBank(H*.78, t, "#8090c8", .05, .04);
@@ -7521,6 +9477,9 @@ const Cinematic = (()=>{
         c.fillStyle = "#12102e"; c.fillRect(W*.08, H*.78, W*.5, H*.045);
         waterTower(W*.82, H*.82, Math.min(W,H)*.0016, "#171436");
         fireEscape(W*.04, H*.5, 3, "#171436");
+        bats(W*.55, H*.3, t, 6);
+        owl(W*.9, H*.78, Math.min(W,H)/400, t);
+        streetLights(H*.6, t, 11);
         /* l'artiste, de dos, assis sur la margelle : immobile */
         perso(W*.30, H*.82, Math.min(W,H)/165, "stand", t, 1);
         c.fillStyle = "#141428"; rrect(W*.30 + 22, H*.82 - 10, 6, 12, 2); c.fill();
@@ -7540,7 +9499,19 @@ const Cinematic = (()=>{
         const g = c.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, "#241a34"); g.addColorStop(1, "#150f24");
         c.fillStyle = g; c.fillRect(0, 0, W, H);
-        brickWall(0, 0, W, H*.72, W*.36);
+        /* les murs de l'atelier : moellons de calcaire, pas de la brique */
+        if(stoneTile){
+          c.save(); c.beginPath(); c.rect(0, 0, W, H*.72); c.clip();
+          for(let yy = 0; yy < H*.72; yy += stoneTile.h)
+            for(let xx = 0; xx < W; xx += stoneTile.w)
+              c.drawImage(stoneTile.img, xx, yy, stoneTile.w, stoneTile.h);
+          const lg = c.createRadialGradient(W*.36, H*.16, H*.06, W*.36, H*.4, W*.8);
+          lg.addColorStop(0, "rgba(255,236,190,.14)");
+          lg.addColorStop(.55, "rgba(20,12,26,.3)");
+          lg.addColorStop(1, "rgba(12,8,20,.66)");
+          c.fillStyle = lg; c.fillRect(0, 0, W, H*.72);
+          c.restore();
+        } else brickWall(0, 0, W, H*.72, W*.36);
         /* ampoule nue qui se balance */
         { const sw = Math.sin(t*.9)*W*.012;
           c.strokeStyle = "rgba(0,0,0,.6)"; c.lineWidth = 1.2;
@@ -7562,6 +9533,8 @@ const Cinematic = (()=>{
           c.fillStyle = "#c0392b"; c.beginPath(); c.arc(0, -w/2 + 4, 2.4, 0, 7); c.fill();   // punaise
           c.restore(); c.globalAlpha = 1;
         });
+        gecko(W*.88, H*.3, Math.min(W,H)/240, t);
+        butterflies(W*.36, H*.22, t, 5, "#f0d8a0");
         /* un pochoir en cours de découpe, posé de biais sur l'établi */
         atelierBench(H*.72, t, clamp01(p*2.2));
         stencilCut(W*.66, H*.5, Math.min(W,H)*.013, "crab", "#0d0a1c", clamp01(p*2.2 - .1), t);
@@ -7574,14 +9547,18 @@ const Cinematic = (()=>{
     { d:10, subs:[[.8,"L'invader n'a jamais été un inconnu."],[5.4,"C'était moi. Depuis le début."]],
       draw(t, p){
         const q = ease(clamp01(p*1.15));
-        drawSky(q < .5 ? "#2a1e4a" : "#4a2e50", "#e08a54", 1 - q*.5);
+        drawSky(q < .5 ? "#2e2054" : "#553360", "#f09a5e", 1 - q*.5, null,
+          { glow:1.5, clouds:.55, cloudTop:"rgba(255,200,146,.6)" });
         glowDot(W*.5, H*.36, H*.55, "#ffc878", .42*q);
         sunBurst(W*.5, H*.36, q, t, "#ffc882", 9, .26, -2.15);
         birdsDawn(t, 7, H*.2, .05, "rgba(40,26,54,.55)");
         /* la ville reste BASSE et lointaine : rien ne doit encombrer
            la silhouette, qui doit se lire d'un bloc contre le soleil */
+        drawRidges(H*.83, "#4a3450", .03, 3);
         drawCity(cityFar, H*.87, .26, "#1c1434", .12, .03, .32);
         fogBank(H*.83, t, "#c8a0a0", .07, .02);
+        cypress(W*.09, H*.875, Math.min(W,H)/560, t, "#241c1e", .3);
+        cypress(W*.93, H*.875, Math.min(W,H)/620, t, "#241c1e", 1.7);
         c.fillStyle = "#120d26"; c.fillRect(0, H*.87, W, H);
         c.fillStyle = "rgba(255,190,120,.12)"; c.fillRect(0, H*.87, W, 2.5);
         /* la silhouette, grande, entière et bien détachée */
@@ -7644,7 +9621,7 @@ const Cinematic = (()=>{
     /* ── E7 · LE SOUVENIR ────────────────────────────────────────
        Retour en arrière : un toit, une nuit d'été, deux silhouettes
        qui regardent les étoiles. C'est de là que tout vient. */
-    { d:9, subs:[[.8,"Tu m'as tout appris."],[4.6,"Les étoiles. Les invaders.\nEt les blagues pourries."]],
+    { d:9, subs:[[.8,"Tu m'as tout appris."],[4.6,"Les étoiles. Puis les invaders.\nEt les blagues pourries."]],
       draw(t, p){
         const g = c.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, "#20143a"); g.addColorStop(.55, "#3a2442"); g.addColorStop(1, "#5c3a3c");
@@ -7674,6 +9651,9 @@ const Cinematic = (()=>{
         /* le toit + les deux silhouettes assises, la tête levée */
         c.fillStyle = "#0d0a1e"; c.fillRect(0, H*.74, W, H);
         c.fillRect(W*.1, H*.7, W*.44, H*.045);
+        /* un feu de camp, tout en bas, au bord du Chassezac */
+        campfire(W*.82, H*.9, Math.min(W,H)/420, t);
+        chestnutTree(W*.06, H*.75, Math.min(W,H)/520, t, "#1a2614", 1.1);
         const bx = W*.42;
         child(bx, H*.74, Math.min(W,H)/145, t);
         child(bx + Math.min(W,H)*.055, H*.74, Math.min(W,H)/210, t);
@@ -7693,21 +9673,25 @@ const Cinematic = (()=>{
 
     /* ── E8 · LES ANNÉES ─────────────────────────────────────────
        Une pellicule défile : tous les moments, en polaroids. */
-    { d:7, subs:[[.6,"Et puis les années sont passées…"],[3.8,"mais pas cette habitude-là."]],
+    { d:7, subs:[[.6,"2023. Le tout premier."],[3.8,"Et depuis, ça ne s'est jamais arrêté."]],
       draw(t, p){
         const g = c.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, "#191234"); g.addColorStop(1, "#0c0a1e");
         c.fillStyle = g; c.fillRect(0, 0, W, H);
         /* halo de projecteur, comme dans une salle de projection */
         glowDot(W*.5, H*.5, Math.min(W,H)*.75, "#8fa8ff", .1);
+        /* la silhouette du village, très basse, qui rappelle où on est */
+        c.save(); c.globalAlpha = .18;
+        drawCity(cityFar, H*.99, .28, "#2a2050", .3, .02, .2);
+        c.restore(); c.globalAlpha = 1;
         /* deux bandes de pellicule qui défilent en sens inverse */
         filmStrip(H*.115, H*.17, t, .18, .9);
         filmStrip(H*.615, H*.17, -t, .14, .9);
         /* les polaroids, au centre, qui se posent un par un */
         const pw = Math.min(W, H)*.185;
         const CARDS = [
-          [W*.24, H*.43, -.14, "squid", "#2BE4D0", "1998"],
-          [W*.5,  H*.41,  .05, "crab",  "#FFD23F", "2007"],
+          [W*.24, H*.43, -.14, "squid", "#2BE4D0", "2023"],
+          [W*.5,  H*.41,  .05, "crab",  "#FFD23F", "2024"],
           [W*.76, H*.44,  .17, "octo",  "#FF2E88", "aujourd'hui"],
         ];
         CARDS.forEach(([px, py, ang, sp, col, leg], i)=>{
@@ -7733,12 +9717,21 @@ const Cinematic = (()=>{
     { d:9, subs:[[.8,"Alors j'ai semé les Vans d'étoiles…"],[4.8,"rien que pour toi."]],
       draw(t, p){
         const q = ease(clamp01(p));
-        drawSky("#3a2850", "#f0a45c", 1 - q*.4);
+        drawSky("#43305c", "#f7b068", 1 - q*.4, null,
+          { glow:1.6, clouds:.6, cloudTop:"rgba(255,208,150,.65)" });
         glowDot(W*.5, H*.88, H*.7, "#ffb464", .4);
         sunBurst(W*.5, H*.88, q*.7, t, "#ffcf8f", 7, .34, -2.5);
         birdsDawn(t, 9, H*.22, .05, "rgba(60,36,60,.5)");
+        drawRidges(H*.68, "#6a4a58", .02, 3);
+        drawCliffs(H*.72, .8, "#70505c", .02, .8);
         drawCity(cityFar,  H*.74, .5, "#3a2a48", .3, .02, .1);
+        bellTower(W*.82, H*.745, Math.min(W,H)/600, "#3e2c4c", t, false);
+        swifts(W*.3, H*.36, t, 10, 1.2);
         drawCity(cityNear, H*.82, .7, "#2a2040", .5, .03 + p*.03);
+        oliveTree(W*.1, H*.845, Math.min(W,H)/380, t, .6);
+        hotAirBalloon(t, .24 + p*.12, H*.26, Math.min(W,H)/440, ["#c9483f", "#f0c04a", "#f2ece0"]);
+        hotAirBalloon(t + 4, .7 - p*.06, H*.18, Math.min(W,H)/640, ["#3f6a9c", "#f2ece0", "#c9483f"]);
+        flock(H*.79, t, 9, .028, "#e8e0cc");
         endPiecesGlow(H*.63, 1, t);
         fogBank(H*.8, t, "#c89ab0", .06, .03);
         c.fillStyle = "#1a1226"; c.fillRect(0, H*.84, W, H);
@@ -7759,13 +9752,20 @@ const Cinematic = (()=>{
        Huit lampions montent au-dessus des Vans, un par pièce. */
     { d:7, subs:[[.8,"Huit lumières au-dessus des Vans."],[4,"Une pour chaque endroit\noù tu es allé me chercher."]],
       draw(t, p){
-        drawSky("#2a1e46", "#6a3a58", 1, .12);
+        drawSky("#2e2250", "#7a4462", 1, .12, { glow:1.2, clouds:.42 });
+        drawRidges(H*.76, "#3a2c58", .02, 3);
         drawCity(cityFar,  H*.82, .5, "#221a40", .4, .02, .12);
+        bellTower(W*.15, H*.825, Math.min(W,H)/580, "#2a2050", t, true);
         drawCity(cityNear, H*.9, .7, "#2c2050", .6, .03);
         c.fillStyle = "#1c1436"; c.fillRect(0, H*.9, W, H);
+        /* le Chassezac en contrebas, son pont de pierre, ses reflets */
+        riverChassezac(H*.9, t, "#b8c8f0", H*.055);
+        stoneBridge(W*.06, H*.9, W*.5, H*.07, "#2c2050", t);
+        fwReflection(H*.9, t, .28);
         /* le toit du premier plan, sur lequel ils se tiennent */
         c.fillStyle = "#100b22"; c.fillRect(0, H*.87, W, H);
         c.fillStyle = "rgba(255,200,140,.07)"; c.fillRect(0, H*.87, W, 2);
+        streetLights(H*.66, t, 12);
         /* les huit lampions, décalés, qui montent */
         CONFIG.stations.forEach((st, i)=>{
           const u = clamp01(p*1.35 - i*.055); if(u <= 0) return;
@@ -7783,13 +9783,27 @@ const Cinematic = (()=>{
        Le cœur d'invaders, les feux d'artifice, le message tamponné. */
     { d:10, subs:[[0,""]],
       draw(t, p){
-        drawSky("#241848", "#4a2c5a", 1, .1);
+        drawSky("#2a1c52", "#563466", 1, .1, { glow:1.15, clouds:.36 });
+        drawRidges(H*.8, "#38285a", .02, 3);
+        drawCliffs(H*.84, .8, "#3e2e5e", .02, .55);
         drawCity(cityFar, H*.86, .5, "#20183c", .4, .02);
+        bellTower(W*.17, H*.865, Math.min(W,H)/540, "#281e4a", t, true);
         c.fillStyle = "#1a1434"; c.fillRect(0, H*.86, W, H);
-        firework(W*.26, H*.3, t, 0, "#FFD23F");
-        firework(W*.72, H*.24, t, 1.3, "#FF2E88");
-        firework(W*.5,  H*.38, t, 2.6, "#2BE4D0");
-        firework(W*.14, H*.44, t, 3.4, "#8fd0ff");
+        planeTree(W*.06, H*.875, Math.min(W,H)/440, t, "#22301c", .8);
+        planeTree(W*.95, H*.88, Math.min(W,H)/410, t, "#22301c", 2.3);
+        /* LE SPECTACLE COMPLET : les fusées montent en cadence, deux
+           roues de feu tournent sur les toits, des fontaines crachent
+           depuis la place — et tout part en bouquet à la fin. */
+        fwShow(t, .7 + p*2.6, [.08, .92], null, .95 + p*.5);
+        if(p > .18){
+          fwFountain(W*.24, H*.855, t, "#FFD23F", H*.14);
+          fwFountain(W*.76, H*.855, t, "#2BE4D0", H*.14);
+        }
+        if(p > .3 && p < .8){
+          fwWheel(W*.13, H*.7, t, Math.min(W,H)*.06, "#FF2E88", 6);
+          fwWheel(W*.87, H*.7, t, Math.min(W,H)*.06, "#8fd0ff", 6);
+        }
+        if(p > .82) fwGrandFinale(t, H*.855, ["#FFD23F","#FF2E88","#2BE4D0","#8fd0ff"]);
         bunting(H*.15, t);
         heartOfPieces(t, ease(clamp01(p*1.4)), W*.5, H*.36, Math.min(W,H)*.25, true);
         if(p > .28){
@@ -7827,6 +9841,18 @@ const Cinematic = (()=>{
           heartOfPieces(t, k, W*.5, H*.32, Math.min(W,H)*.22*k, false);
           c.restore(); c.globalAlpha = 1;
         }
+        /* la fête continue dehors : des éclats colorés passent sur le mur */
+        c.save(); c.globalCompositeOperation = "lighter";
+        for(let i = 0; i < 3; i++){
+          const fl = Math.max(0, Math.sin(t*(.9 + i*.4) + i*2));
+          if(fl < .82) continue;
+          const col = ["#FFD23F", "#FF2E88", "#2BE4D0"][i];
+          const g2 = c.createRadialGradient(W*(.2 + i*.3), H*.2, 4, W*(.2 + i*.3), H*.2, W*.6);
+          g2.addColorStop(0, hexA(col, (fl - .82)*.5));
+          g2.addColorStop(1, hexA(col, 0));
+          c.fillStyle = g2; c.fillRect(0, 0, W, H*.7);
+        }
+        c.restore();
         confettiFall(t, clamp01((p - .4)*2));
         drawEmbers("#ffd98a");
       } },
@@ -7836,7 +9862,10 @@ const Cinematic = (()=>{
        rendue à l'écran de victoire. */
     { d:6, noKB:true, subs:[[.6,"Ton cadeau t'attend dans la boîte."]],
       draw(t, p){
-        drawSky("#241848", "#4a2c5a", 1, .1);
+        drawSky("#2a1c52", "#563466", 1, .1, { glow:1.15, clouds:.36 });
+        fwShow(t, .9, [.08, .92], ["#FFD23F","#FF2E88","#2BE4D0","#ffd98a"], .85);
+        fwFountain(W*.12, H*.92, t, "#FFD23F", H*.17);
+        fwFountain(W*.88, H*.92, t, "#FF2E88", H*.17);
         heartOfPieces(t, 1, W*.5, H*.4, Math.min(W,H)*.26, true);
         sparkleBurst(W*.5, H*.4, Math.min(W,H)*.32, .5, "#ffd98a", 18, t, .4);
         handwrite("avec tout mon amour", W*.5, H*.68, Math.min(W,H)*.045,
@@ -7878,6 +9907,9 @@ const Cinematic = (()=>{
     for(let i=0;i<SC.length;i++){ if(T < acc + SC[i].d){ sc = SC[i]; t = T - acc; idx = i; break; } acc += SC[i].d; }
     if(!sc){ end(); return; }
     const p = t / sc.d, last = idx === SC.length - 1, first = idx === 0;
+    /* on remet les feux d'artifice à zéro quand on change de plan :
+       une fusée ne doit jamais traverser un raccord */
+    if(idx !== fwScene){ fwScene = idx; fwReset(); }
 
     /* ── Ken Burns : lent zoom/travelling, alterné selon le plan ── */
     c.save();
@@ -7959,8 +9991,11 @@ const Cinematic = (()=>{
     stars = Array.from({length:60}, ()=>[Math.random(), Math.random()*.5, Math.random()*1.6+.6, Math.random()*7]);
     cityFar = buildCity(0, .12, .3); cityNear = buildCity(0, .08, .22);
     mist = []; TOUR = null; drips = []; sparks = []; ROOFS = null; CONSTEL = null; seedAmbience();
+    CLIFFS = null; CLOUDS = null; endConfs = null; FW = []; fwSmoke = []; fwFlash = 0;
     if(!grainTile) grainTile = makeGrain();
-    if(!wallTile) wallTile = makeWallTile();
+    if(!wallTile)  wallTile  = makeWallTile();
+    if(!stoneTile) stoneTile = makeStoneTile();     // moellons du village
+    if(!roofTile)  roofTile  = makeRoofTile();      // tuiles romanes
     rain = Array.from({length:90}, ()=>({
       x: Math.random()*W*1.2, y: Math.random()*H,
       l: 10 + Math.random()*14, v: 9 + Math.random()*7,
@@ -14667,7 +16702,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v89</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v90</p>`);
     wire();
   }
   function wire(){

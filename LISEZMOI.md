@@ -62,6 +62,65 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v90) — LES VANS, POUR DE VRAI (+ vrais feux d'artifice)
+
+Le décor des deux cinématiques ne ressemblait pas aux Vans : c'était une
+skyline d'immeubles, froide et un peu dystopique. Tout a été remplacé par le
+**vocabulaire cévenol**, et comme les fonctions gardent les mêmes noms, les
+vingt-trois plans changent de visage d'un coup.
+
+**Le village.** Des maisons de pierre calcaire larges et basses, serrées les
+unes contre les autres, avec des toits de tuiles romanes à pente douce, la
+génoise sous le débord, des volets bleu lavande ou vert olive (ouverts ou
+fermés), des jardinières de géraniums, des portes cintrées à clé de voûte,
+des balcons en fer forgé, des treilles qui grimpent, des lanternes de façade
+et des lucarnes. Deux textures sont pré-rendues une fois pour toutes : les
+moellons de calcaire et les tuiles canal.
+
+**Le paysage.** Les falaises du Bois de Païolive avec leurs strates et leurs
+pins d'Alep accrochés à la crête, les lignes de crête en aplats, les
+terrasses en pierre sèche plantées de vignes, la garrigue, la lavande, le
+Chassezac avec ses galets et son pont de pierre à trois arches.
+
+**Les arbres.** Platanes de la place (écorce en plaques, houppier qui
+respire, feuilles qui tombent), châtaigniers, cyprès, oliviers.
+
+**La vie du village.** Le clocher avec son horloge, sa cloche et son coq qui
+tourne au vent ; la fontaine qui coule vraiment ; le lavoir ; la terrasse du
+café avec ses guéridons et sa guirlande ; le terrain de pétanque et ses
+boules ; le marché du samedi ; les ruelles en escalier ; les enseignes en fer
+forgé ; le feu de camp au bord de la rivière ; les guirlandes tendues en
+travers de la rue. Et les habitants : les martinets qui tournoient au
+crépuscule, les chauves-souris, la chouette sur la cheminée, le gecko sur le
+mur chaud, les papillons de nuit, le troupeau de la transhumance avec son
+chien, les montgolfières qui décollent à l'aube.
+
+**Le ciel.** Réchauffé partout : une lueur d'horizon, la Voie lactée bien
+visible (aucune pollution lumineuse dans les Cévennes), des étoiles qui
+scintillent avec leur croix de diffraction, des nuages aux bords dissous qui
+dérivent, des étoiles filantes, et une lune moins brûlante.
+
+**LES FEUX D'ARTIFICE.** Un vrai moteur, plus trois traits : les fusées
+partent du sol avec leur traînée, montent, ralentissent et éclatent en
+**pivoine, chrysanthème, saule pleureur, palmier, anneau, crépitant, cœur ou
+double détonation**. Chaque étincelle a sa gravité, son frottement, sa
+traînée et sa mort en braise. Le ciel garde la fumée, un flash accompagne
+chaque détonation. S'y ajoutent les **fontaines à étincelles**, les **roues
+de feu** sur les toits, les **mines** qui partent du sol, le **reflet dans la
+rivière** et un **bouquet final**. Le plan d'anniversaire est devenu une
+vraie fête votive : guirlandes, fanions, roues, fontaines, confettis.
+
+**La chronologie corrigée.** Les invaders, c'est **2023**, pas les années 90 :
+les polaroids disent maintenant 2023 / 2024 / aujourd'hui, et le texte suit
+(« 2023. Le tout premier. » → « Et depuis, ça ne s'est jamais arrêté. »).
+
+**Aucun plan n'a été rallongé** : les durées des vingt-trois plans sont
+inchangées, seul leur contenu a changé. Tout reste peint au canevas — zéro
+image, le hors-ligne est intact.
+
+Testé de bout en bout, les deux cinématiques, zéro erreur console.
+sw v89→v90.
+
 ## Nouveautés (v89) — le code `INVADER`
 
 Un troisième code secret, à taper dans la saisie manuelle du scanner :
