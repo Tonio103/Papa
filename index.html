@@ -1724,6 +1724,107 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
 :root.reduce-fx #gbg-fg{ opacity:.4; }
 :root.reduce-fx #gbg{ opacity:.55; }
 
+/* ══════════════════════════════════════════════════════════════
+   MODE PLEIN SOLEIL — pour jouer dehors, en plein cagnard
+   ──────────────────────────────────────────────────────────────
+   Le jeu a un thème de nuit : superbe au calme, illisible à midi
+   sur une place des Vans. En plein soleil, un écran se « lave » :
+   tous les tons moyens disparaissent, il ne reste que les
+   contrastes extrêmes. Ce mode ne change donc pas les couleurs du
+   jeu — il pousse le contraste au maximum :
+     · les fonds deviennent franchement noirs (plus de dégradés
+       moyens qui virent au gris sous le soleil) ;
+     · les textes secondaires, volontairement discrets, repassent
+       en pleine opacité et en plus gras ;
+     · chaque texte reçoit un contour noir épais, pour tenir même
+       quand l'écran est délavé ;
+     · les décors animés s'effacent derrière le contenu utile ;
+     · le grain, la vignette et les voiles décoratifs sautent ;
+     · les bordures et les traits s'épaississent.
+   ══════════════════════════════════════════════════════════════ */
+:root.sun{
+  --bg:     #000006;
+  --panel:  #06060f;
+  --panel2: #0a0a16;
+  --line:   #5a5a8c;
+  --gris:   #a8b0d8;
+}
+:root.sun body{ background:#000006 !important; }
+:root.sun body::before, :root.sun body::after{ display:none !important; }
+/* le contenu utile passe devant : les décors s'effacent */
+:root.sun #gbg{ opacity:.28 !important; }
+:root.sun #gbg-fg{ display:none !important; }
+:root.sun #hub-amb, :root.sun #stars, :root.sun #wall-art, :root.sun #sky-deco{
+  opacity:.12 !important; }
+/* TEXTES : pleine opacité, plus gras, contour noir */
+:root.sun .sub, :root.sun .dim, :root.sun .opt-sub, :root.sun .pix{
+  opacity:1 !important; color:#f2f4ff !important; font-weight:800 !important; }
+:root.sun h1, :root.sun h2, :root.sun h3,
+:root.sun p, :root.sun span, :root.sun div, :root.sun button, :root.sun label{
+  text-shadow:
+    -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+    0 0 6px #000 !important;
+}
+/* PANNEAUX : fond franc, bord net */
+:root.sun .card, :root.sun #game-box, :root.sun #player-card,
+:root.sun .stat-block, :root.sun .opt-row, :root.sun #menu-panel{
+  background:#05050d !important;
+  border-width:3px !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+}
+/* BOUTONS : plus lisibles, contour marqué */
+:root.sun button{
+  border-width:3px !important;
+  filter:saturate(1.25) brightness(1.12);
+}
+:root.sun .b3{ background:#0a0a18 !important; color:#ffffff !important; }
+/* les sous-titres de cinématique : le plus important à lire dehors */
+:root.sun #cine-sub{
+  background:rgba(0,0,0,.78) !important;
+  padding:8px 14px !important; border-radius:10px !important;
+  font-weight:900 !important;
+}
+/* on enlève tout ce qui « brouille » : grain, vignette, flou */
+:root.sun [style*="backdrop-filter"]{ backdrop-filter:none !important; }
+/* LES CASES : quête et code final étaient sombres sur noir — c'est
+   exactement ce qui disparaît en premier au soleil. On leur donne un
+   fond franc et un bord net, et leur contenu passe en blanc. */
+:root.sun .qseg{
+  background:#1c1c34 !important;
+  border:2px solid #7a86c8 !important;
+  color:#ffffff !important;
+}
+:root.sun .qseg.half{ background:linear-gradient(90deg,var(--cyan) 50%,#1c1c34 50%) !important;
+  border-color:#7dffe8 !important; }
+:root.sun .qseg.done{ background:#ffd23f !important; border-color:#fff0a8 !important;
+  color:#241a00 !important; }
+:root.sun .fcell{
+  background:#16162c !important;
+  border:2.5px solid #7a86c8 !important;
+  color:#dfe4ff !important;
+}
+:root.sun .fcell.filled{ color:#ffffff !important; }
+:root.sun .fcell.ok{ background:#ffd23f !important; color:#241a00 !important;
+  border-color:#fff0a8 !important; }
+/* les 8 chiffres du code, sur le tableau de bord */
+:root.sun .frag{
+  background:#16162c !important;
+  border:2.5px solid #7a86c8 !important;
+  color:#dfe4ff !important;
+}
+:root.sun .frag.got{ background:#ffd23f !important; color:#241a00 !important;
+  border-color:#fff0a8 !important; text-shadow:none !important; }
+/* LES VIGNETTES de la galerie : on remonte leur luminosité, sinon
+   les pièces verrouillées deviennent des carrés noirs */
+:root.sun .card{ background:#0f0f1e !important; }
+:root.sun .card canvas, :root.sun .card img, :root.sun .card .mos{
+  filter:brightness(1.55) contrast(1.12) !important;
+}
+/* LA BARRE D'ONGLETS : c'est elle qu'on cherche du doigt en marchant */
+:root.sun #tabbar .tab{ background:#0a0a18 !important; border:2px solid #4a4a7c !important; }
+:root.sun #tabbar .tab.on{ border-color:var(--cyan) !important; background:#101028 !important; }
+
 /* ── ÉCRAN DE DÉFI : l'affiche de la station (couleur --st) ───── */
 #game-box{
   background:
@@ -2758,6 +2859,7 @@ function persist(){ Store.save(S); }
   window.hapticTest = ()=>buzz([40,60,120]);    // secousse nette pour l'écran Réglages
   /* applique tout de suite la préférence « animations réduites » */
   if(S.opts.reduceFx) document.documentElement.classList.add("reduce-fx");
+  if(S.opts.sunMode)  document.documentElement.classList.add("sun");
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -19249,6 +19351,11 @@ const Options = (()=>{
         <button class="opt-sw ${S.opts.haptics!==false?"on":""}" data-tog="haptics" aria-label="Vibrations"></button></div>`);
     host.insertAdjacentHTML("beforeend",
       toggleRow("Animations réduites", "Coupe les décors animés (batterie / confort)", "reduceFx"));
+    /* LE réglage du jour J : le jeu se joue dehors, en plein été */
+    host.insertAdjacentHTML("beforeend",
+      `<div class="opt-row"><div class="opt-txt"><div class="opt-name">☀ Mode plein soleil</div>
+        <div class="opt-sub">Contraste maximum pour lire l'écran dehors, en plein jour. À activer sur place si le soleil tape.</div></div>
+        <button class="opt-sw ${S.opts.sunMode ? "on" : ""}" data-tog="sunMode" aria-label="Mode plein soleil"></button></div>`);
     /* difficulté de la borne : segmenté 3 / 5 vies */
     host.insertAdjacentHTML("beforeend",
       `<div class="opt-row"><div class="opt-txt"><div class="opt-name">Difficulté de la borne</div>
@@ -19267,7 +19374,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v95</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v96</p>`);
     wire();
   }
   function wire(){
@@ -19279,6 +19386,7 @@ const Options = (()=>{
         persist();
         AudioFX.select();
         if(k === "reduceFx") document.documentElement.classList.toggle("reduce-fx", S.opts[k]);
+        if(k === "sunMode")  document.documentElement.classList.toggle("sun", S.opts[k]);
         if(k === "haptics" && S.opts[k]){ try{ navigator.vibrate && navigator.vibrate(20); }catch(e){} }
       });
     });
