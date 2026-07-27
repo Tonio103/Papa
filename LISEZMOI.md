@@ -62,6 +62,34 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v96) — ☀ MODE PLEIN SOLEIL
+
+Le jeu se joue **dehors**, en plein été, en Ardèche — et il a un thème de
+nuit. Magnifique au calme le soir ; illisible à midi sur la place des Vans.
+En plein soleil un écran se « lave » : tous les tons moyens disparaissent, il
+ne reste que les contrastes extrêmes.
+
+Nouveau réglage, dans **Menu › Réglages › ☀ Mode plein soleil**. Il ne change
+pas les couleurs du jeu — il pousse le contraste au maximum :
+
+- les fonds deviennent franchement noirs (plus de dégradés moyens qui virent
+  au gris sous le soleil) ;
+- tous les textes reçoivent un **contour noir épais** et passent en gras ;
+- les textes secondaires, volontairement discrets, repassent en pleine
+  opacité ;
+- les cases de la quête, les 8 chiffres du code et les vignettes de la
+  galerie reçoivent un fond franc et un bord net — ce sont elles qui
+  disparaissent en premier au soleil ;
+- les décors animés s'effacent derrière le contenu utile (28 % d'opacité) ;
+- le grain, la vignette et les flous décoratifs sautent ;
+- bordures et boutons s'épaississent, la barre d'onglets est cerclée.
+
+**À dire à ton père le jour J** : si le soleil tape et qu'il n'arrive plus à
+lire, l'onglet Menu → Réglages → ☀ Mode plein soleil. Ça se remet en un
+appui, et le réglage est mémorisé.
+
+sw v95→v96.
+
 ## Nouveautés (v95) — le double-tap ne zoome plus
 
 Un double-tap continuait de zoomer la page. La cause : **`touch-action`
