@@ -15,7 +15,7 @@ Le plus simple : **Netlify Drop** (https://app.netlify.com/drop) → glisse le d
 
 ## Préparer le hors-ligne (à faire AVANT le jour J)
 
-1. Sur le téléphone qui servira au jeu, ouvre l'URL **avec du réseau** — le service worker met tout en cache (page, polices, jsQR).
+1. Sur le téléphone qui servira au jeu, ouvre l'URL **avec du réseau** — le service worker met tout en cache (page, polices). Le lecteur de QR, lui, est embarqué dans le jeu : le scan marche même sans cette étape.
 2. « Ajouter à l'écran d'accueil » : le jeu devient une appli plein écran.
 3. **Test en mode avion** : ferme tout, coupe le réseau, rouvre depuis l'icône. Tout doit marcher sauf la caméra si le navigateur redemande la permission — d'où le secours par saisie manuelle du code, toujours disponible.
 4. Si tu modifies le jeu après coup : incrémente `invasion-v1` → `invasion-v2` dans `sw.js`, sinon les téléphones garderont l'ancienne version en cache.
@@ -61,6 +61,55 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `SHAPES.portrait` + `PALETTES.portrait` | le portrait pixel de ton père (LV_08, peint au pochoir) — grille de lettres, une lettre = une couleur ; un visage 12×12 d'exemple montre le format. `LAYER_NAMES` (dans LV_08) nomme chaque couche de couleur |
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
+
+## Nouveautés (v97) — LE SCAN DES QR NE MARCHAIT PAS SANS RÉSEAU ⚠
+
+**C'était un bug bloquant pour le jour J.** Quand on scannait un QR code, il
+ne se passait rien du tout — pas d'erreur, pas de message, la caméra tournait
+simplement dans le vide.
+
+### La cause
+
+Le lecteur de QR (`jsQR`) était chargé depuis un **CDN** :
+
+```
+<script src="https://cdnjs.cloudflare.com/.../jsQR.min.js"></script>
+```
+
+Si ce script ne se chargeait pas — pas de réseau, réseau capricieux, CDN
+bloqué, ou tout simplement le mode avion pour lequel le jeu est prévu —
+`window.jsQR` n'existait pas. Or la boucle de scan testait silencieusement sa
+présence : sans lui, elle bouclait indéfiniment **sans jamais rien dire**.
+
+Le comble : la planche `qr-codes.html` a, elle, son générateur de QR intégré
+depuis le début. La génération marchait hors-ligne, la lecture non.
+
+### Le correctif
+
+1. **Le lecteur est maintenant embarqué dans le jeu** (jsQR 1.4.0, Apache 2.0,
+   130 Ko minifiés). Le scan fonctionne dès la première ouverture, en mode
+   avion, quoi qu'il arrive au réseau. Il ne reste **plus aucun script
+   externe** dans `index.html`.
+2. **Un lecteur natif est utilisé en priorité** quand le navigateur en a un
+   (`BarcodeDetector`, sur Android) : plus rapide et plus tolérant aux QR
+   froissés ou pris de travers. jsQR prend le relais partout ailleurs.
+3. **Deuxième passe en contraste inversé** : un QR plastifié sous un reflet
+   renvoie parfois une image inversée, que l'ancienne version ne lisait pas.
+4. **Fini le silence.** Le scanner parle maintenant :
+   - au bout de 6 s sans lecture : « Approche à ~15 cm, bien à plat, et évite
+     l'ombre de ta main. »
+   - au bout de 14 s : « Toujours rien ? Le code est écrit sous le QR —
+     tape-le juste en dessous. »
+   - refus de la caméra, absence de caméra arrière, page non-HTTPS : chaque
+     cas a désormais son message, avec la marche à suivre.
+
+### Vérifié
+
+Les 13 QR de la vraie planche imprimée sont décodés par la bibliothèque
+embarquée, et un test de bout en bout avec une fausse caméra diffusant un vrai
+QR le lit correctement dans le jeu.
+
+sw v96→v97.
 
 ## Nouveautés (v96) — ☀ MODE PLEIN SOLEIL
 

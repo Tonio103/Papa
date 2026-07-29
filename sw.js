@@ -1,14 +1,16 @@
 /* ═══════════════════════════════════════════════════════════
    Service worker — L'Invasion des Vans
    Stratégie : cache d'abord, réseau en secours.
-   IMPORTANT : ouvre le jeu UNE FOIS avec du réseau. Le SW met
-   alors en cache la page, les polices Google et jsQR. Ensuite,
-   tout fonctionne en mode avion (seule la caméra a toujours
-   besoin de HTTPS, pas de réseau).
+   Le lecteur de QR est désormais EMBARQUÉ dans index.html : le scan
+   fonctionne dès la première ouverture, même en mode avion. Seules
+   les polices Google restent externes, et elles ont un repli — si
+   elles manquent, le jeu est juste un peu moins typé.
+   Ouvre quand même le jeu une fois avec du réseau pour que tout soit
+   en cache (la caméra, elle, exige toujours HTTPS mais pas de réseau).
    Pour forcer une mise à jour après modification du jeu :
    incrémente le numéro de version ci-dessous (v1 → v2).
    ═══════════════════════════════════════════════════════════ */
-const CACHE = "invasion-v96";
+const CACHE = "invasion-v97";
 const PRECACHE = [
   "./",
   "./index.html",
