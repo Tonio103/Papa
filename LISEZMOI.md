@@ -62,6 +62,59 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v98) — LE SCAN ÉTAIT « TRÈS TRÈS DIFFICILE À FLASHER » ⚠
+
+La v97 avait rendu le scan possible hors-ligne, mais il restait pénible : il
+fallait insister très longtemps pour qu'un QR soit lu. Ta description du
+contournement que tu avais trouvé — *taper un code bidon dans le champ, faire
+OK, obtenir SIGNAL INCONNU, puis reflasher* — a mis le doigt exactement sur la
+cause.
+
+### Les deux vrais défauts
+
+1. **La boucle de scan pouvait mourir en silence.** Elle ne reprogrammait
+   l'image suivante qu'**à la fin** de son travail. La moindre exception au
+   milieu (une image vidéo pas encore prête, un pixel buffer refusé) arrêtait
+   donc le scan **définitivement**, sans message, sans rien : la caméra
+   continuait de s'afficher mais plus personne ne la regardait. Il fallait
+   quitter et revenir sur l'écran pour la relancer.
+   → La boucle programme désormais l'image suivante **en tout premier**, et
+   tout son contenu est sous `try/catch`. Elle ne peut plus s'arrêter.
+
+2. **Ton contournement marchait par accident.** Un code refusé déclenche
+   `restartScanSoon()`, qui rappelait `Scanner.start()` **sans arrêter la
+   boucle précédente**. Résultat : deux boucles empilées analysaient la même
+   caméra, ce qui doublait le nombre d'analyses par seconde — d'où
+   « ça marche quand je fais ça ». C'était un bug qui compensait l'autre.
+   → `start()` appelle maintenant `stop()` en premier. Une seule boucle, un
+   seul flux caméra, et le débit est correct dès la première tentative.
+
+### Et le scan lui-même a été renforcé
+
+- **Caméra demandée en 1280×720** (au lieu de la résolution par défaut, souvent
+  640×480) : deux fois plus de pixels sur le QR, avec repli automatique si le
+  téléphone refuse.
+- **Mise au point continue** activée quand l'appareil le permet — c'est ce qui
+  évite de rester bloqué sur une image floue à 15 cm.
+- **Trois cadrages en alternance** d'une image à l'autre : l'image entière,
+  puis un gros plan sur les 60 % du centre, puis sur les 35 %. Chaque
+  resserrage augmente la résolution utile du code.
+  Mesuré sur un QR de la vraie planche : l'image entière seule échoue déjà
+  quand le QR occupe 15 % de la hauteur, alors que le cadrage à 35 % le lit
+  encore à 65 pixels — soit le bras tendu.
+- **~18 analyses par seconde**, cadencées : assez pour accrocher tout de suite,
+  sans étouffer l'affichage de la caméra.
+
+### Vérifié
+
+Détection en **130 à 160 ms** sur tous les cadrages réalistes (gros plan,
+normal, bras tendu, décentré) — contre 130 à 250 ms et des ratés avant.
+Ta séquence exacte a été rejouée de bout en bout : caméra sur un mur vide →
+`LV_XX` au clavier → SIGNAL INCONNU → on présente le QR → il est lu tout seul,
+avec **un seul flux caméra** ouvert. Le contournement n'est plus nécessaire.
+
+sw v97→v98.
+
 ## Nouveautés (v97) — LE SCAN DES QR NE MARCHAIT PAS SANS RÉSEAU ⚠
 
 **C'était un bug bloquant pour le jour J.** Quand on scannait un QR code, il

@@ -3971,14 +3971,14 @@ function renderHub(){
    8. SCANNER — caméra + jsQR, saisie manuelle en secours
    ─────────────────────────────────────────────────────────── */
 const Scanner = (()=>{
-  let stream=null, raf=null, workCv=null;
-  let t0 = 0, hint = 0, native = null;
+  let stream=null, raf=null, workCv=null, wctx=null;
+  let t0 = 0, hint = 0, native = null, lastScan = 0, pass = 0;
   const video = ()=>$("#cam");
 
   /* LE LECTEUR NATIF, quand le navigateur en a un (Android/Chrome) :
-     il est décodé par le système, donc plus rapide et plus tolérant
-     aux QR froissés ou de travers. Sinon on utilise jsQR, désormais
-     embarqué dans la page — il n'y a plus de cas « aucun lecteur ». */
+     décodé par le système, donc plus rapide et plus tolérant aux QR
+     froissés ou de travers. Sinon jsQR, embarqué dans la page — il
+     n'y a plus de cas « aucun lecteur ». */
   function initNative(){
     if(native !== null) return;
     native = false;
@@ -3990,24 +3990,45 @@ const Scanner = (()=>{
   }
 
   async function start(){
+    /* TOUJOURS repartir propre : sans ça, chaque « signal inconnu »
+       relançait start() par-dessus le scan en cours. On se retrouvait
+       avec plusieurs boucles et plusieurs flux caméra empilés — ce qui
+       faisait, par accident, mieux détecter… en épuisant la batterie. */
+    stop();
     msg("");
     initNative();
-    t0 = performance.now(); hint = 0;
-    /* si vraiment aucun lecteur n'est disponible, on le DIT, au lieu
-       de laisser la caméra tourner dans le vide */
+    t0 = performance.now(); hint = 0; lastScan = 0; pass = 0;
     if(!native && typeof jsQR !== "function"){
       msg("Lecteur de QR indisponible — utilise la saisie du code juste en dessous.", true);
       return;
     }
     try{
-      stream = await navigator.mediaDevices.getUserMedia({
-        video:{ facingMode:"environment" }, audio:false
-      });
+      /* on DEMANDE une image nette et détaillée : une définition trop
+         basse était la vraie raison pour laquelle il fallait s'y
+         reprendre à dix fois. Si le téléphone refuse, on retombe sur
+         la demande minimale. */
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:{ ideal:"environment" },
+                  width:{ ideal:1280 }, height:{ ideal:720 } },
+          audio:false });
+      }catch(e){
+        stream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:"environment" }, audio:false });
+      }
       video().srcObject = stream;
       await video().play();
+      /* mise au point continue quand l'appareil sait le faire : un QR
+         tenu à 15 cm est sinon souvent flou */
+      try{
+        const tr = stream.getVideoTracks()[0];
+        const caps = tr.getCapabilities ? tr.getCapabilities() : {};
+        const adv = [];
+        if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({ focusMode:"continuous" });
+        if(adv.length) await tr.applyConstraints({ advanced:adv });
+      }catch(e){}
       loop();
     }catch(e){
-      /* on distingue les cas : c'est ce qui permet de s'en sortir seul */
       const n = (e && e.name) || "";
       if(n === "NotAllowedError" || n === "SecurityError")
         msg("Accès caméra refusé. Autorise-le dans les réglages du navigateur, ou saisis le code à la main.", true);
@@ -4020,44 +4041,78 @@ const Scanner = (()=>{
     }
   }
 
+  /* lit une zone de l'image vidéo, en deux passes de contraste */
+  function readZone(v, sx, sy, sw, sh, outW){
+    if(typeof jsQR !== "function") return null;
+    if(!workCv){ workCv = document.createElement("canvas");
+      wctx = workCv.getContext("2d", { willReadFrequently:true }); }
+    const sc = Math.min(1, outW/sw);
+    const w = Math.max(2, Math.round(sw*sc)), h = Math.max(2, Math.round(sh*sc));
+    if(workCv.width !== w || workCv.height !== h){ workCv.width = w; workCv.height = h; }
+    wctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+    const img = wctx.getImageData(0, 0, w, h);
+    let q = jsQR(img.data, w, h, { inversionAttempts:"dontInvert" });
+    /* un QR plastifié sous un reflet renvoie parfois un contraste
+       inversé : on retente à l'envers avant d'abandonner */
+    if(!q) q = jsQR(img.data, w, h, { inversionAttempts:"onlyInvert" });
+    return (q && q.data) ? q.data : null;
+  }
+
   async function loop(){
+    /* on programme l'image SUIVANTE tout de suite : si quoi que ce
+       soit échoue plus bas, la boucle continue. Avant, la moindre
+       exception tuait le scan définitivement — sans rien afficher. */
+    raf = requestAnimationFrame(loop);
     const v = video();
-    if(v.readyState >= 2 && v.videoWidth){
-      let data = null;
+    if(!(v && v.readyState >= 2 && v.videoWidth)) return;
+    /* ~18 analyses par seconde : assez pour attraper une image nette,
+       sans étouffer le flux de la caméra */
+    const now = performance.now();
+    if(now - lastScan < 55) return;
+    lastScan = now;
+
+    let data = null;
+    try{
       /* 1) le lecteur du système, s'il existe */
       if(native){
         try{
           const found = await native.detect(v);
           if(found && found.length && found[0].rawValue) data = found[0].rawValue;
-        }catch(e){ native = false; }   // il a échoué : on retombe sur jsQR
+        }catch(e){ native = false; }
       }
-      /* 2) jsQR, embarqué dans la page */
-      if(!data && typeof jsQR === "function"){
-        if(!workCv) workCv = document.createElement("canvas");
-        const scale = Math.min(1, 480 / v.videoWidth);   // 480px suffisent à jsQR
-        workCv.width = Math.round(v.videoWidth*scale);
-        workCv.height = Math.round(v.videoHeight*scale);
-        const c = workCv.getContext("2d", { willReadFrequently:true });
-        c.drawImage(v, 0, 0, workCv.width, workCv.height);
-        const img = c.getImageData(0, 0, workCv.width, workCv.height);
-        /* on tente aussi l'inversion : un QR imprimé puis plastifié
-           renvoie parfois un contraste inversé sous un reflet */
-        let q = jsQR(img.data, workCv.width, workCv.height, { inversionAttempts:"dontInvert" });
-        if(!q) q = jsQR(img.data, workCv.width, workCv.height, { inversionAttempts:"onlyInvert" });
-        if(q && q.data) data = q.data;
+      /* 2) jsQR — on alterne TROIS cadrages d'une image à l'autre :
+            l'image entière, puis deux gros plans de plus en plus serrés
+            sur le centre. Chaque resserrage augmente la résolution utile
+            du QR : le cadrage à 60 % rattrape les codes un peu loin, celui
+            à 35 % rattrape ceux photographiés à bout de bras. Comme le
+            viseur invite déjà à centrer le code, ces deux zones tombent
+            juste là où il se trouve neuf fois sur dix. */
+      if(!data){
+        const W0 = v.videoWidth, H0 = v.videoHeight;
+        if(pass === 0){
+          data = readZone(v, 0, 0, W0, H0, 640);
+        } else {
+          const f = (pass === 1) ? .6 : .35;
+          const cw = Math.round(W0*f), ch = Math.round(H0*f);
+          data = readZone(v, (W0-cw)/2, (H0-ch)/2, cw, ch, 640);
+        }
+        pass = (pass + 1) % 3;
       }
-      if(data){ handleCode(data); return; }
+    }catch(e){ /* on ne casse jamais la boucle */ }
 
-      /* AUCUN SILENCE : au bout de quelques secondes sans rien lire,
-         on guide au lieu de laisser le joueur dans le doute. */
-      const el = performance.now() - t0;
-      if(hint === 0 && el > 6000){
-        hint = 1; msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
-      } else if(hint === 1 && el > 14000){
-        hint = 2; msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
-      }
+    if(data){
+      if(raf) cancelAnimationFrame(raf);
+      raf = null;
+      handleCode(data);
+      return;
     }
-    raf = requestAnimationFrame(loop);
+    /* AUCUN SILENCE : on guide au lieu de laisser dans le doute */
+    const el = now - t0;
+    if(hint === 0 && el > 6000){
+      hint = 1; msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
+    } else if(hint === 1 && el > 14000){
+      hint = 2; msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
+    }
   }
   function stop(){
     if(raf) cancelAnimationFrame(raf);
@@ -19446,7 +19501,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v97</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v98</p>`);
     wire();
   }
   function wire(){
