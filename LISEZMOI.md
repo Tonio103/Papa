@@ -62,6 +62,50 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v107) — LE MODE RÉGLAGE, UTILISABLE SUR LE TERRAIN
+
+### D'où vient une position ? (le piège à connaître)
+
+Il y a **deux couches** de positions GPS, et elles ne vont pas au même endroit :
+
+| couche | où c'est stocké | qui la voit |
+|---|---|---|
+| celle du **jeu** | `CONFIG.map.spots`, dans le code | **tout le monde**, ton père compris |
+| celle de **ce téléphone** | `localStorage` du navigateur | **toi seul**, sur ce téléphone |
+
+Le bouton « 📌 Enregistrer la pièce ici » écrit dans la **seconde**. Une position
+enregistrée sur ton téléphone n'apparaîtra donc **jamais** sur celui de ton
+père tant qu'elle n'a pas été collée dans le code.
+
+Et surtout : **la couche locale écrase celle du jeu.** Si tu as fait un essai
+sur ton téléphone, tu continueras à voir cet essai même après qu'on ait gravé
+la vraie position dans le code — tu croiras que la correction n'a pas marché,
+alors qu'elle marche pour tous les autres.
+
+L'écran de réglage dit maintenant à quelle couche on a affaire, à chaque fois :
+
+- 🟢 *gravée dans le jeu — visible par tous*
+- 🔵 *réglage de CE téléphone seulement — invisible pour les autres*
+- 🟡 *⚠ réglage de CE téléphone — il masque celle du jeu (…)*
+
+### Entrer dans le mode réglage
+
+`?triche=1` restait pénible : depuis l'icône de l'écran d'accueil il n'y a pas
+de barre d'adresse, et le moindre rechargement faisait tout perdre en plein
+repérage. Trois façons désormais :
+
+- `?triche=1` — la forme historique ;
+- `#triche` — bien plus court à taper, et il suffit de l'ajouter à la fin de
+  l'adresse déjà ouverte ;
+- **et l'onglet s'en souvient.** Une fois entré, un rechargement (mise à jour du
+  service worker, retour arrière, veille du téléphone) ne fait plus rien perdre.
+
+La mémoire est celle de l'**onglet** (`sessionStorage`), pas du téléphone : elle
+meurt à la fermeture. Ton père, qui ouvrira le jeu par son icône, ne peut pas
+tomber dedans par accident — vérifié.
+
+sw v106→v107.
+
 ## Nouveautés (v106) — REPÉRAGE GPS : EFFACER UN ESSAI
 
 Le mode réglage du radar (`?triche=1`) permettait d'enregistrer la position
