@@ -62,6 +62,29 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v106) — REPÉRAGE GPS : EFFACER UN ESSAI
+
+Le mode réglage du radar (`?triche=1`) permettait d'enregistrer la position
+d'une pièce, mais pas de la **retirer**. Or on repère rarement du premier coup :
+on pose une pièce quelque part pour essayer, on change d'avis, et le radar
+continue de guider vers un point qu'on sait faux.
+
+Deux ajouts dans la barre de réglage du Radar :
+
+- **✕ Effacer ce spot** — retire la position de la pièce sélectionnée.
+  (Réenregistrer écrasait déjà la précédente ; ce qui manquait, c'était de
+  pouvoir revenir à *rien*.)
+- **La position enregistrée s'affiche** sous les pastilles, en clair :
+  `LV_04 : 44.40458, 4.13214`, ou *aucune position enregistrée*. Sans ça, on ne
+  peut pas savoir si on regarde un vrai repérage ou un essai oublié.
+
+À retenir : ces positions vivent dans le **téléphone**, pas dans le jeu. Un
+essai n'abîme donc rien, et n'a pas besoin d'être « annulé » dans le code.
+Quand les 8 seront définitives, « ⎘ Copier les spots » donne la ligne à coller
+dans `CONFIG.map.spots`, ce qui les grave dans le jeu pour de bon.
+
+sw v105→v106.
+
 ## Nouveautés (v105) — PLUS RIEN NE TOUCHE LE BORD DE L'ÉCRAN ⚠
 
 **C'est une régression que j'avais introduite en v105… pardon, en v100.** Le
