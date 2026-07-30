@@ -62,6 +62,43 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v113) — LES VINGT DERNIERS MÈTRES, PAR L'IMAGE
+
+Aucun GPS de téléphone ne couvre les vingt derniers mètres : à ±15 m, la flèche
+tourne dans le vide. Ce qui les couvre, c'est **une photo du mur et une
+phrase**.
+
+### Sur place, au repérage
+
+Deux ajouts dans le panneau de réglage, pour la pièce sélectionnée :
+
+- **📷 Photo du mur** — la photo est prise avec l'appareil arrière, puis
+  **réduite à 560 px**. Vérifié : une photo d'iPhone de 3024×4032 passe de
+  **324 Ko à 25 Ko**. C'est ce qui permet d'en garder huit : le stockage local
+  d'un navigateur plafonne à ~5 Mo en tout.
+- **Un repère écrit** : *« à gauche de la porte verte, à 3 m de haut »*.
+
+### Le jour de la chasse
+
+Dès qu'on entre dans la zone — la marge d'erreur avale la distance, ou moins de
+25 m — un panneau **« Cherche à vue »** s'ouvre tout seul sous le radar, avec la
+photo et le repère. Et il se referme dès qu'on s'éloigne.
+
+Sans photo ni repère, il affiche quand même le bon conseil : *« Le GPS ne peut
+plus t'aider : lève les yeux, regarde les murs, les angles et au-dessus de la
+hauteur des yeux. »*
+
+C'est le seul moment du jeu où l'écran doit dire **arrête de me regarder**.
+
+### Emporter le repérage
+
+**⬇ Exporter le repérage** produit un fichier unique contenant les huit
+positions, les repères écrits et les photos. C'est ce qui permet de graver le
+travail de terrain dans le jeu — pour qu'il serve aussi sur **un autre
+téléphone**, celui de ton père.
+
+sw v112→v113.
+
 ## Nouveautés (v112) — POSER LES POINTS DEPUIS GOOGLE MAPS ⚠
 
 ### Pourquoi Google Maps paraît si simple

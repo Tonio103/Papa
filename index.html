@@ -665,6 +665,35 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 #paste-out .ok{ color:#39e08a; }
 #paste-out .ko{ color:#ff8484; }
 
+
+/* ── Photo et repère du lieu ──────────────────────────────── */
+#radar-photo{ margin:10px 0 4px; padding:12px; text-align:left;
+  border:1px solid rgba(255,255,255,.12); border-radius:14px;
+  background:rgba(255,210,63,.05); }
+#lbl-photo{ display:inline-flex; align-items:center; justify-content:center;
+  cursor:pointer; }
+#note-in{ width:100%; margin-top:8px; font-family:var(--f-lire); font-size:14px;
+  text-align:left; letter-spacing:0; text-transform:none;
+  background:#0d0d22; color:var(--blanc); border:1px solid rgba(255,255,255,.18);
+  border-radius:10px; padding:10px 12px; }
+#note-in:focus{ outline:none; border-color:var(--jaune); }
+#photo-prev{ margin-top:10px; }
+#photo-prev img{ width:100%; max-height:180px; object-fit:cover;
+  border-radius:10px; border:1px solid rgba(255,255,255,.16); display:block; }
+#photo-prev .none{ font-family:var(--f-lire); font-size:13px; color:#7b8199; }
+
+/* le panneau « à vue », sur le radar lui-même */
+#radar-zone{ margin:10px 0 2px; padding:12px; text-align:left;
+  border:1px solid rgba(143,208,255,.35); border-radius:14px;
+  background:rgba(143,208,255,.08); }
+#radar-zone[hidden]{ display:none; }
+#radar-zone .z-t{ font-family:var(--f-lire); font-size:12px; font-weight:600;
+  letter-spacing:1.6px; text-transform:uppercase; color:#8fd0ff; margin-bottom:8px; }
+#radar-zone img{ width:100%; max-height:210px; object-fit:cover; border-radius:10px;
+  border:1px solid rgba(255,255,255,.18); display:block; margin-bottom:8px; }
+#radar-zone .z-n{ font-family:var(--f-lire); font-size:15px; line-height:1.5;
+  color:#EDEDF7; }
+
 /* ── Banc d'essai du radar ────────────────────────────────── */
 #radar-cal{ margin:10px 0 4px; padding:12px; text-align:left;
   border:1px solid rgba(255,255,255,.12); border-radius:14px;
@@ -2873,6 +2902,10 @@ button.b2{ color:#04231d !important; }
     <div id="radar-dist"></div>
     <div id="radar-guide"></div>
     <div id="radar-sub" class="dim"></div>
+    <!-- LES VINGT DERNIERS MÈTRES. Aucun GPS de téléphone ne les
+         couvre : à ±15 m, la flèche tourne dans le vide. Ce qui les
+         couvre, c'est une photo du mur et une phrase. -->
+    <div id="radar-zone" hidden></div>
     <canvas id="radar-trend" aria-hidden="true"></canvas>
     <div id="radar-list"></div>
     <div id="radar-setup" hidden>
@@ -2884,6 +2917,7 @@ button.b2{ color:#04231d !important; }
         <button id="btn-radar-del" class="b3">✕ Effacer ce spot</button>
         <button id="btn-radar-copy" class="b3">⎘ Copier les spots</button>
         <button id="btn-radar-map" class="b3">🗺 Voir ce spot sur une carte</button>
+        <button id="btn-radar-export" class="b3">⬇ Exporter le repérage</button>
       </div>
       <!-- LE BANC D'ESSAI : il tranche entre « le radar calcule mal »
            et « la position enregistrée est fausse ». Sans lui, on ne
@@ -2912,6 +2946,22 @@ button.b2{ color:#04231d !important; }
         <div class="btn-row" style="gap:8px; padding-top:6px;">
           <button id="btn-paste-me" class="b3">⎘ Copier ma position (pour la vérifier dans Maps)</button>
         </div>
+      </div>
+      <div id="radar-photo">
+        <div class="rc-t">Photo et repère du lieu</div>
+        <div class="rc-s">C'est ce qui fera vraiment trouver la pièce. Sur les
+          vingt derniers mètres le GPS ne sert plus à rien : une photo du mur et
+          une phrase valent mieux que toutes les flèches.<br>
+          La photo s'affichera toute seule dès qu'on entrera dans la zone.</div>
+        <div class="btn-row" style="gap:8px;">
+          <label class="b3" id="lbl-photo" for="photo-in">📷 Photo du mur</label>
+          <input id="photo-in" type="file" accept="image/*" capture="environment"
+                 style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+          <button id="btn-photo-del" class="b3">✕ Retirer la photo</button>
+        </div>
+        <input id="note-in" placeholder="Ex. : à gauche de la porte verte, à 3 m de haut"
+               autocomplete="off" maxlength="120">
+        <div id="photo-prev"></div>
       </div>
       <div id="radar-cal">
         <div class="rc-t">Vérifier le radar en marchant</div>
@@ -8381,6 +8431,11 @@ function fireworks(){
    ─────────────────────────────────────────────────────────── */
 const Radar = (()=>{
   const KEY = "invasionLesVans:spots";
+  const KEY_IMG = "invasionLesVans:spotshots";   // photo du lieu, par pièce
+  const KEY_NOTE = "invasionLesVans:spotnotes";  // repère écrit, par pièce
+  const loadMap = (k)=>{ try{ return JSON.parse(localStorage.getItem(k) || "{}"); }catch(e){ return {}; } };
+  const saveMap = (k, v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }
+                            catch(e){ return false; } };
   /* paliers : [distance max (m), libellé, couleur, période de bip (ms)] */
   const HEAT = [
     [  15, "C'EST LÀ ! FOUILLE !", "#39e08a", 220],
@@ -8873,9 +8928,11 @@ const Radar = (()=>{
       setUI("RADAR COUPÉ", "", "Active le radar pour traquer la pièce la plus proche.", null);
       if(guide) guide.textContent = "";
       hist.length = 0; trail.length = 0;
+      montrerZone(null, false);
     }else if(!fix && gpsErr){
       setUI("POSITION REFUSÉE", "", "Autorise la localisation dans les réglages du téléphone.", "#ff8484");
       if(guide) guide.textContent = "";
+      montrerZone(null, false);
     }else if(!fix){
       { const el = Math.round((performance.now() - t0Watch)/1000);
         setUI("RECHERCHE GPS…", el + " s",
@@ -8902,6 +8959,7 @@ const Radar = (()=>{
         "#ff8484");
       if(guide){ guide.textContent = "Ne suis pas ce cap : la position est fausse.";
                  guide.style.color = "#ff8484"; }
+      montrerZone(null, false);
     }else{
       pushHist(t.d);
       const heat2 = heatOf(t.d, accM);
@@ -8922,6 +8980,13 @@ const Radar = (()=>{
                         : "boussole absente");
       else if(headSrc === "gps") bits.push("cap déduit de ta marche");
       setUI(zone ? ZONE[0] : heat2[1], distTxt, bits.join(" · "), zone ? ZONE[1] : heat2[2]);
+      /* ── DANS LA ZONE : on passe la main à l'œil ───────────────
+         Dès que la marge d'erreur avale la distance, ou sous 25 m,
+         le GPS n'a plus rien à dire d'utile. On montre alors ce qui
+         sert vraiment : le mur, et la phrase qu'on a écrite dessus.
+         C'est le seul moment du jeu où l'écran doit dire « arrête de
+         me regarder ». */
+      montrerZone(t, zone || t.d < 25);
       if(guide){
         guide.textContent = fiable ? guideTxt(t, up, live)
           : (t.d <= (accM||0)
@@ -9083,6 +9148,7 @@ const Radar = (()=>{
       b.addEventListener("click", ()=>{ selCode = st.code; AudioFX.nav(); buildChips(); });
       host.appendChild(b);
     });
+    majPhoto();
     /* ── D'OÙ VIENT CETTE POSITION ? ─────────────────────────────
        Il y a DEUX couches, et c'est là qu'on se fait piéger :
 
@@ -9124,6 +9190,37 @@ const Radar = (()=>{
       }
     }
   }
+  /* le panneau « cherche à vue », sur l'écran radar */
+  let zoneCode = null, zoneOn = null;
+  function montrerZone(t, on){
+    const el = $("#radar-zone"); if(!el) return;
+    const code = t ? t.st.code : null;
+    if(on === zoneOn && code === zoneCode) return;   // rien de neuf : on ne redessine pas
+    zoneOn = on; zoneCode = code;
+    if(!on || !t){ el.hidden = true; el.innerHTML = ""; return; }
+    const img = loadMap(KEY_IMG)[code], note = loadMap(KEY_NOTE)[code] || "";
+    if(!img && !note){
+      el.hidden = false;
+      el.innerHTML = `<div class="z-t">Cherche à vue</div>`
+        + `<div class="z-n">Tu es à portée de ${t.st.code} — ${t.st.nom}. `
+        + `Le GPS ne peut plus t'aider : lève les yeux, regarde les murs, `
+        + `les angles et au-dessus de la hauteur des yeux.</div>`;
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `<div class="z-t">Cherche à vue — ${t.st.code}</div>`
+      + (img ? `<img src="${img}" alt="Le mur de ${t.st.code}">` : "")
+      + (note ? `<div class="z-n">${note.replace(/[<>&]/g, ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]))}</div>` : "");
+  }
+
+  /* l'aperçu de la photo et du repère écrit de la pièce choisie */
+  function majPhoto(){
+    const prev = $("#photo-prev"); if(!prev) return;
+    const img = loadMap(KEY_IMG)[selCode], note = loadMap(KEY_NOTE)[selCode] || "";
+    prev.innerHTML = img ? `<img src="${img}" alt="">`
+      : "<span class='none'>Aucune photo pour cette pièce.</span>";
+    const ni = $("#note-in"); if(ni && document.activeElement !== ni) ni.value = note;
+  }
   function start(){
     cv = $("#radar-cv"); c = cv.getContext("2d");
     $("#radar-setup").hidden = !TRICHE;
@@ -9157,6 +9254,33 @@ const Radar = (()=>{
         hist.length = 0;                       // la courbe repart à zéro
         AudioFX.nav(); drawList();
       });
+      /* ── RÉDUIRE LA PHOTO ─────────────────────────────────────
+         Une photo d'iPhone pèse 3 à 5 Mo. Le stockage local d'un
+         navigateur en accepte environ 5 en TOUT : en garder huit
+         telles quelles est impossible. On les ramène donc à 560 px de
+         large en JPEG — largement assez pour reconnaître un mur, et
+         une quarantaine de kilo-octets pièce. */
+      function reduireImage(file, cb){
+        const fr = new FileReader();
+        fr.onload = ()=>{
+          const img = new Image();
+          img.onload = ()=>{
+            const max = 560;
+            const k = Math.min(1, max/Math.max(img.width, img.height));
+            const w = Math.max(1, Math.round(img.width*k)), h = Math.max(1, Math.round(img.height*k));
+            const cv2 = document.createElement("canvas");
+            cv2.width = w; cv2.height = h;
+            const c2 = cv2.getContext("2d");
+            c2.drawImage(img, 0, 0, w, h);
+            cb(cv2.toDataURL("image/jpeg", 0.72));
+          };
+          img.onerror = ()=>cb(null);
+          img.src = fr.result;
+        };
+        fr.onerror = ()=>cb(null);
+        fr.readAsDataURL(file);
+      }
+
       /* ── LIRE DES COORDONNÉES ÉCRITES N'IMPORTE COMMENT ───────
          Google Maps, selon qu'on copie l'étiquette, l'adresse de la
          page ou le partage, produit au moins quatre formats
@@ -9335,6 +9459,51 @@ const Radar = (()=>{
         else prompt("Ta position :", txt);
         $("#paste-out").innerHTML = `Copié : <b>${txt}</b> (±${Math.round(accM||0)} m).`
           + ` Colle-le dans Google Maps pour voir où ton téléphone te situe.`;
+      });
+
+      $("#photo-in").addEventListener("change", e=>{
+        const f = e.target.files && e.target.files[0];
+        e.target.value = "";                     // pour pouvoir reprendre la même
+        if(!f) return;
+        $("#photo-prev").innerHTML = "<span class='none'>Réduction en cours…</span>";
+        reduireImage(f, (data)=>{
+          if(!data){ AudioFX.err();
+            $("#photo-prev").innerHTML = "<span class='none'>Image illisible.</span>"; return; }
+          const m = loadMap(KEY_IMG); m[selCode] = data;
+          if(!saveMap(KEY_IMG, m)){ AudioFX.err();
+            $("#photo-prev").innerHTML = "<span class='none'>Plus de place : retire une photo d'une autre pièce.</span>";
+            return; }
+          AudioFX.ok(); majPhoto();
+        });
+      });
+      $("#btn-photo-del").addEventListener("click", ()=>{
+        const m = loadMap(KEY_IMG); delete m[selCode]; saveMap(KEY_IMG, m);
+        AudioFX.back(); majPhoto();
+      });
+      $("#note-in").addEventListener("change", ()=>{
+        const m = loadMap(KEY_NOTE);
+        const v = $("#note-in").value.trim();
+        if(v) m[selCode] = v; else delete m[selCode];
+        saveMap(KEY_NOTE, m); AudioFX.tick();
+      });
+      /* ── EXPORTER LE REPÉRAGE ────────────────────────────────
+         Positions, repères écrits et photos dans un seul fichier :
+         c'est ce qui permet de graver le travail de terrain dans le
+         jeu, pour qu'il serve aussi sur un AUTRE téléphone. */
+      $("#btn-radar-export").addEventListener("click", ()=>{
+        const paquet = { spots: loadSpots(), notes: loadMap(KEY_NOTE), photos: loadMap(KEY_IMG),
+                         le: new Date().toISOString().slice(0,10) };
+        const txt = JSON.stringify(paquet);
+        AudioFX.select();
+        try{
+          const bl = new Blob([txt], { type:"application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(bl);
+          a.download = "reperage-les-vans.json";
+          document.body.appendChild(a); a.click();
+          setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          $("#radar-sub").textContent = `Repérage exporté (${Math.round(txt.length/1024)} Ko).`;
+        }catch(e){ prompt("Repérage :", txt); }
       });
 
       /* ouvrir la position enregistrée dans l'appli Cartes : c'est le
@@ -21462,7 +21631,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v112</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v113</p>`);
     wire();
   }
   function wire(){
