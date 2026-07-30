@@ -62,6 +62,42 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v104) — LE QUIZ EN VERRE CLAIR
+
+Le quiz passe en **blanc translucide**. Le reste du jeu ne bouge pas : le hub,
+les défis, les cinématiques et l'écran-titre gardent leur fond nuit.
+
+C'est justement le contraste qui fait exister l'écran. Le jeu est une borne
+d'arcade dans la nuit ; le quiz est une **plaque de verre claire** qui vient se
+poser par-dessus, le temps de trois questions. Le rapport est celui d'un cartel
+à son tableau.
+
+Trois principes, qui sont ceux du verre réel :
+
+1. **Le verre a besoin de quelque chose à réfracter.** Le décor animé du défi
+   continue de vivre derrière, flouté et éclairci : c'est ce qu'on aperçoit à
+   travers la plaque, et c'est ce qui la fait changer pendant qu'on répond. Sur
+   un fond plat, la même plaque ne serait qu'un rectangle blanc.
+2. **L'arête fait le volume.** Un liseré très clair en haut, plus discret en
+   bas : l'œil en déduit une épaisseur.
+3. **La lumière passe, elle ne cogne pas.** Ombres larges et très diluées,
+   jamais de noir franc. Deux reflets — la lumière du haut et un éclat en
+   diagonale — donnent le côté *liquide* plutôt que *dépoli* ; tous deux sont
+   **additifs**, ils ajoutent de la clarté sans jamais retirer de contraste au
+   texte.
+
+Le contenu garde le parti pris « galerie » de la v103 : pas de boutons mais des
+lignes, une seule couleur d'accent — celle de l'épreuve, foncée juste ce qu'il
+faut pour tenir sur du blanc — et le pixel réservé au seul score.
+
+### Et dehors ?
+
+Le mode ☀ **plein soleil** force la plaque en **blanc opaque** et passe le texte
+au noir. La transparence est un luxe qu'on ne peut plus se payer en plein jour,
+et le quiz est le seul écran de texte long du jeu.
+
+sw v103→v104.
+
 ## Nouveautés (v103) — LE QUIZ REDESSINÉ : PARTI PRIS « GALERIE »
 
 Le quiz est le seul écran du jeu où on **lit** et où on **réfléchit**. Il prend
