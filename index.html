@@ -2794,8 +2794,10 @@ button.b2{ color:#04231d !important; }
     <div id="radar-sub" class="dim"></div>
     <div id="radar-setup" hidden>
       <div id="radar-chips"></div>
+      <div id="radar-spot" class="dim" style="text-align:center; font-size:14px; min-height:20px; margin:2px 0 6px;"></div>
       <div class="btn-row" style="padding-top:6px; gap:10px;">
         <button id="btn-radar-rec" class="b3">📌 Enregistrer la pièce ici</button>
+        <button id="btn-radar-del" class="b3">✕ Effacer ce spot</button>
         <button id="btn-radar-copy" class="b3">⎘ Copier les spots</button>
       </div>
     </div>
@@ -8246,6 +8248,15 @@ const Radar = (()=>{
   const loadSpots = ()=>{ let s = {};
     try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
     return Object.assign({}, CONFIG.map.spots, s); };
+  /* Effacer une position d'essai. Enregistrer deux fois de suite
+     écrase déjà la précédente — mais pour un repérage provisoire, il
+     faut aussi pouvoir REVENIR À RIEN, sinon le radar continue de
+     guider vers un point qu'on sait faux. */
+  function delSpot(code){
+    let s = {}; try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
+    delete s[code];
+    try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){}
+  }
   function saveSpot(code, lat, lon){
     let s = {}; try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
     s[code] = [ +lat.toFixed(6), +lon.toFixed(6) ];
@@ -8397,6 +8408,17 @@ const Radar = (()=>{
       b.addEventListener("click", ()=>{ selCode = st.code; AudioFX.nav(); buildChips(); });
       host.appendChild(b);
     });
+    /* on montre NOIR SUR BLANC ce qui est enregistré pour la pièce
+       choisie : sans ça, impossible de savoir si on regarde un vrai
+       repérage ou un essai oublié la semaine dernière. */
+    const el = $("#radar-spot");
+    if(el){
+      const sp = spots[selCode];
+      el.textContent = sp
+        ? `${selCode} : ${sp[0].toFixed(5)}, ${sp[1].toFixed(5)}`
+        : `${selCode} : aucune position enregistrée`;
+      el.style.color = sp ? "var(--ink)" : "";
+    }
   }
   function start(){
     cv = $("#radar-cv"); c = cv.getContext("2d");
@@ -8413,6 +8435,13 @@ const Radar = (()=>{
         saveSpot(selCode, fix[0], fix[1]);
         AudioFX.ok(); buildChips();
         $("#radar-sub").textContent = `${selCode} enregistrée ici (±${Math.round(accM||0)} m)`;
+      });
+      $("#btn-radar-del").addEventListener("click", ()=>{
+        const spots = loadSpots();
+        if(!spots[selCode]){ AudioFX.err();
+          $("#radar-sub").textContent = `${selCode} n'a aucune position à effacer.`; return; }
+        delSpot(selCode); AudioFX.back(); buildChips();
+        $("#radar-sub").textContent = `${selCode} effacée — le radar ne la cherche plus.`;
       });
       $("#btn-radar-copy").addEventListener("click", ()=>{
         const json = JSON.stringify(loadSpots());
@@ -20522,7 +20551,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v105</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v106</p>`);
     wire();
   }
   function wire(){
