@@ -62,6 +62,46 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v105) — PLUS RIEN NE TOUCHE LE BORD DE L'ÉCRAN ⚠
+
+**C'est une régression que j'avais introduite en v105… pardon, en v100.** Le
+passage des défis en plein écran enlevait la marge de la boîte de jeu — or le
+plein écran doit enlever le **cadre**, pas les **marges**.
+
+Résultat : sur **les huit défis**, le texte et les boutons venaient se coller à
+2 px du bord. Et sur un iPhone, le bord de l'écran est arrondi : la dernière
+lettre disparaît dans le coin.
+
+### Ce qui est corrigé
+
+1. **Les marges latérales sont rendues** à la boîte de défi en plein écran,
+   zones sûres comprises (encoche, coins arrondis, barre d'accueil). Les décors
+   animés, eux, sont en position absolue : ils ignorent cette marge et restent
+   bien à fond perdu, comme avant.
+2. **Les rangées d'outils passent à la ligne.** Dans La Palette, quatre boutons
+   côte à côte — *Annuler, Aperçu, Recommencer, Miroir* — débordaient de
+   l'écran : le premier et le dernier étaient coupés en deux. Ils s'organisent
+   maintenant sur deux rangs. Le retour à la ligne ne se déclenche que s'il y a
+   vraiment débordement, donc rien ne change sur les jeux qui tenaient déjà.
+3. **Plus aucun écran ne glisse latéralement.** Les cartes de la galerie sont
+   inclinées en 3D : une carte qui tourne dépasse de quelques pixels de sa
+   case, ce qui suffisait à rendre toute la page glissante sur le côté au
+   doigt. La place est maintenant réservée, et les écrans ne défilent plus
+   qu'à la verticale.
+
+### Vérifié
+
+Un contrôle automatique passe en revue **tous les éléments** des huit défis et
+des sept écrans principaux, à deux largeurs (320 px, le plus étroit encore en
+circulation, et 390 px), et signale tout ce qui dépasse ou approche à moins de
+8 px du bord.
+
+Avant : les huit défis en faute, plus un débordement franc dans La Palette et
+un défilement latéral du hub.
+Après : **rien à signaler**, sur les deux largeurs.
+
+sw v104→v105.
+
 ## Nouveautés (v104) — LE QUIZ EN VERRE CLAIR
 
 Le quiz passe en **blanc translucide**. Le reste du jeu ne bouge pas : le hub,
