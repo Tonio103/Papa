@@ -6883,8 +6883,11 @@ function clearHints(){
    10quater. LE QCM — 24 questions, trois par épreuve
 
    Après chaque défi réussi, trois questions sur Invader et le street
-   art. Les réponses sont VRAIES et vérifiables : le but est qu'il
-   apprenne réellement quelque chose sur ce qu'il pratique depuis 2023.
+   art. Les réponses sont VRAIES et vérifiables, et le niveau est celui
+   d'un CONNAISSEUR : quelqu'un qui flashe depuis 2023 sait déjà ce
+   qu'est FlashInvaders. On va donc chercher ce qu'il ne sait
+   probablement pas — l'atelier, les chiffres, le système de
+   numérotation, les pionniers français dont Invader est l'héritier.
    Chaque question est rattachée au thème de son épreuve — la matière
    pour La Palette, le jeu d'arcade pour Le Binaire, le pochoir pour
    Le Pochoir — pour que ça ne tombe pas de nulle part.
@@ -6893,121 +6896,119 @@ function clearHints(){
    les propositions sont mélangées à l'affichage.
    ─────────────────────────────────────────────────────────── */
 const QUIZ = {
-  /* ── LA PALETTE : la matière et la couleur ── */
+  /* ── LA PALETTE : la matière, l'atelier, le geste ── */
   LV_01: [
-    { q:"Avec quoi Invader colle-t-il ses œuvres dans la rue ?",
-      r:["Des carreaux de céramique", "De la peinture acrylique",
-         "Du papier collé", "Des autocollants en vinyle"], ok:0,
-      info:"Le carrelage résiste à la pluie, au gel et au soleil. C'est ce qui permet à une pièce de tenir des années dehors — et c'est aussi ce qui la rend si difficile à décoller." },
-    { q:"Comment appelle-t-on les petits carreaux d'une mosaïque ?",
-      r:["Des tesselles", "Des tessons", "Des cabochons", "Des pixels"], ok:0,
-      info:"Du latin tessella, « petit cube ». Chez Invader, une tesselle vaut exactement un pixel : c'est tout son art." },
-    { q:"D'où vient le pseudonyme « Invader » ?",
-      r:["Du jeu d'arcade Space Invaders", "D'un film de science-fiction",
-         "D'un groupe de rock", "De son vrai nom de famille"], ok:0,
-      info:"Le jeu lui a donné ses créatures ET son nom. Il n'a jamais révélé son identité." },
+    { q:"Comment appelle-t-on une pièce détruite, puis réinstallée par Invader lui-même ?",
+      r:["Une réactivation", "Une restauration", "Une réplique", "Un doublon"], ok:0,
+      info:"Le mot est passé dans le vocabulaire des chasseurs. Une pièce arrachée n'est pas forcément perdue : Invader repasse, et le mur redevient vivant." },
+    { q:"Où les tesselles sont-elles assemblées avant d'arriver au mur ?",
+      r:["À l'atelier, sur un filet qui les tient ensemble", "Une par une, directement sur le mur",
+         "Sur une plaque de bois clouée au mur", "Elles sont livrées déjà collées par le fabricant"], ok:0,
+      info:"Tout le travail lent se fait à l'abri. Devant le mur, il ne reste qu'à sceller un panneau déjà monté — quelques minutes, et c'est fini. C'est toute la logistique de l'invasion qui tient dans ce choix." },
+    { q:"Les trois rangées d'aliens de Space Invaders ont des surnoms. La plus petite, tout en haut, c'est…",
+      r:["le calamar", "le crabe", "la pieuvre", "la méduse"], ok:0,
+      info:"Calamar en haut, crabe au milieu, pieuvre en bas. Ce sont ces trois silhouettes-là qu'Invader décline sur les murs depuis presque trente ans." },
   ],
-  /* ── LE BINAIRE : le jeu d'arcade d'origine ── */
+  /* ── LE BINAIRE : la machine de 1978, dans le détail ── */
   LV_02: [
-    { q:"En quelle année le jeu Space Invaders est-il sorti ?",
-      r:["1978", "1972", "1985", "1991"], ok:0,
-      info:"Édité par Taito. Le jeu a été un tel raz-de-marée au Japon qu'une légende tenace — fausse — raconte qu'il y aurait provoqué une pénurie de pièces de 100 yens." },
-    { q:"Dans Space Invaders, pourquoi les aliens accélèrent-ils quand il en reste peu ?",
-      r:["La machine calculait plus vite avec moins d'ennemis à afficher",
-         "Le programmeur l'avait voulu dès le départ",
-         "La difficulté monte avec le score",
-         "Parce que la musique s'accélère"], ok:0,
-      info:"C'était une limite technique, pas une intention. Nishikado a trouvé que ça rendait le jeu bien meilleur — et l'a gardée." },
-    { q:"Qui a conçu Space Invaders ?",
-      r:["Tomohiro Nishikado", "Shigeru Miyamoto", "Nolan Bushnell", "Hideo Kojima"], ok:0,
-      info:"Miyamoto a créé Mario, Bushnell a fondé Atari, Kojima a fait Metal Gear. Trois grands noms — mais pas celui-là." },
+    { q:"Combien de dessins d'aliens différents la machine de 1978 contenait-elle ?",
+      r:["Trois", "Un seul", "Cinq", "Onze"], ok:0,
+      info:"Trois, plus le vaisseau bonus qui traverse le haut de l'écran. Cinquante-cinq ennemis à l'écran avec seulement trois dessins : la mémoire coûtait cher." },
+    { q:"La musique qui accélère avec le jeu compte combien de notes ?",
+      r:["Quatre", "Huit", "Douze", "C'est une vraie mélodie"], ok:0,
+      info:"Quatre notes graves qui descendent, en boucle. C'est l'une des toutes premières musiques continues de l'histoire du jeu vidéo — et elle bat la mesure de ta propre panique." },
+    { q:"Le vaisseau bonus qui passe en haut de l'écran donne un nombre de points…",
+      r:["qui dépend du nombre de tirs déjà effectués", "toujours identique",
+         "tiré au hasard", "qui augmente à chaque niveau"], ok:0,
+      info:"Les joueurs experts comptaient leurs tirs pour décrocher les 300 points à coup sûr. C'est l'un des premiers secrets de compétition de l'histoire de l'arcade." },
   ],
-  /* ── LE SPOTTING : chasser les pièces ── */
+  /* ── LE SPOTTING : la chasse, l'appli, les chiffres ── */
   LV_03: [
-    { q:"Comment s'appelle l'application créée par Invader pour « flasher » ses mosaïques ?",
-      r:["FlashInvaders", "InvaderMap", "SpaceHunt", "TileHunter"], ok:0,
-      info:"Sortie en 2014. On photographie une pièce, l'appli la reconnaît et compte les points. C'est très exactement le principe du jeu que tu es en train de jouer." },
-    { q:"Dans FlashInvaders, que rapporte une mosaïque flashée ?",
-      r:["Des points, variables selon la pièce", "De l'argent réel",
-         "Rien, c'est juste un album", "Un autocollant à imprimer"], ok:0,
-      info:"De 10 à 100 points selon la taille de la pièce et la difficulté d'aller la chercher." },
-    { q:"Qu'est-ce qu'un « Invasion Guide » ?",
-      r:["Une carte publiée par Invader recensant ses pièces d'une ville",
-         "Un manuel pour apprendre le graffiti",
-         "Un documentaire sur son travail",
-         "Un magazine de street art"], ok:0,
-      info:"Un plan-guide, ville par ville. Il en existe pour Paris, Londres, Hong Kong, Los Angeles et bien d'autres." },
+    { q:"Combien de pièces Invader a-t-il posées à Paris, sa ville la plus envahie ?",
+      r:["Plus de 1 500", "Une centaine", "Environ 400", "Plus de 10 000"], ok:0,
+      info:"Paris concentre à elle seule une bonne part de son œuvre de rue. C'est la ville d'origine de l'invasion, et celle qu'il n'a jamais cessé de recouvrir." },
+    { q:"Combien de pièces Invader a-t-il posées dans le monde entier, environ ?",
+      r:["Plus de 4 000", "Environ 300", "Environ 1 000", "Plus de 50 000"], ok:0,
+      info:"Réparties sur plus de quatre-vingts villes. Une œuvre unique en son genre : elle n'existe qu'éclatée, et personne ne l'a jamais vue en entier." },
+    { q:"En 2014, quelques jours après l'invasion de Hong Kong, que s'est-il passé ?",
+      r:["Les services de la ville ont retiré la plupart des pièces",
+         "Invader a été expulsé du territoire",
+         "Un musée a racheté l'ensemble",
+         "Les habitants les ont toutes repeintes"], ok:0,
+      info:"Décollées presque aussitôt posées. L'épisode a fait grand bruit — et beaucoup de chasseurs sont arrivés trop tard." },
   ],
-  /* ── RUBIKCUBISME ── */
+  /* ── RUBIKCUBISME : la contrainte technique ── */
   LV_04: [
-    { q:"Comment Invader a-t-il baptisé son art fait de Rubik's Cubes ?",
-      r:["Le Rubikcubisme", "Le cubisme numérique", "Le pixel art", "Le néo-cubisme"], ok:0,
-      info:"Un clin d'œil au cubisme de Picasso et Braque. Il a lancé la série au début des années 2000, en refaisant des chefs-d'œuvre de la peinture à coups de cubes." },
-    { q:"Qui a inventé le Rubik's Cube ?",
-      r:["Ernő Rubik, un architecte hongrois", "Un ingénieur japonais",
-         "Un mathématicien américain", "Un professeur de physique allemand"], ok:0,
-      info:"En 1974, pour faire comprendre la géométrie dans l'espace à ses étudiants. Il lui a fallu un mois pour résoudre son propre cube." },
-    { q:"Combien un Rubik's Cube a-t-il de combinaisons possibles ?",
-      r:["Plus de 43 milliards de milliards", "Environ un million",
-         "Environ trois milliards", "Exactement cent mille"], ok:0,
-      info:"43 252 003 274 489 856 000, précisément. Et pourtant, depuis n'importe laquelle d'entre elles, 20 mouvements suffisent toujours à le résoudre." },
+    { q:"Combien de couleurs un Rubik's Cube offre-t-il à l'artiste ?",
+      r:["Six", "Quatre", "Huit", "Neuf"], ok:0,
+      info:"Blanc, jaune, rouge, orange, bleu, vert. Toute l'image doit tenir dans cette palette-là : c'est la vraie contrainte du Rubikcubisme, et tout son intérêt." },
+    { q:"Dans une œuvre en Rubik's Cubes, combien de pixels apporte chaque cube ?",
+      r:["Neuf, ceux d'une seule face", "Un seul", "Six, un par face", "Vingt-sept"], ok:0,
+      info:"Une face, trois par trois. Le reste du cube ne sert à rien — sauf à tenir les neuf carrés ensemble." },
+    { q:"Comment s'appelle la série d'Invader qui refait des pochettes d'albums en Rubik's Cubes ?",
+      r:["Low Fidelity", "High Score", "Pixel Sound", "Cube Session"], ok:0,
+      info:"Un pied de nez à la hi-fi : des pochettes mythiques reconstituées cube par cube, en très basse définition." },
   ],
-  /* ── LE SIMON : les séries, les villes, la mémoire ── */
+  /* ── LE SIMON : le système, les codes, la chronologie ── */
   LV_05: [
-    { q:"Comment Invader appelle-t-il le fait de poser des pièces dans une ville ?",
-      r:["Une invasion", "Une tournée", "Une exposition", "Un raid"], ok:0,
-      info:"Chaque ville envahie reçoit son code, et chaque pièce son numéro. Paris est la plus envahie de toutes." },
-    { q:"Environ combien de villes Invader a-t-il envahies dans le monde ?",
-      r:["Plus de 80", "Environ 5", "Environ 20", "Plus de 500"], ok:0,
-      info:"De Paris à Tokyo, en passant par Mombasa, Katmandou et Los Angeles." },
-    { q:"Une mosaïque d'Invader a été installée…",
-      r:["dans la Station spatiale internationale", "au fond de la fosse des Mariannes",
-         "sur la Lune", "sur la planète Mars"], ok:0,
-      info:"Il avait déjà envoyé une pièce dans la stratosphère en 2012, accrochée à un ballon météo : l'opération « Space One »." },
+    { q:"Dans la numérotation d'Invader, que veut dire le préfixe « PA » ?",
+      r:["Paris", "Palerme", "Panama", "Pasadena"], ok:0,
+      info:"Chaque ville a son code : LDN pour Londres, HK pour Hong Kong, TK pour Tokyo. Le numéro qui suit donne l'ordre de pose dans cette ville." },
+    { q:"En quelle année Invader a-t-il posé sa toute première mosaïque ?",
+      r:["1996", "1988", "2001", "2004"], ok:0,
+      info:"À Paris. L'invasion méthodique, ville après ville, ne commence vraiment que deux ans plus tard, en 1998." },
+    { q:"Qu'est-ce qu'une « invasion » de ville, concrètement ?",
+      r:["Une campagne de pose menée d'un coup, souvent en quelques jours",
+         "Une pièce posée par quartier, étalée sur des années",
+         "Une exposition accompagnée d'une pièce dans la rue",
+         "Un an de résidence dans la ville"], ok:0,
+      info:"Il arrive avec ses pièces déjà fabriquées et son plan, et pose tout d'un seul mouvement. C'est ce qui explique les vagues brutales : une ville passe de zéro à cinquante pièces en une semaine." },
   ],
-  /* ── LA CAVALE : l'illégalité, la fuite ── */
+  /* ── LA CAVALE : le risque, la durée, la disparition ── */
   LV_06: [
-    { q:"Pourquoi Invader travaille-t-il masqué et anonyme ?",
-      r:["Parce que poser une œuvre dans la rue sans autorisation est illégal",
-         "Par timidité", "Par superstition", "C'est une exigence de sa galerie"], ok:0,
-      info:"Il n'a jamais montré son visage. Ses rares interviews se font lunettes noires et masque — et il a été arrêté plusieurs fois, dans plusieurs pays." },
-    { q:"En 2018, une œuvre de Banksy s'est autodétruite…",
-      r:["juste après avoir été adjugée aux enchères", "pendant un vernissage",
-         "dans la réserve d'un musée", "au contrôle de la douane"], ok:0,
-      info:"« Girl with Balloon », chez Sotheby's à Londres : une broyeuse était cachée dans le cadre. L'œuvre à moitié déchiquetée a pris de la valeur." },
-    { q:"Que veut dire « faire un flop » dans le vocabulaire du graffiti ?",
-      r:["Peindre une pièce vite faite, en deux couleurs",
-         "Se faire attraper", "Rater sa bombe", "Repeindre par-dessus quelqu'un"], ok:0,
-      info:"Aussi appelé « throw-up ». Un contour et un remplissage, en quelques secondes : c'est la réponse du graffeur au fait que le temps passé devant le mur, c'est du risque." },
+    { q:"Pourquoi Invader pose-t-il si souvent ses pièces en hauteur ?",
+      r:["Pour qu'elles soient difficiles à décrocher", "Pour être vu de plus loin",
+         "Pour éviter les projections de pluie", "Parce que la loi l'y oblige"], ok:0,
+      info:"Plus c'est haut, plus ça dure. Certaines tiennent depuis plus de vingt ans pour cette seule raison — et c'est aussi ce qui rend le spotting difficile : il faut lever la tête." },
+    { q:"Quel est, en plus des services de nettoyage, l'autre grand ennemi d'une pièce ?",
+      r:["Les voleurs, qui l'arrachent pour la revendre", "Le gel, qui fait éclater les tesselles",
+         "Les autres street-artistes, qui repeignent dessus", "Le soleil, qui décolore les couleurs"], ok:0,
+      info:"Des pièces ont été descellées au burin puis revendues. Le carrelage résiste à tout — sauf à quelqu'un qui le veut vraiment." },
+    { q:"Que porte Invader lors de ses très rares apparitions publiques ?",
+      r:["Un masque et des lunettes noires", "Une cagoule de ski",
+         "Rien de particulier", "Un costume de Space Invader"], ok:0,
+      info:"Il n'a jamais montré son visage en public, et son identité civile n'a jamais été confirmée. Vingt-cinq ans d'anonymat pour un artiste exposé dans le monde entier." },
   ],
-  /* ── LA COOP : collectifs et collaborations ── */
+  /* ── LA COOP : l'écosystème français, les vrais pionniers ── */
   LV_07: [
-    { q:"Quel artiste français colle d'immenses portraits en noir et blanc sur les façades ?",
-      r:["JR", "Invader", "Banksy", "Shepard Fairey"], ok:0,
-      info:"Il a fait « disparaître » la pyramide du Louvre en 2016 grâce à un collage en trompe-l'œil, et habillé la façade du Panthéon de portraits d'anonymes." },
-    { q:"Qui a créé l'affiche « HOPE » de la campagne d'Obama, en 2008 ?",
-      r:["Shepard Fairey, alias Obey", "Keith Haring", "Banksy", "Jean-Michel Basquiat"], ok:0,
-      info:"Le même artiste que le visage placardé partout dans le monde avec le mot OBEY : celui du catcheur André the Giant." },
-    { q:"Où Keith Haring a-t-il commencé à dessiner, au début des années 1980 ?",
-      r:["Sur les panneaux publicitaires vides du métro de New York",
-         "Sur les trains de Berlin", "Sur les murs de Paris", "Sur les plages de Rio"], ok:0,
-      info:"À la craie blanche, sur le papier noir qui recouvrait les emplacements libres. Des centaines de dessins, effacés au fur et à mesure — c'est là qu'il s'est fait connaître." },
+    { q:"Qui collait déjà des sérigraphies dans la rue en 1966, bien avant le graffiti new-yorkais ?",
+      r:["Ernest Pignon-Ernest", "Blek le Rat", "Daniel Buren", "Jacques Villeglé"], ok:0,
+      info:"Le vrai pionnier de l'art dans la rue en France, avec plus de quinze ans d'avance sur tout le monde. Blek le Rat n'a commencé qu'en 1981." },
+    { q:"Jacques Villeglé, lui, ne collait rien sur les murs. Il…",
+      r:["arrachait les affiches lacérées pour en faire des œuvres",
+         "photographiait les murs à l'aube", "peignait par-dessus les publicités",
+         "grattait les murs à la pointe"], ok:0,
+      info:"Ses « affiches lacérées » disent quelque chose de très proche du travail d'Invader : le mur de la rue est déjà une image, il suffit de savoir la regarder." },
+    { q:"Blek le Rat, Miss.Tic, Jef Aérosol, Invader : qu'ont-ils en commun ?",
+      r:["Ils sont tous français", "Ils travaillent tous au pochoir",
+         "Ils sont tous restés anonymes", "Ils ont tous commencé la même année"], ok:0,
+      info:"Une école française de la rue, ancienne et très dense — dont Invader est l'héritier direct, même s'il a troqué la bombe contre le carrelage." },
   ],
-  /* ── LE POCHOIR ── */
+  /* ── LE POCHOIR : la technique et ses maîtres ── */
   LV_08: [
-    { q:"Qui est considéré comme le père du pochoir dans la rue ?",
-      r:["Blek le Rat", "Banksy", "Miss.Tic", "C215"], ok:0,
-      info:"Français, il a commencé à Paris en 1981, et sa signature était un rat. Banksy a reconnu son influence : « à chaque fois que je crois avoir inventé quelque chose, Blek le Rat l'a fait vingt ans avant »." },
-    { q:"Pourquoi le pochoir est-il l'outil favori des artistes de rue ?",
-      r:["Il permet de peindre un motif détaillé en quelques secondes",
-         "Il coûte moins cher que la peinture",
-         "Il est autorisé par la loi",
-         "Il résiste mieux à la pluie"], ok:0,
-      info:"Le gabarit est découpé tranquillement à l'atelier. Devant le mur, il ne reste qu'à poser et pulvériser — le temps d'exposition est réduit au minimum." },
-    { q:"L'artiste française Miss.Tic accompagnait toujours ses pochoirs…",
-      r:["de jeux de mots poétiques", "de sa date de naissance",
-         "d'un code-barres", "d'un numéro de série"], ok:0,
-      info:"Une silhouette de femme et une phrase à double sens. Elle a marqué les murs de Ménilmontant et de la Butte-aux-Cailles pendant quarante ans." },
+    { q:"Pourquoi Blek le Rat a-t-il choisi le rat comme signature ?",
+      r:["Parce que « rat » est l'anagramme d'« art »", "Parce qu'il en avait vu un en peignant",
+         "Parce que c'est l'emblème de Paris", "Pour faire fuir les passants"], ok:0,
+      info:"Et parce que le rat est, selon lui, le seul animal vraiment libre dans une ville. Deux raisons pour un seul dessin : c'est ça, une bonne signature." },
+    { q:"L'artiste Miss.Tic a emprunté son nom…",
+      r:["à une sorcière de l'univers de Picsou", "au mot « mystique »",
+         "à une marque de bombe de peinture", "à une chanson des années 1980"], ok:0,
+      info:"La sorcière s'appelle Miss Tick en français. Elle y a simplement ajouté le point — et quarante ans de murs à Ménilmontant et à la Butte-aux-Cailles." },
+    { q:"Pour un pochoir détaillé en plusieurs tons, il faut…",
+      r:["un gabarit par ton, posés du plus clair au plus foncé",
+         "un seul gabarit, toujours", "deux gabarits au maximum",
+         "autant de gabarits que de couleurs primaires"], ok:0,
+      info:"Chaque couche est un gabarit séparé, et l'ordre ne se rattrape pas : une couche foncée posée trop tôt est perdue. C'est exactement ce que te demande le défi du Pochoir." },
   ],
 };
 
@@ -20342,7 +20343,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v100</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v101</p>`);
     wire();
   }
   function wire(){

@@ -62,6 +62,34 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v101) — LE QCM REPRIS POUR LES VRAIS CONNAISSEURS
+
+Les 24 questions de la v100 étaient de la culture générale street art : quelqu'un
+qui flashe depuis 2023 sait déjà ce qu'est FlashInvaders, et que le pseudonyme
+vient du jeu de 1978. Elles ont toutes été remplacées par des questions de
+**connaisseur** — on va chercher ce qu'un chasseur régulier ne sait
+probablement pas.
+
+Le nouveau terrain :
+
+| épreuve | ce qu'on demande vraiment |
+|---|---|
+| LV_01 La Palette | le mot « réactivation », le montage sur filet à l'atelier, le nom des trois aliens (calamar, crabe, pieuvre) |
+| LV_02 Le Binaire | les 3 dessins pour 55 ennemis, les 4 notes de la musique, le vaisseau bonus dont les points dépendent du nombre de tirs |
+| LV_03 Le Spotting | les chiffres réels : 1 500+ pièces à Paris, 4 000+ dans le monde, et le décrochage de Hong Kong en 2014 |
+| LV_04 Rubikcubisme | la contrainte à 6 couleurs, les 9 pixels d'une face, la série *Low Fidelity* |
+| LV_05 Le Simon | le préfixe `PA`, la première mosaïque de 1996, ce qu'est vraiment une « invasion » de ville |
+| LV_06 La Cavale | pourquoi il pose en hauteur, les pièces descellées au burin pour être revendues, l'anonymat tenu depuis vingt-cinq ans |
+| LV_07 La Coop | Ernest Pignon-Ernest dès 1966, les affiches lacérées de Villeglé, l'école française de la rue |
+| LV_08 Le Pochoir | « rat » anagramme d'« art », Miss.Tic nommée d'après la sorcière de Picsou, le principe des couches du plus clair au plus foncé |
+
+Les explications suivent le même mouvement : elles ne redisent pas la réponse,
+elles ajoutent ce qui la rend intéressante — pourquoi le montage sur filet
+explique toute la logistique d'une invasion, pourquoi poser haut fait durer une
+pièce vingt ans.
+
+sw v100→v101.
+
 ## Nouveautés (v100) — QCM, PLEIN ÉCRAN, PAUSE
 
 ### Un QCM après chaque défi — 24 questions, vraies
