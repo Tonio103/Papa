@@ -403,6 +403,18 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   }
   @keyframes scanline{ from{ transform:translateY(-100%); } to{ transform:translateY(340%); } }
 }
+/* la lampe : n'apparaît que si l'appareil sait vraiment l'allumer */
+#btn-torch{
+  position:absolute; right:10px; bottom:10px; z-index:3;
+  width:46px; height:46px; font-size:22px; line-height:1;
+  background:rgba(6,6,24,.72); color:#fff; border:2px solid var(--line);
+  border-radius:50%; cursor:pointer; padding:0;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  transition:box-shadow .18s, border-color .18s, background .18s;
+}
+#btn-torch.on{ border-color:var(--jaune); background:rgba(255,214,64,.22);
+  box-shadow:0 0 16px rgba(255,214,64,.75); }
+#btn-torch:active{ transform:translateY(1px); }
 #manual{ display:flex; gap:8px; margin-top:14px; }
 #manual input{
   flex:1; font-family:var(--f-pix); font-size:14px; text-transform:uppercase;
@@ -2367,6 +2379,8 @@ button.b2{ color:#04231d !important; }
     <div id="cam-wrap">
       <video id="cam" playsinline muted></video>
       <div id="cam-frame"></div>
+      <button id="btn-torch" type="button" hidden aria-pressed="false"
+              aria-label="Allumer la lampe">🔦</button>
     </div>
     <div id="scan-msg"></div>
     <div id="manual">
@@ -3973,6 +3987,9 @@ function renderHub(){
 const Scanner = (()=>{
   let stream=null, raf=null, workCv=null, wctx=null;
   let t0 = 0, hint = 0, native = null, lastScan = 0, pass = 0;
+  /* état de l'ambiance : luminosité moyenne, part de pixels cramés
+     (= reflet), et la lampe de l'appareil */
+  let lum = 128, blown = 0, torchCan = false, torchOn = false, autoTorch = false;
   const video = ()=>$("#cam");
 
   /* LE LECTEUR NATIF, quand le navigateur en a un (Android/Chrome) :
@@ -3998,6 +4015,8 @@ const Scanner = (()=>{
     msg("");
     initNative();
     t0 = performance.now(); hint = 0; lastScan = 0; pass = 0;
+    lum = 128; blown = 0; torchCan = false; torchOn = false; autoTorch = false;
+    syncTorch();
     if(!native && typeof jsQR !== "function"){
       msg("Lecteur de QR indisponible — utilise la saisie du code juste en dessous.", true);
       return;
@@ -4018,14 +4037,20 @@ const Scanner = (()=>{
       }
       video().srcObject = stream;
       await video().play();
-      /* mise au point continue quand l'appareil sait le faire : un QR
-         tenu à 15 cm est sinon souvent flou */
+      /* On demande à l'appareil tout ce qu'il sait faire de mieux :
+         mise au point continue (un QR tenu à 15 cm est sinon flou),
+         exposition et balance des blancs continues — ce sont elles qui
+         rattrapent un passage nuage/soleil ou un néon de rue. */
       try{
         const tr = stream.getVideoTracks()[0];
         const caps = tr.getCapabilities ? tr.getCapabilities() : {};
         const adv = [];
         if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({ focusMode:"continuous" });
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode:"continuous" });
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({ whiteBalanceMode:"continuous" });
         if(adv.length) await tr.applyConstraints({ advanced:adv });
+        torchCan = !!caps.torch;   // la lampe n'est pas toujours exposée
+        syncTorch();
       }catch(e){}
       loop();
     }catch(e){
@@ -4041,8 +4066,143 @@ const Scanner = (()=>{
     }
   }
 
-  /* lit une zone de l'image vidéo, en deux passes de contraste */
-  function readZone(v, sx, sy, sw, sh, outW){
+  /* ─────────────────────────────────────────────────────────────
+     PRÉTRAITEMENTS — c'est ce qui fait la différence dehors.
+
+     jsQR décide du noir et du blanc avec un seuil quasi global.
+     Ça marche sur une feuille bien éclairée, et ça s'effondre dès
+     que la lumière n'est plus uniforme :
+       · un REFLET sur le plastique crame une zone en blanc pur ;
+         le seuil global monte, et tout le reste du code bascule en
+         noir d'un coup ;
+       · sous la PLUIE, les gouttes brouillent les bords des modules
+         et écrasent le contraste ;
+       · dans le NOIR, tout l'histogramme se tasse dans les valeurs
+         basses : il reste de l'information, mais plus assez d'écart
+         pour que le seuil tombe au bon endroit.
+
+     On répond aux trois avec deux traitements, appliqués seulement
+     quand les passes normales ont déjà échoué (voir la boucle) :
+       · seuil ADAPTATIF local — chaque pixel est comparé à la
+         moyenne de son voisinage, pas à celle de l'image. Un reflet
+         ne contamine plus que lui-même ;
+       · ÉTIREMENT de contraste sur les centiles — on retrouve toute
+         la dynamique d'une image sombre ou délavée.
+     ───────────────────────────────────────────────────────────── */
+  let grayBuf = null, intBuf = null;
+
+  /* niveaux de gris + mesure de l'ambiance (luminosité, cramé) */
+  function toGray(d, w, h){
+    const n = w*h;
+    if(!grayBuf || grayBuf.length < n) grayBuf = new Uint8ClampedArray(n);
+    const g = grayBuf;
+    let sum = 0, blown = 0;
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      /* luma perceptuelle, en entiers : ~3x plus rapide que la version flottante */
+      const y = (d[p]*77 + d[p+1]*150 + d[p+2]*29) >> 8;
+      g[i] = y; sum += y; if(y > 245) blown++;
+    }
+    return { mean: sum/n, blown: blown/n };
+  }
+  function writeBack(d, g, n){
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      const y = g[i]; d[p] = d[p+1] = d[p+2] = y; d[p+3] = 255;
+    }
+  }
+
+  /* seuil adaptatif de Bradley-Roth : la réponse aux reflets.
+     Une image intégrale donne la moyenne de n'importe quelle
+     fenêtre en temps constant — donc le tout reste à quelques
+     millisecondes, même à 640 px de large. */
+  function adaptive(d, w, h){
+    const n = w*h;
+    toGray(d, w, h);
+    const g = grayBuf;
+    const need = (w+1)*(h+1);
+    if(!intBuf || intBuf.length < need) intBuf = new Int32Array(need);
+    const I = intBuf, W1 = w+1;
+    for(let x = 0; x <= w; x++) I[x] = 0;
+    for(let y = 0; y < h; y++){
+      let row = 0;
+      I[(y+1)*W1] = 0;
+      for(let x = 0; x < w; x++){
+        row += g[y*w + x];
+        I[(y+1)*W1 + x+1] = I[y*W1 + x+1] + row;
+      }
+    }
+    /* fenêtre ~ 1/12 de la largeur : plus grand qu'un module de QR,
+       plus petit qu'une tache de reflet */
+    const s = Math.max(2, w/12 | 0), T = 14;
+    for(let y = 0; y < h; y++){
+      const y1 = y-s < 0 ? 0 : y-s, y2 = y+s >= h ? h-1 : y+s;
+      const r1 = y1*W1, r2 = (y2+1)*W1, hh = y2-y1+1;
+      for(let x = 0; x < w; x++){
+        const x1 = x-s < 0 ? 0 : x-s, x2 = x+s >= w ? w-1 : x+s;
+        const count = hh*(x2-x1+1);
+        const sum = I[r2 + x2+1] - I[r1 + x2+1] - I[r2 + x1] + I[r1 + x1];
+        g[y*w + x] = (g[y*w + x]*count*100 <= sum*(100-T)) ? 0 : 255;
+      }
+    }
+    writeBack(d, g, n);
+  }
+
+  /* CORRECTION DE CHAMP PLAT — le meilleur outil des trois, et de loin.
+
+     On estime l'éclairage de la scène par un gros flou de l'image
+     (le flou est fait par le GPU via ctx.filter, donc quasi gratuit),
+     puis on le SOUSTRAIT. Ce qui reste, c'est le code seul, débarrassé
+     de la façon dont il était éclairé : le reflet, l'ombre portée de
+     la main et le dégradé d'une lampe rasante disparaissent tous les
+     trois d'un coup, parce que ce sont tous des variations LENTES de
+     luminosité — exactement ce que le flou capture.
+     C'est la seule passe qui rattrape un reflet en bande sur le code. */
+  let blurCv = null, bctx = null;
+  function flatField(d, w, h){
+    if(!blurCv){ blurCv = document.createElement("canvas");
+      bctx = blurCv.getContext("2d", { willReadFrequently:true }); }
+    if(blurCv.width !== w || blurCv.height !== h){ blurCv.width = w; blurCv.height = h; }
+    bctx.clearRect(0, 0, w, h);
+    bctx.filter = "blur(" + Math.max(3, w/28) + "px)";
+    bctx.drawImage(workCv, 0, 0);
+    bctx.filter = "none";
+    const bd = bctx.getImageData(0, 0, w, h).data, n = w*h;
+    toGray(d, w, h);
+    const g = grayBuf;
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      const bg = (bd[p]*77 + bd[p+1]*150 + bd[p+2]*29) >> 8;
+      /* on ré-centre sur le gris moyen et on amplifie l'écart local */
+      const v = 128 + (g[i]-bg)*1.9;
+      g[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    writeBack(d, g, n);
+  }
+
+  /* étirement de contraste sur les centiles : la réponse au noir
+     et à la pluie. On ignore 2 % de chaque bout de l'histogramme —
+     sinon un seul pixel cramé ou un seul pixel noir suffirait à
+     annuler tout le gain. */
+  function stretch(d, w, h){
+    const n = w*h; toGray(d, w, h);
+    const g = grayBuf, hist = new Uint32Array(256);
+    for(let i = 0; i < n; i++) hist[g[i]]++;
+    const cut = n*0.02;
+    let lo = 0, hi = 255, acc = 0;
+    for(let i = 0; i < 256; i++){ acc += hist[i]; if(acc > cut){ lo = i; break; } }
+    acc = 0;
+    for(let i = 255; i >= 0; i--){ acc += hist[i]; if(acc > cut){ hi = i; break; } }
+    if(hi - lo < 8) return;                      // image uniforme : rien à sauver
+    const k = 255/(hi-lo);
+    for(let i = 0; i < n; i++){
+      const v = (g[i]-lo)*k;
+      g[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    writeBack(d, g, n);
+  }
+
+  /* lit une zone de l'image vidéo. `prep` choisit le prétraitement ;
+     les deux sens de contraste sont toujours tentés, car un QR
+     plastifié sous un reflet renvoie parfois une image inversée. */
+  function readZone(v, sx, sy, sw, sh, outW, prep){
     if(typeof jsQR !== "function") return null;
     if(!workCv){ workCv = document.createElement("canvas");
       wctx = workCv.getContext("2d", { willReadFrequently:true }); }
@@ -4051,11 +4211,40 @@ const Scanner = (()=>{
     if(workCv.width !== w || workCv.height !== h){ workCv.width = w; workCv.height = h; }
     wctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
     const img = wctx.getImageData(0, 0, w, h);
-    let q = jsQR(img.data, w, h, { inversionAttempts:"dontInvert" });
-    /* un QR plastifié sous un reflet renvoie parfois un contraste
-       inversé : on retente à l'envers avant d'abandonner */
-    if(!q) q = jsQR(img.data, w, h, { inversionAttempts:"onlyInvert" });
+    if(prep === "flat") flatField(img.data, w, h);
+    else if(prep === "adapt") adaptive(img.data, w, h);
+    else if(prep === "stretch") stretch(img.data, w, h);
+    else if(prep === "mesure"){ const s = toGray(img.data, w, h); lum = s.mean; blown = s.blown; }
+    /* jsQR lève parfois sur une image très dégradée (il croit avoir
+       trouvé un motif de repérage et déraille en le mesurant). Ça ne
+       doit jamais faire perdre les autres passes de la même image. */
+    const q = safeQR(img.data, w, h, "dontInvert") || safeQR(img.data, w, h, "onlyInvert");
     return (q && q.data) ? q.data : null;
+  }
+  function safeQR(data, w, h, inv){
+    try{ return jsQR(data, w, h, { inversionAttempts:inv }); }catch(e){ return null; }
+  }
+
+  /* ─── LA LAMPE ────────────────────────────────────────────────
+     Le seul vrai remède au noir : ajouter de la lumière. Tous les
+     appareils ne l'exposent pas (Safari iOS, notamment), d'où le
+     bouton qui n'apparaît que s'il sert à quelque chose. */
+  async function setTorch(on){
+    if(!stream) return false;
+    try{
+      const tr = stream.getVideoTracks()[0];
+      const caps = tr.getCapabilities ? tr.getCapabilities() : {};
+      if(!caps.torch) return false;
+      await tr.applyConstraints({ advanced:[{ torch: !!on }] });
+      torchOn = !!on; syncTorch();
+      return true;
+    }catch(e){ return false; }
+  }
+  function syncTorch(){
+    const b = $("#btn-torch"); if(!b) return;
+    b.hidden = !torchCan;
+    b.classList.toggle("on", torchOn);
+    b.setAttribute("aria-pressed", torchOn ? "true" : "false");
   }
 
   async function loop(){
@@ -4080,43 +4269,86 @@ const Scanner = (()=>{
           if(found && found.length && found[0].rawValue) data = found[0].rawValue;
         }catch(e){ native = false; }
       }
-      /* 2) jsQR — on alterne TROIS cadrages d'une image à l'autre :
-            l'image entière, puis deux gros plans de plus en plus serrés
-            sur le centre. Chaque resserrage augmente la résolution utile
-            du QR : le cadrage à 60 % rattrape les codes un peu loin, celui
-            à 35 % rattrape ceux photographiés à bout de bras. Comme le
-            viseur invite déjà à centrer le code, ces deux zones tombent
-            juste là où il se trouve neuf fois sur dix. */
+      /* 2) jsQR — on ESCALADE.
+
+            Les trois premières passes alternent des cadrages : l'image
+            entière, puis deux gros plans de plus en plus serrés sur le
+            centre. Chaque resserrage augmente la résolution utile du QR.
+            Comme le viseur invite déjà à centrer le code, ces zones
+            tombent là où il se trouve neuf fois sur dix.
+
+            Si rien n'est lu au bout d'une seconde et demie, c'est que
+            les conditions ne sont pas bonnes : on ajoute alors trois
+            passes prétraitées. Elles coûtent environ deux fois plus
+            cher, d'où l'escalade — le cas facile reste aussi rapide
+            qu'avant, et le cas difficile dispose de tout l'arsenal.
+
+            L'ordre des passes « mauvais temps » suit leur rendement
+            mesuré : champ plat d'abord (c'est elle qui rattrape les
+            reflets et les ombres portées), seuil adaptatif ensuite
+            (la pluie battante dans la pénombre). */
       if(!data){
         const W0 = v.videoWidth, H0 = v.videoHeight;
-        if(pass === 0){
-          data = readZone(v, 0, 0, W0, H0, 640);
-        } else {
-          const f = (pass === 1) ? .6 : .35;
-          const cw = Math.round(W0*f), ch = Math.round(H0*f);
-          data = readZone(v, (W0-cw)/2, (H0-ch)/2, cw, ch, 640);
+        const dur = (dt) => { const cw = Math.round(W0*dt), ch = Math.round(H0*dt);
+                              return [ (W0-cw)/2, (H0-ch)/2, cw, ch ]; };
+        const nPasses = (now - t0) > 1500 ? 6 : 3;
+        let z;
+        switch(pass){
+          /* passes rapides */
+          case 0: data = readZone(v, 0, 0, W0, H0, 640); break;
+          case 1: z = dur(.6);  data = readZone(v, z[0], z[1], z[2], z[3], 640, "mesure"); break;
+          case 2: z = dur(.35); data = readZone(v, z[0], z[1], z[2], z[3], 640); break;
+          /* passes « mauvais temps » */
+          case 3: z = dur(.6);  data = readZone(v, z[0], z[1], z[2], z[3], 640, "flat"); break;
+          case 4: data = readZone(v, 0, 0, W0, H0, 640, "flat"); break;
+          default: z = dur(.6); data = readZone(v, z[0], z[1], z[2], z[3], 640, "adapt"); break;
         }
-        pass = (pass + 1) % 3;
+        pass = (pass + 1) % nPasses;
       }
     }catch(e){ /* on ne casse jamais la boucle */ }
 
     if(data){
       if(raf) cancelAnimationFrame(raf);
       raf = null;
+      setTorch(false);
       handleCode(data);
       return;
     }
-    /* AUCUN SILENCE : on guide au lieu de laisser dans le doute */
+
     const el = now - t0;
+    /* LA LAMPE, toute seule. À la tombée du jour, aucun traitement ne
+       remplace un peu de lumière : dès qu'on constate que l'image est
+       sombre, on l'allume — une fois, sans harceler. */
+    if(!autoTorch && torchCan && !torchOn && el > 1800 && lum < 60){
+      autoTorch = true;
+      setTorch(true).then(ok=>{ if(ok) msg("Il fait sombre : lampe allumée."); });
+    }
+
+    /* AUCUN SILENCE — et le conseil colle à ce que voit la caméra */
     if(hint === 0 && el > 6000){
-      hint = 1; msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
+      hint = 1;
+      /* un QR normal a déjà ~1/4 de pixels blancs dans le viseur : il
+         faut donc un seuil haut pour ne diagnostiquer « reflet » que
+         quand il y a vraiment de la lumière parasite */
+      if(blown > .45)
+        msg("Un reflet écrase le code : incline le téléphone de côté, ou fais-toi de l'ombre.");
+      else if(lum < 60)
+        msg(torchCan ? "Il fait sombre — approche encore, la lampe est allumée."
+                     : "Il fait sombre : éclaire le QR avec la lampe d'un autre téléphone.");
+      else
+        msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
     } else if(hint === 1 && el > 14000){
-      hint = 2; msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
+      hint = 2;
+      msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
     }
   }
   function stop(){
     if(raf) cancelAnimationFrame(raf);
     raf = null;
+    /* on éteint la lampe AVANT de couper la piste : sinon elle reste
+       allumée jusqu'à ce qu'on quitte la page */
+    if(torchOn){ try{ stream.getVideoTracks()[0].applyConstraints({ advanced:[{ torch:false }] }); }catch(e){} }
+    torchOn = false; torchCan = false; syncTorch();
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
   }
   function msg(txt, err){
@@ -4124,7 +4356,7 @@ const Scanner = (()=>{
     m.textContent = txt;
     m.className = err ? "err" : "ok";
   }
-  return { start, stop, msg };
+  return { start, stop, msg, setTorch, toggleTorch: ()=>setTorch(!torchOn) };
 })();
 
 /* Un code arrive (QR ou clavier) → on décide.
@@ -13043,6 +13275,7 @@ $("#btn-manual").addEventListener("click", ()=>{
 $("#manual-in").addEventListener("keydown", e=>{
   if(e.key==="Enter"){ e.preventDefault(); $("#btn-manual").click(); }
 });
+$("#btn-torch").addEventListener("click", ()=>{ AudioFX.tick && AudioFX.tick(); Scanner.toggleTorch(); });
 $("#btn-challenge").addEventListener("click", ()=>{
   if(flashSpin){ flashSpin(); flashSpin = null; }     // coupe la rotation
   startGame(currentStation);
@@ -19501,7 +19734,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v98</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v99</p>`);
     wire();
   }
   function wire(){

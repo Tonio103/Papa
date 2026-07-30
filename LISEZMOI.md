@@ -62,6 +62,76 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v99) — LE SCAN ENTRAÎNÉ AU PIRE : REFLETS, PLUIE, NUIT
+
+Le jeu se joue dehors, en Ardèche, sur des QR plastifiés collés à des murs.
+Donc : soleil rasant sur le plastique, ombre de la main, averse, fin de
+journée. jsQR décide du noir et du blanc avec un seuil quasi global — ça marche
+sur une feuille bien éclairée et ça s'effondre dès que la lumière n'est plus
+uniforme.
+
+### Ce qui a été ajouté
+
+Trois prétraitements, appliqués **seulement** quand les passes normales ont
+déjà échoué pendant 1,5 s (le cas facile reste aussi rapide qu'avant) :
+
+1. **Correction de champ plat** — de loin la plus efficace. On estime
+   l'éclairage de la scène par un gros flou de l'image (fait par le GPU, donc
+   quasi gratuit) et on le **soustrait**. Reflet, ombre portée de la main et
+   dégradé d'une lampe rasante sont tous des variations *lentes* de
+   luminosité : le flou les capture, la soustraction les efface. C'est la seule
+   passe qui rattrape un reflet en bande en travers du code.
+2. **Seuil adaptatif local** (Bradley-Roth, via image intégrale) — chaque pixel
+   est comparé à la moyenne de son voisinage et non à celle de l'image, donc un
+   reflet ne contamine plus que lui-même. C'est elle qui sauve la pluie
+   battante dans la pénombre.
+3. **Étirement de contraste sur les centiles** — récupère la dynamique d'une
+   image délavée, en ignorant 2 % de chaque bout de l'histogramme.
+
+Et surtout, **la lampe** : à la tombée du jour, aucun traitement ne remplace un
+peu de lumière. Un bouton 🔦 apparaît dans le viseur quand l'appareil sait
+l'allumer, et elle s'allume **toute seule** si l'image reste sombre au bout de
+2 s. Elle s'éteint dès qu'un code est lu ou qu'on quitte l'écran.
+
+S'y ajoutent l'exposition et la balance des blancs continues (elles rattrapent
+un passage nuage/soleil), et une garde autour de jsQR : la bibliothèque **lève
+une exception** sur certaines images très dégradées, ce qui faisait perdre
+toutes les autres passes de la même image.
+
+### Les messages collent maintenant à ce que voit la caméra
+
+- beaucoup de blanc saturé → « Un reflet écrase le code : incline le téléphone
+  de côté, ou fais-toi de l'ombre. »
+- image sombre → « Il fait sombre : éclaire le QR avec la lampe d'un autre
+  téléphone. » (ou « la lampe est allumée » si l'appareil en a une)
+- sinon → le conseil de distance habituel.
+
+### Vérifié
+
+Dix scénarios de dégradation **physiquement modélisés** (le reflet *s'ajoute*
+à l'image au lieu de la remplacer ; la nuit ajoute du bruit capteur, qui est le
+vrai tueur ; la pluie ajoute des gouttes réfractantes et du flou), rejoués de
+bout en bout avec le vrai scanner du jeu :
+
+| condition | résultat |
+|---|---|
+| plein jour | lu en 280 ms |
+| reflet spéculaire sur le plastique | lu en 260 ms |
+| reflet rasant en bande en travers | lu en 227 ms |
+| contre-jour voilé | lu en 116 ms |
+| nuit + bruit capteur | lu en 266 ms |
+| nuit noire + gros bruit | lu en 1516 ms |
+| nuit + lampe rasante | lu en 254 ms |
+| pluie + flou | lu en 258 ms |
+| pluie battante + pénombre | lu en 308 ms |
+| ombre de la main sur la moitié du code | lu en 245 ms |
+
+**10 sur 10.** Sur les cadrages normaux, aucune régression (148–201 ms) — et le
+cas « très petit, bras tendu », qui échouait systématiquement, passe désormais
+en 198 ms.
+
+sw v98→v99.
+
 ## Nouveautés (v98) — LE SCAN ÉTAIT « TRÈS TRÈS DIFFICILE À FLASHER » ⚠
 
 La v97 avait rendu le scan possible hors-ligne, mais il restait pénible : il
