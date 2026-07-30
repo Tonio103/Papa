@@ -62,6 +62,68 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v110) — LE RADAR ARRÊTE DE PRÉTENDRE ⚠
+
+**Le vrai défaut n'était pas la précision du GPS. C'était l'aplomb.**
+
+Dans un village, entre des murs de pierre, le GPS d'un téléphone donne
+couramment **±30 à ±50 m**. À 60 m d'une pièce, la position mesurée peut donc
+tomber à 20 m d'elle. Le radar annonçait alors « BRÛLANT », et une direction
+calculée à partir d'un point faux — c'est-à-dire n'importe laquelle.
+
+C'est exactement le symptôme rapporté : *« il dit que c'est près alors qu'on
+s'éloigne, et ce n'est pas la bonne direction »*.
+
+Rien ne peut rendre le GPS plus précis. Ce qu'on peut faire, c'est **arrêter de
+prétendre**.
+
+### Ce que le radar dit maintenant
+
+| avant | après |
+|---|---|
+| « 47 m » | « 15–105 m » quand la marge le justifie |
+| « BRÛLANT » à 60 m avec ±45 m | « CHAUD » — un palier ne peut pas être plus serré que la marge d'erreur |
+| « C'EST LÀ ! FOUILLE ! » avec ±35 m | « DANS LA ZONE » |
+| une direction, toujours | « direction ±62° : pas fiable » quand elle ne veut plus rien dire |
+| un point net sur le cadran | un **arc d'incertitude** : « elle est quelque part par là » |
+| « Va vers le sud » | « Tu es dans la zone. Cherche à vue : le GPS ne peut plus t'aider. » |
+
+Chaque palier de chaleur a désormais sa **précision minimale** : on ne peut pas
+annoncer « c'est là » au-delà de ±18 m, ni « brûlant » au-delà de ±30 m.
+
+Et « RECHERCHE GPS… » n'est plus muet : compteur de secondes, nombre de relevés
+reçus, meilleure précision atteinte.
+
+### Le filtre de position a aussi changé
+
+L'ancien lissait par moyenne exponentielle. Ce type de lissage ne peut
+**mathématiquement pas** suivre un déplacement régulier : il garde un retard
+constant, proportionnel à la vitesse. On passe à un **filtre de Kalman à
+vitesse** — l'état n'est plus « où je suis » mais « où je suis *et à quelle
+allure je vais* ». Il suit un déplacement sans retard, gomme le tremblement à
+l'arrêt, et se règle tout seul sur la précision annoncée par le GPS au lieu d'un
+coefficient choisi à la main.
+
+| allure | avant | après |
+|---|---|---|
+| marche · ±10 m | +1,2 m | **−0,2 m** |
+| marche · ±30 m | +3,2 m | **−5,2 m** |
+| marche rapide · ±15 m | +2,0 m | **+1,0 m** |
+| vélo · ±15 m | +6,9 m | **+3,3 m** |
+
+Le filtre fournit aussi le **vecteur vitesse**, donc le cap déduit de la marche
+est désormais calculé directement, sans remonter la piste.
+
+### Honnêteté sur ce test
+
+À vitesse réelle, l'ancien lissage n'avait que 1 à 7 m de retard : ce n'est donc
+**pas** lui qui causait le symptôme rapporté. Un premier banc d'essai m'avait
+fait croire le contraire, parce qu'il simulait 54 km/h. Le filtre de Kalman
+reste une amélioration réelle, mais c'est l'**honnêteté sur l'incertitude** qui
+corrige le problème.
+
+sw v109→v110.
+
 ## Nouveautés (v109) — LE RADAR, GROSSE REFONTE
 
 ### Pourquoi il « était perdu »
