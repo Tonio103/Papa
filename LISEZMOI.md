@@ -62,6 +62,37 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v102) — LA TYPOGRAPHIE DU QUIZ
+
+Le quiz était illisible : trop gros, trop gras, « ça fait dessins ».
+
+La cause est structurelle. Le jeu charge cinq polices — Baloo 2, Nunito, Bungee,
+Bangers, Permanent Marker — et **aucune des cinq n'est faite pour lire un
+paragraphe**. Ce sont des polices d'affiche : rondes, grasses, pleines de
+caractère. Parfaites sur un titre de trois mots, écrasantes sur trois lignes de
+texte. Jusqu'ici ça ne s'était jamais vu, parce que le jeu n'avait nulle part
+où on lit vraiment. Le quiz est le premier endroit.
+
+Le quiz a donc désormais **sa propre typographie** :
+
+- la **police système** de l'appareil (SF Pro sur iPhone, Roboto sur Android) —
+  une vraie police de texte, gratuite, présente partout, y compris hors-ligne ;
+- des graisses **normales** (400) pour le texte, 600 seulement pour la question
+  et le verdict, au lieu du 700-800 partout ;
+- des tailles **plus petites** : 16 px la question, 15 px les propositions,
+  14 px l'explication — avec plus d'interligne, ce qui se lit mieux que du gros
+  serré ;
+- des propositions en **cartes sobres** — un fond, un filet fin, un coin
+  arrondi — au lieu des gros boutons biseautés en relief ;
+- les boutons du quiz au même diapason : un simple aplat cyan, plus le gros
+  bouton dégradé rose et orange qui hurlait par-dessus le texte.
+
+Le petit intitulé `QUESTION 1/3` reste en police pixel : c'est ce contraste
+entre le pixel de l'interface et la typo sobre du texte qui fait sérieux, au
+lieu de tout écrire dans la même police d'affiche.
+
+sw v101→v102.
+
 ## Nouveautés (v101) — LE QCM REPRIS POUR LES VRAIS CONNAISSEURS
 
 Les 24 questions de la v100 étaient de la culture générale street art : quelqu'un
