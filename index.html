@@ -458,36 +458,79 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 .gtool:active{ transform:translateY(2px); box-shadow:inset 0 2px 0 rgba(255,255,255,.06); }
 .gtool:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
 
-/* ── QCM d'après-défi — parti pris ÉPURÉ / GALERIE ────────────
-   Le reste du jeu est une borne d'arcade : biseaux, reliefs, halos,
-   dégradés. Le quiz est le seul écran où on LIT, et où on réfléchit —
-   il prend donc le parti inverse, celui d'un cartel de musée :
+/* ── QCM d'après-défi — VERRE CLAIR SUR SCÈNE SOMBRE ──────────
+   Le jeu reste une borne d'arcade dans la nuit. Le quiz, lui, est le
+   seul écran où on LIT et où on RÉFLÉCHIT : il devient une plaque de
+   verre CLAIRE qui vient se poser par-dessus. Le rapport est celui
+   d'un cartel à son tableau — c'est justement le contraste avec le
+   fond nuit qui le fait exister.
 
-     · aucun panneau, aucun relief, aucune ombre portée ;
-     · des filets d'un pixel pour séparer, jamais des boutons ;
-     · UNE seule couleur d'accent par écran — et c'est celle de
-       l'épreuve (var(--st)), si bien que chaque quiz porte la couleur
-       de son défi sans qu'on ait à le dire ;
-     · la police système, en 400, avec beaucoup d'interligne ;
-     · le pixel réservé au SEUL endroit où il fait sens : le score.
+   Trois principes, qui sont ceux du verre réel :
 
-   Le décor animé du défi continue derrière, mais très assourdi : on
-   sait qu'il est là, il ne lit plus avec nous.                       */
+   1. LE VERRE A BESOIN DE QUELQUE CHOSE À RÉFRACTER. Le décor animé
+      du défi continue de vivre derrière, flouté et éclairci : c'est
+      ce qu'on aperçoit à travers la plaque, et c'est ce qui la fait
+      changer pendant qu'on répond. Sur un fond plat, la même plaque
+      ne serait qu'un rectangle blanc.
+   2. L'ARÊTE FAIT LE VOLUME. Un liseré très clair en haut, plus
+      discret en bas : l'œil en déduit une épaisseur.
+   3. LA LUMIÈRE PASSE, ELLE NE COGNE PAS. Ombres larges et très
+      diluées, jamais de noir franc.
 
+   Le contenu, lui, garde le parti pris « galerie » : pas de boutons,
+   des lignes ; une seule couleur d'accent, celle de l'épreuve ; et
+   le pixel réservé au seul score.                                   */
+
+/* la plaque de verre : elle couvre toute la boîte de défi */
 .quiz-host{
   position:absolute; inset:0; z-index:3;
   display:flex; flex-direction:column; align-items:center;
   overflow-y:auto; -webkit-overflow-scrolling:touch;
-  padding:26px 22px calc(26px + var(--sab));
-  background:rgba(7,7,20,.93);
-  backdrop-filter:blur(14px) saturate(.55);
-  -webkit-backdrop-filter:blur(14px) saturate(.55);
+  padding:28px 24px calc(28px + var(--sab));
+  /* éclaircir ET flouter : le décor sombre passe en voile pâle */
+  background:linear-gradient(157deg, rgba(255,255,255,.90), rgba(238,243,255,.80));
+  backdrop-filter:blur(26px) saturate(150%) brightness(1.9);
+  -webkit-backdrop-filter:blur(26px) saturate(150%) brightness(1.9);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),
+             inset 0 -1px 0 rgba(255,255,255,.5),
+             0 18px 44px rgba(6,8,24,.45);
 }
+/* les deux reflets qui font « liquide » plutôt que « dépoli » :
+   la lumière du haut, et un éclat diagonal qui traverse la plaque.
+   Tous deux ADDITIFS — ils ajoutent de la clarté, ils n'enlèvent
+   jamais de contraste au texte. */
+.quiz-host::before{
+  content:""; position:absolute; inset:0 0 auto 0; height:40%;
+  background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0));
+  pointer-events:none; z-index:0;
+}
+.quiz-host::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:linear-gradient(118deg,
+    rgba(255,255,255,0)   34%,
+    rgba(255,255,255,.42) 48%,
+    rgba(255,255,255,.10) 56%,
+    rgba(255,255,255,0)   66%);
+}
+
+/* PLEIN SOLEIL : dehors, la transparence est un luxe qu'on ne peut
+   plus se payer. La plaque devient franchement opaque et le texte
+   passe au noir — c'est le seul écran de texte long du jeu. */
+:root.sun .quiz-host{
+  background:#ffffff !important;
+  backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+:root.sun .quiz-host::before, :root.sun .quiz-host::after{ display:none !important; }
+:root.sun .quiz-q{ color:#000 !important; }
+:root.sun .quiz-opt{ color:#1a1a1a !important; }
+:root.sun .quiz-note{ color:#2e2e2e !important; }
 .quiz{
-  --acc:var(--st, var(--cyan));
+  /* la couleur de l'épreuve est un néon : on la fonce juste ce qu'il
+     faut pour qu'elle tienne sur du blanc, sans perdre sa teinte */
+  --acc:color-mix(in srgb, var(--st, #2BE4D0) 60%, #0a1024);
+  position:relative; z-index:1;
   width:100%; max-width:330px; margin:auto 0;
   display:flex; flex-direction:column;
-  font-family:var(--f-lire); font-weight:400; color:#e7e7f2;
+  font-family:var(--f-lire); font-weight:400; color:#141728;
   animation:quizIn .3s cubic-bezier(.2,.7,.3,1) both;
 }
 @keyframes quizIn{ from{ opacity:0; transform:translateY(6px); } }
@@ -496,42 +539,43 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 .quiz-top{ display:flex; align-items:baseline; justify-content:space-between;
   gap:12px; margin-bottom:22px; }
 .quiz-kick{ font-family:var(--f-lire); font-size:10px; font-weight:600;
-  letter-spacing:2.2px; text-transform:uppercase; color:#61618a; }
+  letter-spacing:2.2px; text-transform:uppercase; color:#8189a6; }
 .quiz-dots{ display:flex; gap:6px; }
-.quiz-dots i{ width:5px; height:5px; border-radius:50%; background:#2b2b4e; display:block; }
-.quiz-dots i.done{ background:#61618a; }
+.quiz-dots i{ width:5px; height:5px; border-radius:50%;
+  background:rgba(20,23,40,.18); display:block; }
+.quiz-dots i.done{ background:rgba(20,23,40,.42); }
 .quiz-dots i.now{ background:var(--acc); }
 
 .quiz-q{ margin:0 0 24px; font-size:19px; line-height:1.5; font-weight:500;
-  color:#f4f4fb; letter-spacing:-.2px; }
+  color:#0d1020; letter-spacing:-.2px; }
 
 /* les propositions : des lignes, pas des boutons */
 .quiz-opts{ display:flex; flex-direction:column;
-  border-top:1px solid #23233f; }
+  border-top:1px solid rgba(20,23,40,.13); }
 .quiz-opt{
   width:100%; text-align:left; cursor:pointer; display:block;
   font-family:var(--f-lire); font-size:15.5px; font-weight:400; line-height:1.45;
-  letter-spacing:0; color:#c9c9dd;
+  letter-spacing:0; color:#3b4159;
   min-height:52px; padding:14px 2px 14px 16px;
-  background:none; border:0; border-bottom:1px solid #23233f; border-radius:0;
-  box-shadow:none; position:relative;
-  transition:color .16s, padding-left .16s;
+  background:none; border:0; border-bottom:1px solid rgba(20,23,40,.13);
+  border-radius:0; box-shadow:none; position:relative;
+  transition:color .16s;
 }
-/* le filet d'accent qui se déploie au survol : le seul mouvement */
+/* le filet d'accent qui se déploie au toucher : le seul mouvement */
 .quiz-opt::before{
   content:""; position:absolute; left:0; top:14px; bottom:14px; width:2px;
   background:var(--acc); transform:scaleY(0); transform-origin:center;
   transition:transform .18s ease;
 }
-.quiz-opt:hover:not(:disabled){ color:#fff; }
+.quiz-opt:hover:not(:disabled){ color:#0b0e1c; }
 .quiz-opt:hover:not(:disabled)::before{ transform:scaleY(.5); }
 .quiz-opt:active:not(:disabled){ color:var(--acc); }
-.quiz-opt:disabled{ cursor:default; color:#4e4e70; }
+.quiz-opt:disabled{ cursor:default; color:#9ba1b6; }
 /* après la réponse : la bonne est la seule chose qui reste allumée */
 .quiz-opt.bon{ color:var(--acc); font-weight:600; }
 .quiz-opt.bon::before{ transform:scaleY(1); }
-.quiz-opt.faux{ color:#7a5a68; text-decoration:line-through;
-  text-decoration-color:rgba(255,63,63,.5); text-decoration-thickness:1px; }
+.quiz-opt.faux{ color:#a2778a; text-decoration:line-through;
+  text-decoration-color:rgba(190,40,60,.45); text-decoration-thickness:1px; }
 
 /* le cartel de réponse */
 .quiz-info{ margin-top:24px; }
@@ -539,8 +583,8 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 .quiz-verdict{ display:block; font-size:10px; font-weight:600; letter-spacing:2.2px;
   text-transform:uppercase; color:var(--acc); margin-bottom:9px; }
 /* un échec ne s'écrit pas dans la couleur de la réussite */
-.quiz-verdict.rate{ color:#6f6f92; }
-.quiz-note{ display:block; font-size:14.5px; line-height:1.7; color:#9c9cba;
+.quiz-verdict.rate{ color:#8c93aa; }
+.quiz-note{ display:block; font-size:14.5px; line-height:1.7; color:#5a6076;
   font-weight:400; }
 
 /* l'action : un lien, aligné à droite, sans caisson */
@@ -552,8 +596,8 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   background:none; border:0; border-radius:0; box-shadow:none; text-shadow:none;
   transition:opacity .15s;
 }
-.quiz-next:hover{ opacity:.7; }
-.quiz-next:active{ opacity:.45; }
+.quiz-next:hover{ opacity:.65; }
+.quiz-next:active{ opacity:.4; }
 
 /* le récapitulatif : le seul endroit où le pixel a le droit de parler */
 .quiz-recap{ text-align:center; }
@@ -1949,7 +1993,7 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   box-shadow:none !important; letter-spacing:inherit !important;
   text-shadow:none !important;
 }
-.quiz-opt{ border-bottom:1px solid #23233f !important; }
+.quiz-opt{ border-bottom:1px solid rgba(20,23,40,.13) !important; }
 .quiz-opt:active, .quiz-next:active{ transform:none !important; box-shadow:none !important; }
 .quiz-next{ letter-spacing:1.4px !important; }
 #gbg-fg{
@@ -20446,7 +20490,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v103</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v104</p>`);
     wire();
   }
   function wire(){
