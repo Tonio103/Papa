@@ -62,6 +62,60 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v111) — PROUVER OÙ EST LA FAUTE
+
+« Il indique la mauvaise direction, la mauvaise distance. » Trois choses
+peuvent produire ça, et **on ne peut pas les distinguer depuis un écran** :
+
+1. les formules du radar sont fausses ;
+2. la position enregistrée de la pièce est fausse ;
+3. le GPS du téléphone raconte n'importe quoi à cet endroit.
+
+### 1 est écarté : les formules ont été auditées
+
+300 couples (position, cible) tirés au hasard autour des Vans, de 5 m à 5 km,
+comparés à **Vincenty sur l'ellipsoïde WGS84** — la référence géodésique,
+indépendante du code du jeu :
+
+| | écart maximal |
+|---|---|
+| distance | **0,28 %** (8 m sur 3 km — l'écart sphère/ellipsoïde, inévitable) |
+| relèvement | **0,10°** |
+
+Les formules sont justes. Le problème est donc **dans les données ou dans le
+signal**.
+
+### Le banc d'essai de marche
+
+Nouveau, dans le panneau de réglage. Il tranche entre les cas 2 et 3 :
+
+1. **① Poser un repère ici**
+2. marcher 30 à 50 m en ligne droite
+3. **② Je suis arrivé**
+
+Le radar annonce alors ce **qu'il** a mesuré : *« 43 m vers l'est (90°), en
+6 s »*, avec la précision au départ et à l'arrivée, et un verdict :
+
+- déplacement plus petit que la marge d'erreur → *« ce test ne prouve rien,
+  recommence en marchant plus loin, à ciel ouvert »* ;
+- déplacement trois fois supérieur à la marge → *« mesure fiable — si ça
+  correspond à ta marche, le radar calcule juste, et c'est la position
+  enregistrée qui est fausse »*.
+
+### Alerte sur les positions aberrantes
+
+Une pièce enregistrée à plus de 30 km déclenche désormais **POSITION
+ABERRANTE** au lieu d'un cap parfaitement calculé vers nulle part. Testé avec
+une latitude et une longitude interverties — l'erreur la plus courante — le
+radar annonce « 5955 km d'ici, c'est une coordonnée fausse » et refuse de
+guider.
+
+S'ajoute un bouton **🗺 Voir ce spot sur une carte**, qui ouvre la position
+enregistrée dans l'appli de cartes du téléphone : le moyen le plus direct de
+vérifier qu'un repérage tombe au bon endroit.
+
+sw v110→v111.
+
 ## Nouveautés (v110) — LE RADAR ARRÊTE DE PRÉTENDRE ⚠
 
 **Le vrai défaut n'était pas la précision du GPS. C'était l'aplomb.**

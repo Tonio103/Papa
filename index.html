@@ -649,6 +649,21 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   background:rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.08);
   border-radius:10px; }
 
+
+/* ── Banc d'essai du radar ────────────────────────────────── */
+#radar-cal{ margin:10px 0 4px; padding:12px; text-align:left;
+  border:1px solid rgba(255,255,255,.12); border-radius:14px;
+  background:rgba(255,255,255,.035); }
+#radar-cal .rc-t{ font-family:var(--f-lire); font-size:13px; font-weight:600;
+  letter-spacing:1.4px; text-transform:uppercase; color:#8fd0ff; margin-bottom:6px; }
+#radar-cal .rc-s{ font-family:var(--f-lire); font-size:13px; font-weight:400;
+  line-height:1.55; color:#9299b5; margin-bottom:10px; }
+#radar-cal-out{ font-family:var(--f-lire); font-size:14px; line-height:1.6;
+  margin-top:10px; min-height:20px; color:#EDEDF7; }
+#radar-cal-out b{ color:#8fd0ff; }
+#radar-cal-out .ok{ color:#39e08a; }
+#radar-cal-out .ko{ color:#ff8484; }
+
 /* ── Voile de pause ───────────────────────────────────────── */
 #game-pause{
   position:absolute; inset:0; z-index:40; display:flex;
@@ -2853,6 +2868,22 @@ button.b2{ color:#04231d !important; }
         <button id="btn-radar-rec" class="b3">📌 Enregistrer la pièce ici</button>
         <button id="btn-radar-del" class="b3">✕ Effacer ce spot</button>
         <button id="btn-radar-copy" class="b3">⎘ Copier les spots</button>
+        <button id="btn-radar-map" class="b3">🗺 Voir ce spot sur une carte</button>
+      </div>
+      <!-- LE BANC D'ESSAI : il tranche entre « le radar calcule mal »
+           et « la position enregistrée est fausse ». Sans lui, on ne
+           peut que supposer. -->
+      <div id="radar-cal">
+        <div class="rc-t">Vérifier le radar en marchant</div>
+        <div class="rc-s">Pose un repère, marche 30 à 50 m en ligne droite,
+          puis touche « je suis arrivé ». Le radar te dira ce qu'il a mesuré.
+          Si ça correspond à ta marche, le radar est bon : c'est la position
+          enregistrée qui est fausse.</div>
+        <div class="btn-row" style="gap:10px;">
+          <button id="btn-cal-a" class="b3">① Poser un repère ici</button>
+          <button id="btn-cal-b" class="b3">② Je suis arrivé</button>
+        </div>
+        <div id="radar-cal-out"></div>
       </div>
     </div>
     <div class="btn-row">
@@ -8329,6 +8360,7 @@ const Radar = (()=>{
   /* filtre de Kalman : origine locale, un état par axe, horodatage */
   let kOrigin = null, kN = null, kE = null, kAt = 0;
   let nFix = 0, bestAcc = null, t0Watch = 0;
+  let calA = null, calAcc = null, calT = 0;   // banc d'essai de marche
   let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
 
   const loadSpots = ()=>{ let s = {};
@@ -8427,6 +8459,10 @@ const Radar = (()=>{
   const cardIdx = (d)=> Math.round(((d%360)+360)%360/22.5) % 16;
   const cardinal  = (d)=> CARD_S[cardIdx(d)];
   const cardinalL = (d)=> CARD[cardIdx(d)];
+  /* « vers le est » ne se dit pas : les points cardinaux commençant
+     par une voyelle prennent l'élision */
+  const versCard = (d)=>{ const n = cardinalL(d);
+    return (/^[aeiouéè]/i.test(n) ? "vers l'" : "vers le ") + n; };
   /* écart signé, ramené dans [-180, +180] */
   const relAngle = (a, b)=> ((a - b) % 360 + 540) % 360 - 180;
 
@@ -8578,7 +8614,7 @@ const Radar = (()=>{
   function guideTxt(t, up, live){
     if(!t) return "";
     if(t.d <= 12) return "Tu y es. Lève les yeux et cherche le mur.";
-    if(!live) return `Va vers le ${cardinalL(t.brg)}.`;
+    if(!live) return `Va ${versCard(t.brg)}.`;
     const rel = relAngle(t.brg, up);
     const a = Math.abs(rel);
     if(a < 12)  return "Tout droit.";
@@ -8807,6 +8843,20 @@ const Radar = (()=>{
         "", any ? "Plus rien à traquer par ici. 👏"
                 : "Les coordonnées des pièces ne sont pas encore enregistrées.", "#39e08a");
       if(guide) guide.textContent = "";
+    }else if(t.d > 30000){
+      /* ── LA POSITION ENREGISTRÉE EST ABERRANTE ────────────────
+         Trente kilomètres, ce n'est pas une pièce mal repérée : c'est
+         une coordonnée fausse — inversée, mal saisie, ou enregistrée
+         ailleurs pour un essai. Le radar donnerait alors une distance
+         et une direction parfaitement calculées… vers nulle part. Il
+         vaut mille fois mieux le dire que de guider dans le vide. */
+      setUI("POSITION ABERRANTE",
+        (t.d/1000).toFixed(0) + " km",
+        `${t.st.code} est enregistrée à ${(t.d/1000).toFixed(0)} km d'ici. `
+        + `C'est une coordonnée fausse, pas une pièce lointaine — vérifie-la, ou efface-la.`,
+        "#ff8484");
+      if(guide){ guide.textContent = "Ne suis pas ce cap : la position est fausse.";
+                 guide.style.color = "#ff8484"; }
     }else{
       pushHist(t.d);
       const heat2 = heatOf(t.d, accM);
@@ -9059,6 +9109,64 @@ const Radar = (()=>{
         lockCode = (lockCode === code) ? null : code;
         hist.length = 0;                       // la courbe repart à zéro
         AudioFX.nav(); drawList();
+      });
+      /* ── LE BANC D'ESSAI DE MARCHE ────────────────────────────
+         Quand quelqu'un dit « le radar est tout faux », trois choses
+         peuvent être en cause, et on ne peut pas les distinguer depuis
+         un écran : les formules, la position enregistrée, ou le GPS du
+         téléphone. Les formules, elles, ont été vérifiées contre la
+         référence géodésique (Vincenty, WGS84) : 0,28 % d'écart de
+         distance et 0,1° de relèvement sur 300 tirages. Restent les
+         deux autres, et seule une marche réelle peut trancher.
+
+         On pose un repère, on marche, et le radar annonce ce QU'IL a
+         mesuré. Si ça correspond à ce qu'on vient de faire, il va
+         bien — et c'est la position de la pièce qui est fausse. */
+      $("#btn-cal-a").addEventListener("click", ()=>{
+        if(!fix){ AudioFX.err();
+          $("#radar-cal-out").innerHTML = "<span class='ko'>Pas encore de position — active le radar et attends le premier point.</span>";
+          return; }
+        calA = [fix[0], fix[1]]; calAcc = accM; calT = Date.now();
+        AudioFX.ok();
+        $("#radar-cal-out").innerHTML =
+          `Repère posé à <b>${calA[0].toFixed(5)}, ${calA[1].toFixed(5)}</b> (±${Math.round(calAcc||0)} m).<br>`
+          + `Marche maintenant 30 à 50 m en ligne droite, puis touche ②.`;
+      });
+      $("#btn-cal-b").addEventListener("click", ()=>{
+        if(!calA){ AudioFX.err();
+          $("#radar-cal-out").innerHTML = "<span class='ko'>Pose d'abord un repère avec ①.</span>"; return; }
+        if(!fix){ AudioFX.err();
+          $("#radar-cal-out").innerHTML = "<span class='ko'>Position perdue — attends que le GPS revienne.</span>"; return; }
+        const d = distM(calA, fix), br = bearingTo(calA, fix);
+        const dt = (Date.now() - calT)/1000;
+        const marge = Math.round((calAcc || 0) + (accM || 0));
+        AudioFX.ok();
+        /* le verdict : ce n'est PAS la distance qui compte, c'est de
+           savoir si elle est mesurable compte tenu du bruit */
+        let verdict;
+        if(d < marge)
+          verdict = `<span class='ko'>Le déplacement (${Math.round(d)} m) est plus petit que la marge d'erreur `
+            + `(±${marge} m) : ce test ne prouve rien. Recommence en marchant plus loin, à ciel ouvert.</span>`;
+        else if(d > marge*3)
+          verdict = `<span class='ok'>Mesure fiable.</span> Si ça correspond à ta marche, le radar calcule juste — `
+            + `et c'est la position enregistrée de la pièce qui est fausse.`;
+        else
+          verdict = `Mesure à peu près exploitable, mais le GPS est bruité : marche plus loin pour en être sûr.`;
+        $("#radar-cal-out").innerHTML =
+          `Le radar a mesuré : <b>${Math.round(d)} m</b> ${/^[aeiouéè]/i.test(cardinalL(br))?"vers l'":"vers le "}<b>${cardinalL(br)}</b> `
+          + `(${Math.round(br)}°), en ${Math.round(dt)} s.<br>`
+          + `Précision : ±${Math.round(calAcc||0)} m au départ, ±${Math.round(accM||0)} m à l'arrivée.<br>`
+          + verdict;
+        calA = null;
+      });
+      /* ouvrir la position enregistrée dans l'appli Cartes : c'est le
+         moyen le plus direct de voir si un spot est au bon endroit */
+      $("#btn-radar-map").addEventListener("click", ()=>{
+        const sp = loadSpots()[selCode];
+        if(!sp){ AudioFX.err(); $("#radar-sub").textContent = `${selCode} n'a aucune position à montrer.`; return; }
+        AudioFX.select();
+        const u = `https://maps.google.com/?q=${sp[0]},${sp[1]}`;
+        try{ window.open(u, "_blank", "noopener"); }catch(e){ prompt("Position :", u); }
       });
       $("#btn-radar-copy").addEventListener("click", ()=>{
         const json = JSON.stringify(loadSpots());
@@ -21176,7 +21284,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v110</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v111</p>`);
     wire();
   }
   function wire(){
