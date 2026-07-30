@@ -62,6 +62,61 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v108) — UN VRAI RADAR ⚠
+
+### Le défaut de fond : la direction était inventée
+
+L'angle du point sur le radar était calculé ainsi :
+
+```js
+let hsh = 0; for(const ch of t.st.code) hsh = (hsh*31 + ch.charCodeAt(0)) % 997;
+const ang = hsh/997 * Math.PI*2;      // ← un HACHAGE DU CODE DE LA PIÈCE
+```
+
+Autrement dit : une direction **stable**, mais qui n'avait **aucun rapport**
+avec l'endroit où se trouve la pièce. Ce n'était pas un radar, c'était un
+compteur de distance avec un point décoratif — d'où l'impression d'imprécision.
+
+### Ce que fait le radar maintenant
+
+- **Le vrai relèvement**, calculé par la formule du cap initial de la grande
+  orthodromie. Vérifié aux quatre points cardinaux : **0° d'écart** sur les
+  quatre.
+- **La boussole du téléphone**, donc l'affichage est **tête en haut** : le point
+  tourne quand tu tournes, et une flèche sur le bord indique de quel côté
+  pivoter. Sur iPhone l'autorisation est demandée au moment où tu actives le
+  radar. Si la boussole ne répond pas, on bascule en *nord en haut* et **on
+  l'écrit** — plutôt que de faire semblant.
+- **Le cap lissé sur le cercle**, pas sur l'angle. Faire la moyenne de 359° et
+  1° donnerait 180°, soit exactement le dos de la cible.
+- **Une portée automatique** : l'échelle se resserre à mesure qu'on approche
+  (6 km → 2,5 km → … → 30 m → 15 m), et **les anneaux sont chiffrés**. Un radar
+  figé à 500 m est inutilisable sur les vingt derniers mètres.
+- **La distance au mètre** tant qu'elle est utile — « 47 m » au lieu de « moins
+  de 20 m » — puis arrondie seulement quand l'arrondi est plus honnête.
+- **Le halo d'incertitude du GPS**, dessiné à l'échelle. Un point net laisse
+  croire à une précision qu'on n'a pas : quand le halo avale la cible, il faut
+  chercher à vue.
+- **Le trait qui relie** le centre à la cible, pour lire la direction d'un coup
+  d'œil.
+
+### Et la position elle-même est plus stable
+
+- `maximumAge` passe de 2 s à **0** : avec 2 s de tolérance, le point retardait
+  d'un pas de marche entier.
+- **Les mauvais points sont écartés.** Une mesure trois fois moins précise que
+  la précédente est en général un raccrochage réseau : elle n'est retenue que
+  si elle insiste. Avant, le radar sautait de 40 m sans qu'on ait bougé.
+- **Lissage adaptatif** : d'autant plus ferme que la mesure est imprécise.
+
+### Le bandeau rouge a disparu
+
+Il barrait le bas de l'écran en permanence, y compris pendant un repérage où
+l'on a besoin de toute la hauteur. Il est maintenant replié derrière une
+**poignée ⚙ discrète en haut à droite** : on l'ouvre quand on en a besoin.
+
+sw v107→v108.
+
 ## Nouveautés (v107) — LE MODE RÉGLAGE, UTILISABLE SUR LE TERRAIN
 
 ### D'où vient une position ? (le piège à connaître)
