@@ -62,6 +62,64 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v109) — LE RADAR, GROSSE REFONTE
+
+### Pourquoi il « était perdu »
+
+Il ne dépendait que du **magnétomètre**. Sur la moitié des téléphones, celui-ci
+ne répond jamais dans un navigateur : autorisation refusée, orientation non
+absolue, ou simplement téléphone tenu **debout** — la posture normale quand on
+marche — qui rend la mesure erratique. Sans cap, l'affichage restait « nord en
+haut » : le radar disait la bonne distance et la bonne direction, mais on ne
+savait pas de quel côté se tourner. D'où l'impression qu'il tourne en rond.
+
+**Le cap se déduit désormais de ta marche.** Deux nouvelles sources :
+
+1. `coords.heading` quand le navigateur le fournit ;
+2. **et surtout, le calcul maison** : on remonte la piste des positions
+   récentes jusqu'à un point assez éloigné pour que la direction veuille dire
+   quelque chose — « assez éloigné » signifiant *plus loin que l'incertitude du
+   GPS*, sinon on mesurerait le bruit au lieu de la marche.
+
+Aucune autorisation, aucune calibration, et ça fonctionne sur tous les
+téléphones. La boussole reprend la main dès qu'elle se réveille.
+
+Deux pièges de la boussole sont par ailleurs corrigés : l'**écran tourné**
+(paysage) décalait la mesure d'autant, et le **téléphone redressé** est
+désormais détecté (« pose le téléphone à plat ») au lieu de livrer n'importe
+quoi.
+
+### Ce que le radar affiche maintenant
+
+- **Les 8 pièces à la fois**, chacune à sa couleur et à son vrai relèvement,
+  avec son numéro. Les pièces déjà flashées passent en gris.
+- **Le guidage en toutes lettres**, en gros sous la distance : *« Tout droit »*,
+  *« Tourne à droite — 70° »*, *« Fais demi-tour »*, *« Tu y es. Lève les yeux
+  et cherche le mur. »* C'est ce qu'on lit en marchant, pas un cadran.
+- **La courbe d'approche** : la distance sur la dernière minute et demie, en
+  vert si tu te rapproches, en rouge si tu t'éloignes, plus la vitesse de
+  rapprochement en m/min. Sur les vingt derniers mètres, le GPS tremble plus que
+  la distance ne change : un chiffre seul ne dit plus rien, la **pente** dit
+  tout. Elle est calculée par régression linéaire — une simple différence serait
+  dominée par le dernier point, justement le plus bruité.
+- **La piste** : par où tu es passé, en traînée qui s'efface. Elle révèle ce
+  qu'aucun chiffre ne dit — que tu tournes en rond, ou que tu viens de dépasser
+  la pièce.
+- **La liste des cibles**, triée par distance, avec direction. **Touche-en une
+  pour la traquer** : jusqu'ici le radar imposait la plus proche, alors qu'on
+  veut souvent aller chercher une pièce précise.
+- **Ta propre direction** dessinée au centre, et une flèche sur le bord qui
+  indique où pivoter.
+
+### Et un diagnostic, en mode réglage
+
+Quand le radar se trompe, il faut pouvoir dire **pourquoi**. Un encart brut
+affiche les valeurs réelles du téléphone : position et précision, vitesse, cap
+et sa provenance, état de l'autorisation, orientation (absolue ou non, α β γ,
+précision boussole), inclinaison, nombre de spots, angle de l'écran.
+
+sw v108→v109.
+
 ## Nouveautés (v108) — UN VRAI RADAR ⚠
 
 ### Le défaut de fond : la direction était inventée
