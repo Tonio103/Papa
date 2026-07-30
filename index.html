@@ -149,6 +149,11 @@ body::after{
 
 /* ── Écrans ───────────────────────────────────────────────── */
 .screen{ display:none; position:fixed; inset:0; z-index:1;
+  /* aucun écran ne défile latéralement : les cartes de la galerie sont
+     inclinées en 3D, et une carte qui tourne déborde de quelques pixels
+     de sa case. Ça suffisait à rendre toute la page glissante sur le
+     côté au doigt — un défaut discret, mais qu'on sent tout de suite. */
+  overflow-x:hidden;
   flex-direction:column; overflow-y:auto; overscroll-behavior:none;
   -webkit-overflow-scrolling:touch; }
 .screen.active{ display:flex; }
@@ -321,7 +326,11 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 }
 
 /* ── Cartes de la galerie : scène 3D ──────────────────────── */
+/* les cartes sont inclinées en 3D : leur silhouette déborde de sa case
+   de quelques pixels. On réserve donc cette marge, sinon le coin de la
+   carte de droite se fait raboter par le bord de l'écran. */
 #grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-top:12px;
+  padding-inline:7px;
   perspective:900px; perspective-origin:50% 30%; }
 .card{
   position:relative; overflow:hidden;
@@ -650,11 +659,34 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 #game-screen.plein #game-title{
   font-size:12px; opacity:.72; text-shadow:0 2px 6px rgba(0,0,0,.9); }
 #game-screen.plein #game-box{ position:relative;
-  border:0; border-radius:0; margin:0; padding:0;
+  border:0; border-radius:0; margin:0;
   outline:none; box-shadow:none; background:#0a0a18;
-  padding-top:calc(46px + var(--sat));
-  padding-bottom:calc(6px + var(--sab));
+  /* Le plein écran enlève le CADRE, pas les MARGES. Sans ces marges
+     latérales, le texte et les boutons de chaque défi venaient toucher
+     le bord de l'écran — et sur un iPhone, le bord de l'écran est
+     arrondi : la dernière lettre disparaît dans le coin.
+     Les décors #gbg / #gbg-fg sont en position absolue : ils ignorent
+     ce rembourrage et restent bien à fond perdu. */
+  padding:calc(46px + var(--sat)) calc(14px + var(--sar))
+          calc(8px + var(--sab))  calc(14px + var(--sal));
 }
+/* Les rangées d'outils des mini-jeux sont construites en JavaScript,
+   avec un style en ligne « display:flex » et sans retour à la ligne.
+   À quatre boutons sur un écran de 390 px, ça déborde — c'est ce qui
+   coupait « Annuler » et « Miroir » dans La Palette. Plutôt que de
+   retoucher les huit jeux un par un, on autorise ici le retour à la
+   ligne pour toute rangée d'outils : il ne se déclenche que lorsqu'il
+   y a effectivement débordement. */
+/* attention : le navigateur RÉÉCRIT le style en ligne en y ajoutant
+   une espace — « display:flex » devient « display: flex ». Il faut donc
+   viser les deux écritures, sinon la règle ne s'applique jamais. */
+#game-box div[style*="display:flex"],
+#game-box div[style*="display: flex"]{ flex-wrap:wrap !important; }
+#game-box div[style*="display:flex"] > button,
+#game-box div[style*="display: flex"] > button{ max-width:100%; min-width:0; }
+/* et aucun contenu de défi ne peut pousser la boîte plus large qu'elle */
+#game-box{ max-width:100%; overflow-x:hidden; }
+
 #game-screen.plein #hint-txt{
   position:absolute; z-index:20; left:10px; right:10px;
   bottom:calc(52px + var(--sab)); margin:0; pointer-events:none;
@@ -20490,7 +20522,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v104</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v105</p>`);
     wire();
   }
   function wire(){
