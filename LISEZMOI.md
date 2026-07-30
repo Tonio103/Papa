@@ -62,6 +62,70 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v112) — POSER LES POINTS DEPUIS GOOGLE MAPS ⚠
+
+### Pourquoi Google Maps paraît si simple
+
+Deux raisons, et aucune n'est un défaut de programmation de ce jeu :
+
+1. **Maps affiche une carte.** Avec ±20 m d'erreur, on voit quand même qu'on
+   est devant l'église et pas dans la rue d'à côté : l'œil corrige. Un cadran
+   abstrait, lui, n'offre aucun repère — la même erreur devient inexploitable.
+2. **Quand on pose un point dans Maps, le GPS ne sert à rien.** On appuie sur la
+   carte, à l'endroit qu'on VOIT. L'erreur est nulle.
+
+Le jeu, lui, demandait de se placer devant la pièce et d'appuyer sur un bouton :
+il capturait la position GPS **avec toute son erreur**, soit ±10 à ±40 m selon
+l'endroit. C'était la mauvaise méthode.
+
+### La bonne méthode : coller les coordonnées
+
+Nouveau bloc **« Coller des coordonnées »** dans le panneau de réglage.
+
+1. Dans Google Maps, appui long sur l'endroit exact de la pièce ;
+2. les coordonnées s'affichent en bas, on les touche pour les copier ;
+3. on les colle dans le jeu.
+
+**Aucun GPS, aucune erreur.** La position est celle qu'on a désignée du doigt
+sur une carte satellite.
+
+Tous les formats que Google Maps produit sont acceptés — vérifié sur les sept :
+
+| collé | résultat |
+|---|---|
+| `44.40458, 4.13214` | ✅ |
+| `44.40458,4.13214` | ✅ |
+| `44,40458 4,13214` (virgule française) | ✅ |
+| `https://maps.google.com/?q=44.40458,4.13214` | ✅ |
+| `…/maps/@44.40458,4.13214,19z` | ✅ |
+| lien long avec `!3d44.40458!4d4.13214` | ✅ |
+| `44°24'16.5"N 4°07'55.7"E` | ✅ |
+
+Et les pièges sont arrêtés : coordonnées **inversées** (« ce point est à 5955 km
+— essaie 44.40458, 4.13214 »), point manifestement ailleurs (« à 515 km des
+Vans »), texte illisible.
+
+S'ajoute **⎘ Copier ma position** : pour la coller dans Maps et voir de ses yeux
+où le téléphone croit qu'on est.
+
+### Le banc d'essai mesurait mon propre filtre
+
+Signalé sur le terrain : 17 m parcourus, 7 m annoncés. Le banc lisait la
+position **filtrée**, or le filtre de Kalman est fait pour afficher une position
+stable pendant qu'on marche — il amortit forcément les départs et les arrêts.
+Mesurer une marche avec, c'était mesurer le lissage.
+
+Il repart désormais des relevés **bruts**, et applique la technique du géomètre :
+à l'arrêt, le GPS ne donne pas un point mais un par seconde, dispersés autour du
+vrai. On les moyenne (pondérés par 1/précision², car un relevé à ±5 m vaut
+quatre fois un relevé à ±10 m), en n'gardant que ceux pris **une fois immobile**
+— sinon la fenêtre avale les derniers pas et tire le résultat en arrière.
+
+Mesuré avec un GPS bruité, sur une marche de 17 m : **−60 % avant, +9 % après**.
+Sur 50 m : −1 %.
+
+sw v111→v112.
+
 ## Nouveautés (v111) — PROUVER OÙ EST LA FAUTE
 
 « Il indique la mauvaise direction, la mauvaise distance. » Trois choses

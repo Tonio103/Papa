@@ -650,6 +650,21 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   border-radius:10px; }
 
 
+
+#radar-paste{ margin:10px 0 4px; padding:12px; text-align:left;
+  border:1px solid rgba(255,255,255,.12); border-radius:14px;
+  background:rgba(143,208,255,.06); }
+#radar-paste .rc-s i{ font-style:normal; color:#c9cee6; }
+#paste-in{ flex:1; min-width:0; font-family:var(--f-lire); font-size:15px;
+  text-align:left; letter-spacing:0; text-transform:none;
+  background:#0d0d22; color:var(--blanc); border:1px solid rgba(255,255,255,.18);
+  border-radius:10px; padding:11px 12px; }
+#paste-in:focus{ outline:none; border-color:#8fd0ff; }
+#paste-out{ font-family:var(--f-lire); font-size:14px; line-height:1.6;
+  margin-top:8px; min-height:20px; color:#EDEDF7; }
+#paste-out .ok{ color:#39e08a; }
+#paste-out .ko{ color:#ff8484; }
+
 /* ── Banc d'essai du radar ────────────────────────────────── */
 #radar-cal{ margin:10px 0 4px; padding:12px; text-align:left;
   border:1px solid rgba(255,255,255,.12); border-radius:14px;
@@ -2873,10 +2888,37 @@ button.b2{ color:#04231d !important; }
       <!-- LE BANC D'ESSAI : il tranche entre « le radar calcule mal »
            et « la position enregistrée est fausse ». Sans lui, on ne
            peut que supposer. -->
+      <!-- ── LA VOIE FIABLE ────────────────────────────────────
+           Poser un point avec le GPS, c'est capturer sa position AVEC
+           son erreur : ±10 à ±40 m selon l'endroit. Le repérer sur une
+           carte, c'est le poser à l'œil, sur le bâtiment qu'on voit —
+           erreur nulle. C'est pour ça que Google Maps paraît si
+           simple : il ne demande pas au GPS où est le point, il
+           demande à l'utilisateur de le montrer.
+           On récupère donc ce travail-là, tel quel. -->
+      <div id="radar-paste">
+        <div class="rc-t">Coller des coordonnées</div>
+        <div class="rc-s">La méthode la plus sûre, et de loin. Dans Google Maps,
+          appui long sur l'endroit exact de la pièce → les coordonnées s'affichent
+          en bas → touche-les pour les copier → colle-les ici. Aucun GPS,
+          aucune erreur.<br>
+          Tout est accepté : <i>44.40458, 4.13214</i>, un lien Google Maps,
+          ou 44°24'16.5"N 4°07'55.7"E.</div>
+        <div class="btn-row" style="gap:8px;">
+          <input id="paste-in" placeholder="44.40458, 4.13214" autocomplete="off" spellcheck="false">
+          <button id="btn-paste-ok" class="b3">Poser</button>
+        </div>
+        <div id="paste-out"></div>
+        <div class="btn-row" style="gap:8px; padding-top:6px;">
+          <button id="btn-paste-me" class="b3">⎘ Copier ma position (pour la vérifier dans Maps)</button>
+        </div>
+      </div>
       <div id="radar-cal">
         <div class="rc-t">Vérifier le radar en marchant</div>
-        <div class="rc-s">Pose un repère, marche 30 à 50 m en ligne droite,
-          puis touche « je suis arrivé ». Le radar te dira ce qu'il a mesuré.
+        <div class="rc-s">Reste immobile 5 secondes, pose un repère, marche 30 à 50 m
+          en ligne droite, arrête-toi 5 secondes, puis touche « je suis arrivé ».
+          Les deux pauses comptent : c'est en restant immobile que le GPS se moyenne.
+          Le radar te dira ensuite ce qu'il a mesuré.
           Si ça correspond à ta marche, le radar est bon : c'est la position
           enregistrée qui est fausse.</div>
         <div class="btn-row" style="gap:10px;">
@@ -8361,6 +8403,9 @@ const Radar = (()=>{
   let kOrigin = null, kN = null, kE = null, kAt = 0;
   let nFix = 0, bestAcc = null, t0Watch = 0;
   let calA = null, calAcc = null, calT = 0;   // banc d'essai de marche
+  /* les relevés BRUTS du GPS, non filtrés : le banc d'essai doit
+     mesurer ce que dit l'appareil, pas ce que mon filtre en fait */
+  const raw = [];
   let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
 
   const loadSpots = ()=>{ let s = {};
@@ -8992,6 +9037,8 @@ const Radar = (()=>{
       }
       fix = [ kOrigin[0] + kN.p/mLat, kOrigin[1] + kE.p/mLon ];
       accM = na;
+      raw.push({ lat, lon, a:na, t:tn });
+      while(raw.length && tn - raw[0].t > 20000) raw.shift();
       /* la vitesse vient maintenant du filtre : elle existe même
          quand le navigateur ne fournit pas coords.speed */
       gpsSpeed = Math.hypot(kN.v, kE.v);
@@ -9021,7 +9068,7 @@ const Radar = (()=>{
     stopCompass();
     watchId = null; fix = null; accM = null; badFix = 0; gpsSpeed = null;
     kOrigin = null; kN = null; kE = null; kAt = 0; nFix = 0; bestAcc = null;
-    trail.length = 0; hist.length = 0;
+    trail.length = 0; hist.length = 0; raw.length = 0;
     $("#btn-radar-on").textContent = "📡 Activer le radar";
   }
 
@@ -9110,6 +9157,84 @@ const Radar = (()=>{
         hist.length = 0;                       // la courbe repart à zéro
         AudioFX.nav(); drawList();
       });
+      /* ── LIRE DES COORDONNÉES ÉCRITES N'IMPORTE COMMENT ───────
+         Google Maps, selon qu'on copie l'étiquette, l'adresse de la
+         page ou le partage, produit au moins quatre formats
+         différents. Refuser trois d'entre eux, ce serait transformer
+         la solution en nouveau problème — on les accepte donc tous :
+
+           44.40458, 4.13214
+           https://maps.google.com/?q=44.40458,4.13214
+           https://www.google.com/maps/@44.40458,4.13214,19z
+           https://maps.app.goo.gl/… suivi de !3d44.40458!4d4.13214
+           44°24'16.5"N 4°07'55.7"E                                  */
+      function lireCoords(txt){
+        if(!txt) return null;
+        const t = String(txt).trim();
+        /* 1) la forme la plus riche d'abord : !3d<lat>!4d<lon>, que
+              Google glisse dans ses longues adresses */
+        let m = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+        if(m) return [ +m[1], +m[2] ];
+        /* 2) l'adresse en @lat,lon,zoom */
+        m = t.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+        if(m) return [ +m[1], +m[2] ];
+        /* 3) degrés-minutes-secondes, avec hémisphère */
+        const dms = /(\d+)\s*[°d]\s*(\d+)\s*['\u2032]\s*([\d.]+)\s*["\u2033]?\s*([NSEOW])/gi;
+        const pts = []; let d;
+        while((d = dms.exec(t))){
+          let v = +d[1] + (+d[2])/60 + (+d[3])/3600;
+          const h = d[4].toUpperCase();
+          if(h === "S" || h === "O" || h === "W") v = -v;
+          pts.push({ v, h });
+        }
+        if(pts.length >= 2){
+          const lat = pts.find(p=>"NS".includes(p.h)) || pts[0];
+          const lon = pts.find(p=>"EOW".includes(p.h)) || pts[1];
+          return [ lat.v, lon.v ];
+        }
+        /* 4) deux nombres décimaux, séparés par une virgule ou un espace */
+        m = t.match(/(-?\d+[.,]\d+)\s*[,;\s]\s*(-?\d+[.,]\d+)/);
+        if(m) return [ +m[1].replace(",", "."), +m[2].replace(",", ".") ];
+        return null;
+      }
+
+      /* ── POINT MOYEN À L'ARRÊT ────────────────────────────────
+         C'est la technique du géomètre, et c'est ce qui manquait.
+
+         Quand on est immobile, le GPS ne donne pas UN point : il en
+         donne un par seconde, tous différents, dispersés autour du
+         vrai. Un seul relevé porte donc toute l'erreur ; la moyenne de
+         dix la divise par trois — c'est en racine du nombre de
+         mesures. On pondère par 1/précision², parce qu'un relevé
+         annoncé à ±5 m vaut quatre fois un relevé à ±10 m.
+
+         Et surtout : on repart des relevés BRUTS. Le filtre de
+         Kalman est fait pour afficher une position stable pendant
+         qu'on marche ; il amortit forcément les départs et les
+         arrêts. S'en servir pour MESURER une marche, c'était mesurer
+         mon propre lissage — d'où les 17 m annoncés 7. */
+      function pointMoyen(){
+        const tn = performance.now();
+        let pts = raw.filter(p=>tn - p.t < 8000);
+        if(!pts.length) return null;
+        /* On ne moyenne QUE ce qui a été relevé une fois arrêté.
+           Sinon la fenêtre avale les derniers pas de la marche et
+           tire le point moyen en arrière : une marche de 17 m était
+           mesurée 13. On écarte donc les relevés trop éloignés du
+           tout dernier — ceux-là datent d'avant l'arrêt. */
+        const der = pts[pts.length-1];
+        const seuil = Math.max(6, (der.a || 10) * 1.6);
+        const proche = pts.filter(p=>
+          distM([p.lat,p.lon], [der.lat,der.lon]) <= seuil);
+        if(proche.length >= 2) pts = proche;
+        else pts = [der];
+        let w = 0, sLat = 0, sLon = 0;
+        pts.forEach(p=>{ const k = 1/Math.max(1, p.a*p.a);
+          w += k; sLat += p.lat*k; sLon += p.lon*k; });
+        const accEff = Math.sqrt(1/w) / Math.sqrt(pts.length);
+        return { lat:sLat/w, lon:sLon/w, n:pts.length, acc:accEff };
+      }
+
       /* ── LE BANC D'ESSAI DE MARCHE ────────────────────────────
          Quand quelqu'un dit « le radar est tout faux », trois choses
          peuvent être en cause, et on ne peut pas les distinguer depuis
@@ -9123,23 +9248,30 @@ const Radar = (()=>{
          mesuré. Si ça correspond à ce qu'on vient de faire, il va
          bien — et c'est la position de la pièce qui est fausse. */
       $("#btn-cal-a").addEventListener("click", ()=>{
-        if(!fix){ AudioFX.err();
+        const pm = pointMoyen();
+        if(!pm){ AudioFX.err();
           $("#radar-cal-out").innerHTML = "<span class='ko'>Pas encore de position — active le radar et attends le premier point.</span>";
           return; }
-        calA = [fix[0], fix[1]]; calAcc = accM; calT = Date.now();
+        calA = [pm.lat, pm.lon]; calAcc = pm.acc; calT = Date.now();
         AudioFX.ok();
         $("#radar-cal-out").innerHTML =
-          `Repère posé à <b>${calA[0].toFixed(5)}, ${calA[1].toFixed(5)}</b> (±${Math.round(calAcc||0)} m).<br>`
+          `Repère posé à <b>${calA[0].toFixed(5)}, ${calA[1].toFixed(5)}</b>`
+          + ` — moyenne de ${pm.n} relevé${pm.n>1?"s":""} (±${pm.acc.toFixed(1)} m).<br>`
+          + (pm.n < 3 ? "<span class='ko'>Peu de relevés : reste immobile quelques secondes de plus avant de partir.</span><br>" : "")
           + `Marche maintenant 30 à 50 m en ligne droite, puis touche ②.`;
       });
       $("#btn-cal-b").addEventListener("click", ()=>{
         if(!calA){ AudioFX.err();
           $("#radar-cal-out").innerHTML = "<span class='ko'>Pose d'abord un repère avec ①.</span>"; return; }
-        if(!fix){ AudioFX.err();
+        const pm = pointMoyen();
+        if(!pm){ AudioFX.err();
           $("#radar-cal-out").innerHTML = "<span class='ko'>Position perdue — attends que le GPS revienne.</span>"; return; }
-        const d = distM(calA, fix), br = bearingTo(calA, fix);
+        const B = [pm.lat, pm.lon];
+        const d = distM(calA, B), br = bearingTo(calA, B);
         const dt = (Date.now() - calT)/1000;
-        const marge = Math.round((calAcc || 0) + (accM || 0));
+        /* la marge se combine en quadrature : deux erreurs indépendantes
+           ne s'additionnent pas bêtement */
+        const marge = Math.round(Math.sqrt((calAcc||0)**2 + (pm.acc||0)**2)*2);
         AudioFX.ok();
         /* le verdict : ce n'est PAS la distance qui compte, c'est de
            savoir si elle est mesurable compte tenu du bruit */
@@ -9155,10 +9287,56 @@ const Radar = (()=>{
         $("#radar-cal-out").innerHTML =
           `Le radar a mesuré : <b>${Math.round(d)} m</b> ${/^[aeiouéè]/i.test(cardinalL(br))?"vers l'":"vers le "}<b>${cardinalL(br)}</b> `
           + `(${Math.round(br)}°), en ${Math.round(dt)} s.<br>`
-          + `Précision : ±${Math.round(calAcc||0)} m au départ, ±${Math.round(accM||0)} m à l'arrivée.<br>`
+          + `Points moyens : ±${(calAcc||0).toFixed(1)} m au départ, ±${(pm.acc||0).toFixed(1)} m à l'arrivée`
+          + ` (${pm.n} relevé${pm.n>1?"s":""}).<br>`
           + verdict;
         calA = null;
       });
+      $("#btn-paste-ok").addEventListener("click", ()=>{
+        const el = $("#paste-in"), out = $("#paste-out");
+        const p = lireCoords(el.value);
+        if(!p){ AudioFX.err();
+          out.innerHTML = "<span class='ko'>Je n'arrive pas à lire ça. Colle les deux nombres tels que Google Maps les donne, par exemple <b>44.40458, 4.13214</b>.</span>";
+          return; }
+        const [lat, lon] = p;
+        if(!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180){
+          AudioFX.err();
+          out.innerHTML = "<span class='ko'>Ces nombres ne sont pas des coordonnées valables.</span>"; return; }
+        /* garde-fou : latitude et longitude interverties donnent des
+           valeurs qui « passent » mais désignent l'autre bout du monde.
+           À nos latitudes, la longitude est toujours plus petite. */
+        const loin = distM([lat, lon], [44.404, 4.133]) / 1000;
+        if(loin > 150){
+          AudioFX.err();
+          out.innerHTML = `<span class='ko'>Ce point est à ${Math.round(loin)} km des Vans.`
+            + (Math.abs(lon) > Math.abs(lat)
+               ? " On dirait que la latitude et la longitude sont inversées — essaie <b>"
+                 + lon.toFixed(5) + ", " + lat.toFixed(5) + "</b>."
+               : " Vérifie les coordonnées.") + "</span>";
+          return; }
+        saveSpot(selCode, lat, lon);
+        AudioFX.ok(); el.value = ""; buildChips();
+        out.innerHTML = `<span class='ok'>${selCode} posée à ${lat.toFixed(5)}, ${lon.toFixed(5)}.</span>`
+          + ` Vérifie-la avec « 🗺 Voir ce spot sur une carte ».`;
+      });
+      $("#paste-in").addEventListener("keydown", e=>{
+        if(e.key === "Enter"){ e.preventDefault(); $("#btn-paste-ok").click(); }
+      });
+      /* copier SA position : pour aller la coller dans Maps et voir,
+         de ses yeux, où le téléphone croit qu'on est */
+      $("#btn-paste-me").addEventListener("click", ()=>{
+        const pm = raw.length ? { lat:fix[0], lon:fix[1] } : null;
+        if(!pm){ AudioFX.err();
+          $("#paste-out").innerHTML = "<span class='ko'>Active d'abord le radar.</span>"; return; }
+        const txt = pm.lat.toFixed(6) + ", " + pm.lon.toFixed(6);
+        AudioFX.select();
+        if(navigator.clipboard && navigator.clipboard.writeText)
+          navigator.clipboard.writeText(txt).catch(()=>prompt("Ta position :", txt));
+        else prompt("Ta position :", txt);
+        $("#paste-out").innerHTML = `Copié : <b>${txt}</b> (±${Math.round(accM||0)} m).`
+          + ` Colle-le dans Google Maps pour voir où ton téléphone te situe.`;
+      });
+
       /* ouvrir la position enregistrée dans l'appli Cartes : c'est le
          moyen le plus direct de voir si un spot est au bon endroit */
       $("#btn-radar-map").addEventListener("click", ()=>{
@@ -21284,7 +21462,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v111</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v112</p>`);
     wire();
   }
   function wire(){
