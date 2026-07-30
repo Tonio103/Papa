@@ -62,6 +62,90 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v100) — QCM, PLEIN ÉCRAN, PAUSE
+
+### Un QCM après chaque défi — 24 questions, vraies
+
+Chaque épreuve réussie ouvre trois questions sur Invader et le street art,
+**avant** la révélation du fragment : on a gagné, on souffle, on apprend, puis
+on récolte. 8 épreuves × 3 = **24 questions**.
+
+Les questions sont rattachées au thème de leur épreuve, pour qu'elles ne
+tombent pas de nulle part :
+
+| épreuve | sujet des 3 questions |
+|---|---|
+| LV_01 La Palette | la matière : céramique, tesselles, origine du pseudonyme |
+| LV_02 Le Binaire | le jeu d'arcade de 1978 : Taito, Nishikado, l'accélération des aliens |
+| LV_03 Le Spotting | FlashInvaders, les points, les Invasion Guides |
+| LV_04 Rubikcubisme | le mot inventé par Invader, Ernő Rubik, les 43 milliards de milliards |
+| LV_05 Le Simon | les invasions, plus de 80 villes, la mosaïque de la Station spatiale |
+| LV_06 La Cavale | l'anonymat, le Banksy broyé chez Sotheby's, le « flop » |
+| LV_07 La Coop | JR, l'affiche HOPE de Shepard Fairey, Keith Haring dans le métro |
+| LV_08 Le Pochoir | Blek le Rat, pourquoi le pochoir, Miss.Tic |
+
+Les réponses sont **réelles et vérifiables**, et chacune est suivie d'une
+explication d'une ou deux phrases — y compris quand on s'est trompé, où la
+bonne réponse s'allume quand même. Les propositions sont mélangées à chaque
+passage : refaire un défi ne se réduit pas à retenir « c'est la première ».
+
+Bonne réponse = **+10 points**. Trouver les 24 débloque le succès
+**🎓 Docteur ès Invaders**. La tournée chrono, elle, n'est pas interrompue :
+c'est un contre-la-montre.
+
+### Les défis en plein écran
+
+L'écran de défi occupe désormais tout l'appareil : plus de HUD, plus de cadre,
+plus de marges — le titre et les boutons passent en surimpression. Le vrai
+plein écran du navigateur (celui qui escamote la barre d'adresse) est demandé
+en plus quand il est disponible ; Safari iOS ne l'accorde pas hors vidéo, mais
+la mise en page plein cadre suffit à elle seule.
+
+### Pause et sortie
+
+Deux boutons en haut à droite de chaque défi : **❚❚** et **✕**. Le voile de
+pause propose *Reprendre*, *Recommencer le défi* et *Quitter*.
+
+Le défi se met aussi en pause **tout seul** quand on verrouille le téléphone,
+qu'on change d'application ou qu'on répond au téléphone — plutôt que de
+continuer à tourner dans le vide et de faire perdre une partie en cours. Sur
+ordinateur, Échap met en pause et reprend.
+
+**Comment la pause fonctionne, et pourquoi c'était le point délicat.** Les huit
+défis n'ont aucune boucle commune : entre eux, ils utilisent 24
+`requestAnimationFrame`, 24 `setTimeout` et 5 `setInterval`, chacun avec sa
+propre notion du temps. Ajouter un test « si en pause » dans les huit aurait
+été invasif, et une seule omission aurait donné un jeu qui continue de tourner
+sous l'écran de pause. On gèle donc **le temps lui-même**, le temps d'un défi :
+
+- `requestAnimationFrame` — les images demandées pendant la pause sont mises de
+  côté et rejouées à la reprise ;
+- `setTimeout` / `setInterval` — on note le temps qu'il leur restait, on les
+  désarme, on les réarme à la reprise avec ce reste ;
+- `performance.now()` — renvoie le temps **amputé des pauses**, ce qui évite
+  qu'un jeu calculant `maintenant − dernière image` reçoive un delta géant à la
+  reprise et téléporte tout son contenu ;
+- le chrono du défi est décalé d'autant : le temps en pause ne compte pas pour
+  les médailles.
+
+Tout est rendu à l'identique dès que le défi se termine, par quelque chemin
+qu'on en sorte.
+
+### Vérifié
+
+Sur quatre défis animés (dont La Cavale), la pause gèle **réellement** l'image :
+le canvas est pixel pour pixel identique après 900 ms de pause, puis repart. Les
+chemins *recommencer*, *quitter* et *victoire* rendent tous les minuteries
+natives et sortent du plein écran. Le QCM a été joué en entier : 24 questions,
+240 points, succès débloqué, aucune anomalie de données, et la bonne réponse
+s'affiche bien lorsqu'on se trompe.
+
+Au passage, un vrai bug corrigé : la boucle du décor animé levait une exception
+à chaque image dès que son canvas était retiré du DOM par un écran qui vidait
+son conteneur.
+
+sw v99→v100.
+
 ## Nouveautés (v99) — LE SCAN ENTRAÎNÉ AU PIRE : REFLETS, PLUIE, NUIT
 
 Le jeu se joue dehors, en Ardèche, sur des QR plastifiés collés à des murs.
