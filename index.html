@@ -3107,7 +3107,28 @@ const CONFIG = {
   delaiPasserMs: 7*60*1000,   // PASSER apparaît après 7 min
 };
 const CODE_FINAL = CONFIG.stations.map(s=>s.fragment).join("");
-const TRICHE = new URLSearchParams(location.search).get("triche")==="1";
+/* ── MODE RÉGLAGE ────────────────────────────────────────────
+   Trois façons d'y entrer, parce qu'une seule ne suffisait pas :
+
+     · ?triche=1  — la forme historique ;
+     · #triche    — bien plus court à taper sur un téléphone, et il
+       suffit de l'ajouter à la fin de l'adresse déjà ouverte ;
+     · et une fois entré, l'ONGLET s'en souvient. Sans ça, le moindre
+       rechargement (mise à jour du service worker, retour arrière,
+       veille du téléphone) faisait tout perdre en plein repérage,
+       au milieu d'un champ.
+
+   La mémoire est volontairement celle de l'ONGLET (sessionStorage) :
+   elle meurt à la fermeture. Ton père, qui ouvrira le jeu par son
+   icône, ne peut pas tomber dedans par accident. */
+const TRICHE = (()=>{
+  const url = new URLSearchParams(location.search).get("triche") === "1"
+           || /(^|[#&])triche\b/.test(location.hash);
+  try{
+    if(url) sessionStorage.setItem("invasionLesVans:triche", "1");
+    return url || sessionStorage.getItem("invasionLesVans:triche") === "1";
+  }catch(e){ return url; }
+})();
 
 /* ═══════════════════════════════════════════════════════════
    2. STORE — sauvegarde.
@@ -8408,16 +8429,45 @@ const Radar = (()=>{
       b.addEventListener("click", ()=>{ selCode = st.code; AudioFX.nav(); buildChips(); });
       host.appendChild(b);
     });
-    /* on montre NOIR SUR BLANC ce qui est enregistré pour la pièce
-       choisie : sans ça, impossible de savoir si on regarde un vrai
-       repérage ou un essai oublié la semaine dernière. */
+    /* ── D'OÙ VIENT CETTE POSITION ? ─────────────────────────────
+       Il y a DEUX couches, et c'est là qu'on se fait piéger :
+
+         · celle du JEU (CONFIG.map.spots), écrite dans le code, donc
+           la même pour tout le monde — c'est la seule que ton père
+           verra sur son téléphone ;
+         · celle de CE TÉLÉPHONE (localStorage), posée par le bouton
+           « Enregistrer la pièce ici ». Elle ne sort jamais d'ici.
+
+       Et la locale ÉCRASE celle du jeu. Donc, si on a fait un essai
+       sur son propre téléphone, on continuera de voir cet essai même
+       après avoir gravé la vraie position dans le code : on croit
+       que la correction n'a pas marché, alors qu'elle marche
+       parfaitement pour tous les autres.
+
+       D'où cet affichage, qui dit toujours à quelle couche on a
+       affaire — et qui prévient quand la locale en masque une vraie. */
     const el = $("#radar-spot");
     if(el){
-      const sp = spots[selCode];
-      el.textContent = sp
-        ? `${selCode} : ${sp[0].toFixed(5)}, ${sp[1].toFixed(5)}`
-        : `${selCode} : aucune position enregistrée`;
-      el.style.color = sp ? "var(--ink)" : "";
+      let local = {}; try{ local = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
+      const loc = local[selCode], code = (CONFIG.map.spots || {})[selCode];
+      const fmt = (p)=>`${p[0].toFixed(5)}, ${p[1].toFixed(5)}`;
+      if(loc && code && (loc[0] !== code[0] || loc[1] !== code[1])){
+        el.innerHTML = `<b>${selCode} : ${fmt(loc)}</b><br>`
+          + `⚠ réglage de CE téléphone — il masque celle du jeu (${fmt(code)}).`
+          + ` « ✕ Effacer ce spot » pour retrouver la vraie.`;
+        el.style.color = "#ffce4d";
+      }else if(loc){
+        el.innerHTML = `<b>${selCode} : ${fmt(loc)}</b><br>`
+          + `réglage de CE téléphone seulement — invisible pour les autres`
+          + ` tant qu'il n'est pas collé dans le jeu.`;
+        el.style.color = "#8fd0ff";
+      }else if(code){
+        el.innerHTML = `<b>${selCode} : ${fmt(code)}</b><br>gravée dans le jeu — visible par tous.`;
+        el.style.color = "#39e08a";
+      }else{
+        el.textContent = `${selCode} : aucune position enregistrée`;
+        el.style.color = "";
+      }
     }
   }
   function start(){
@@ -20551,7 +20601,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v106</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v107</p>`);
     wire();
   }
   function wire(){
