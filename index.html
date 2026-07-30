@@ -874,14 +874,32 @@ body.plein-jeu #hud{ display:none; }
 .cursor::after{ content:"█"; animation:blink 1s steps(1) infinite; }
 @keyframes blink{ 50%{opacity:0} }
 
-/* ── Barre de triche ──────────────────────────────────────── */
+/* ── Barre de triche : un TIROIR, plus un bandeau ─────────────
+   Elle barrait le bas de l'écran en rouge en permanence, y compris
+   pendant un repérage GPS où l'on a besoin de toute la hauteur. Elle
+   est maintenant repliée derrière une poignée discrète : on l'ouvre
+   quand on en a besoin, elle disparaît le reste du temps. */
 #cheat{ display:none; position:fixed; bottom:0; left:0; right:0; z-index:50;
-  background:#000; border-top:3px solid var(--rouge);
+  background:rgba(6,6,18,.92); border-top:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
   padding:8px calc(8px + var(--sar)) calc(8px + var(--sab)) calc(8px + var(--sal));
-  overflow-x:auto; white-space:nowrap; }
+  overflow-x:auto; white-space:nowrap;
+  transform:translateY(100%); transition:transform .22s ease; }
+#cheat.on{ transform:translateY(0); }
 #cheat button{ font-size:9px; padding:8px; margin-right:6px;
-  background:linear-gradient(180deg,#ff5b5b,#d92626);
-  box-shadow:0 3px 0 #7a0d0d; color:#fff; }
+  background:linear-gradient(180deg,#2a2a4e,#171730);
+  box-shadow:none !important; border:1px solid rgba(255,255,255,.16) !important;
+  border-radius:9px !important; color:#cfd2e6; }
+/* la poignée : minuscule, en HAUT à droite, sous le HUD. En bas elle
+   tombait pile sur le premier onglet de la barre de navigation. */
+#cheat-tab{ display:none; position:fixed; z-index:51;
+  right:calc(6px + var(--sar)); top:calc(62px + var(--sat));
+  width:32px; height:32px; padding:0; font-size:13px; line-height:1;
+  background:rgba(6,6,18,.62) !important; color:#8a8fb0 !important;
+  border:1px solid rgba(255,255,255,.16) !important; border-radius:50% !important;
+  box-shadow:none !important; opacity:.5; transition:opacity .18s, color .18s; }
+#cheat-tab.on{ opacity:1; color:#EDEDF7 !important;
+  border-color:rgba(255,255,255,.5) !important; }
 
 
 /* ── Archive des transmissions (menu) ─────────────────────── */
@@ -3028,6 +3046,7 @@ button.b2{ color:#04231d !important; }
 
 <!-- ═══ BARRE DE TRICHE (?triche=1) ═══ -->
 <div id="cheat"></div>
+<button id="cheat-tab" type="button" aria-label="Outils de réglage">⚙</button>
 
 <script>
 "use strict";
@@ -8264,6 +8283,9 @@ const Radar = (()=>{
   ];
   let cv, c, raf = null, watchId = null, fix = null, accM = null;
   let selCode = null, lastBeep = 0, gpsErr = false, bound = false, stopped = false;
+  /* boussole : cap lissé sur le cercle, date de la dernière mesure */
+  let heading = null, headAt = 0, hx = null, hy = null, badFix = 0;
+  let compassOn = false, compassDenied = false;
   let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
 
   const loadSpots = ()=>{ let s = {};
@@ -8300,17 +8322,91 @@ const Radar = (()=>{
       const sp = spots[st.code];
       if(!sp || S.flashed[st.code]) return;
       const d = distM(fix, sp);
-      if(!best || d < best.d) best = { st, d };
+      if(!best || d < best.d) best = { st, d, sp };
     });
     return best;
   }
   function heatOf(d){ return HEAT.find(h=>d <= h[0]); }
 
+  /* ── CAP VRAI vers la cible ───────────────────────────────────
+     Le relèvement initial de la grande orthodromie. C'est LA donnée
+     qui manquait : jusqu'ici l'angle du blip était un hachage du code
+     de la pièce — un chiffre stable, mais qui n'avait aucun rapport
+     avec l'endroit où elle se trouve. Le radar affichait donc une
+     direction inventée. */
+  function bearingTo(a, b){
+    const r = Math.PI/180;
+    const p1 = a[0]*r, p2 = b[0]*r, dl = (b[1]-a[1])*r;
+    const y = Math.sin(dl)*Math.cos(p2);
+    const x = Math.cos(p1)*Math.sin(p2) - Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+    return (Math.atan2(y, x)*180/Math.PI + 360) % 360;
+  }
+  const CARD = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+  const cardinal = (deg)=> CARD[Math.round(((deg%360)+360)%360/22.5) % 16];
+
+  /* ── BOUSSOLE ────────────────────────────────────────────────
+     Sans elle, un radar ne peut pas être « tête en haut » : on saurait
+     que la pièce est au nord-est sans savoir de quel côté se tourner.
+     iOS donne un cap vrai tout cuit (webkitCompassHeading) mais exige
+     une autorisation demandée depuis un vrai appui. Android passe par
+     l'orientation absolue. Si rien n'est disponible, on bascule en
+     « nord en haut » et on le DIT, plutôt que de mentir. */
+  function smoothHeading(h){
+    /* moyenne sur le CERCLE : faire la moyenne de 359° et 1° donnerait
+       180°, soit exactement le dos de la cible. On lisse donc le
+       vecteur unitaire, pas l'angle. */
+    const r = h*Math.PI/180, k = .25;
+    hx = hx == null ? Math.cos(r) : hx + (Math.cos(r)-hx)*k;
+    hy = hy == null ? Math.sin(r) : hy + (Math.sin(r)-hy)*k;
+    heading = (Math.atan2(hy, hx)*180/Math.PI + 360) % 360;
+    headAt = performance.now();
+  }
+  function onOrient(e){
+    let h = null;
+    if(typeof e.webkitCompassHeading === "number" && !isNaN(e.webkitCompassHeading))
+      h = e.webkitCompassHeading;                       // iOS : déjà un cap vrai
+    else if(e.absolute === true && typeof e.alpha === "number")
+      h = (360 - e.alpha) % 360;                        // Android : orientation absolue
+    if(h == null || isNaN(h)) return;
+    smoothHeading(h);
+  }
+  async function startCompass(){
+    if(compassOn) return;
+    try{
+      const D = window.DeviceOrientationEvent;
+      if(D && typeof D.requestPermission === "function"){
+        const st = await D.requestPermission();          // iOS : exige un appui
+        if(st !== "granted"){ compassDenied = true; return; }
+      }
+      addEventListener("deviceorientationabsolute", onOrient, true);
+      addEventListener("deviceorientation", onOrient, true);
+      compassOn = true;
+    }catch(e){ compassDenied = true; }
+  }
+  function stopCompass(){
+    if(!compassOn) return;
+    removeEventListener("deviceorientationabsolute", onOrient, true);
+    removeEventListener("deviceorientation", onOrient, true);
+    compassOn = false; heading = null; hx = hy = null;
+  }
+  /* la boussole se tait dès qu'on range le téléphone : au bout de
+     3 s sans mesure, on ne prétend plus savoir où est le nord */
+  const headLive = ()=> heading != null && (performance.now() - headAt) < 3000;
+
+  /* ── PORTÉE AUTOMATIQUE ──────────────────────────────────────
+     Un radar figé à 500 m est inutilisable sur les vingt derniers
+     mètres : la cible reste collée au centre. L'échelle se resserre
+     donc à mesure qu'on approche, et les anneaux sont chiffrés. */
+  const PORTEES = [15, 30, 60, 120, 250, 500, 1000, 2500, 6000];
+  function porteeFor(d){
+    for(const p of PORTEES) if(d*1.30 <= p) return p;
+    return PORTEES[PORTEES.length-1];
+  }
+
   function setUI(state, dist, sub, col){
     $("#radar-state").textContent = state;
     $("#radar-dist").textContent = dist;
     $("#radar-sub").textContent = sub;
-    const wrap = $("#radar-wrap");
     document.documentElement.style.setProperty("--rc", col || "rgba(120,150,255,.5)");
     document.documentElement.style.setProperty("--rg", (col || "#7896ff") + "55");
   }
@@ -8320,21 +8416,50 @@ const Radar = (()=>{
     const cssW = cv.clientWidth || 280;
     if(cv.width !== cssW*dpr){ cv.width = cv.height = cssW*dpr; }
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = cssW, R = W/2;
+    const W = cssW, R = W/2, RR = R - 10;
     const t = target();
     const heat = t ? heatOf(t.d) : null;
     const col = heat ? heat[2] : "#5b6699";
+
+    /* tête en haut si la boussole répond, nord en haut sinon */
+    const up = headLive() ? heading : 0;
+    const brg = (t && fix) ? bearingTo(fix, t.sp) : null;
+    const portee = t ? porteeFor(Math.max(t.d, accM || 0)) : 250;
 
     c.clearRect(0, 0, W, W);
     const bg = c.createRadialGradient(R, R, 6, R, R, R);
     bg.addColorStop(0, "#101228"); bg.addColorStop(1, "#0a0a20");
     c.fillStyle = bg; c.fillRect(0, 0, W, W);
-    /* anneaux + croix */
-    c.strokeStyle = "rgba(120,150,255,.18)"; c.lineWidth = 1;
-    [.32,.6,.88].forEach(k=>{ c.beginPath(); c.arc(R, R, R*k, 0, 7); c.stroke(); });
+
+    /* ── anneaux CHIFFRÉS : on lit la distance à l'œil ── */
+    c.strokeStyle = "rgba(120,150,255,.20)"; c.lineWidth = 1;
+    c.font = "9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+    c.textAlign = "center"; c.textBaseline = "middle";
+    /* étiquettes posées sur la diagonale bas-gauche : à la verticale
+       elles se cognaient au repère du nord */
+    const LA = 225*Math.PI/180;
+    [1/3, 2/3, 1].forEach(k=>{
+      c.beginPath(); c.arc(R, R, RR*k, 0, 7); c.stroke();
+      const m = Math.round(portee*k);
+      c.fillStyle = "rgba(150,175,235,.6)";
+      c.fillText(m >= 1000 ? (m/1000).toFixed(m%1000?1:0)+" km" : m+" m",
+                 R + Math.cos(LA)*(RR*k - 12), R + Math.sin(LA)*(RR*k - 12));
+    });
+    c.strokeStyle = "rgba(120,150,255,.13)";
     c.beginPath(); c.moveTo(R, 8); c.lineTo(R, W-8);
     c.moveTo(8, R); c.lineTo(W-8, R); c.stroke();
-    /* balayage rotatif teinté chaleur */
+
+    /* ── le NORD, qui tourne quand on tourne ── */
+    {
+      const a = (-up - 90) * Math.PI/180;
+      const nx = R + Math.cos(a)*(RR+1), ny = R + Math.sin(a)*(RR+1);
+      c.fillStyle = headLive() ? "#ff6b6b" : "rgba(200,210,240,.35)";
+      c.beginPath(); c.arc(nx, ny, 3.4, 0, 7); c.fill();
+      c.fillStyle = headLive() ? "rgba(255,140,140,.9)" : "rgba(200,210,240,.4)";
+      c.fillText("N", R + Math.cos(a)*(RR-11), R + Math.sin(a)*(RR-11));
+    }
+
+    /* ── balayage rotatif ── */
     if(watchId != null){
       const a = now/900;
       const grad = c.createConicGradient ? c.createConicGradient(a, R, R) : null;
@@ -8342,22 +8467,47 @@ const Radar = (()=>{
         grad.addColorStop(0, col + "88"); grad.addColorStop(.16, col + "00");
         grad.addColorStop(1, col + "00");
         c.fillStyle = grad;
-        c.beginPath(); c.moveTo(R, R); c.arc(R, R, R*.92, a, a + .6); c.closePath(); c.fill();
+        c.beginPath(); c.moveTo(R, R); c.arc(R, R, RR, a, a + .6); c.closePath(); c.fill();
       }
     }
-    /* le blip de la cible : angle stable par pièce, rayon = distance */
-    if(t){
-      let hsh = 0; for(const ch of t.st.code) hsh = (hsh*31 + ch.charCodeAt(0)) % 997;
-      const ang = hsh/997*Math.PI*2;
-      const rr = Math.min(.86, Math.max(.10, t.d/500)) * R;
-      const bx = R + Math.cos(ang)*rr, by = R + Math.sin(ang)*rr;
+
+    /* ── L'INCERTITUDE DU GPS, dessinée à l'échelle ───────────
+       Un point net sur un radar laisse croire à une précision qu'on
+       n'a pas. Le halo montre la vraie marge : quand il avale la
+       cible, c'est qu'il faut chercher à vue, pas suivre l'écran. */
+    if(fix && accM != null){
+      const ar = Math.min(RR, accM/portee*RR);
+      c.fillStyle = "rgba(127,208,255,.09)";
+      c.beginPath(); c.arc(R, R, ar, 0, 7); c.fill();
+      c.strokeStyle = "rgba(127,208,255,.35)"; c.setLineDash([3,4]); c.lineWidth = 1;
+      c.beginPath(); c.arc(R, R, ar, 0, 7); c.stroke(); c.setLineDash([]);
+    }
+
+    /* ── LA CIBLE, à son vrai relèvement ── */
+    if(t && brg != null){
+      const rel = ((brg - up) - 90) * Math.PI/180;
+      const rr = Math.min(RR, t.d/portee*RR);
+      const bx = R + Math.cos(rel)*rr, by = R + Math.sin(rel)*rr;
+      /* le trait qui relie : on voit d'un coup d'œil où aller */
+      c.strokeStyle = col + "55"; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(R, R); c.lineTo(bx, by); c.stroke();
       const k = 1 + Math.sin(now/260)*.3;
       c.fillStyle = col + "44";
       c.beginPath(); c.arc(bx, by, 12*k, 0, 7); c.fill();
       c.fillStyle = col;
       c.beginPath(); c.arc(bx, by, 5, 0, 7); c.fill();
+      /* la flèche du bord : elle indique où tourner, même quand la
+         cible est loin et tassée sur l'anneau extérieur */
+      if(headLive()){
+        const ax = R + Math.cos(rel)*(RR+1), ay = R + Math.sin(rel)*(RR+1);
+        c.save(); c.translate(ax, ay); c.rotate(rel);
+        c.fillStyle = col;
+        c.beginPath(); c.moveTo(7,0); c.lineTo(-4,-5); c.lineTo(-4,5); c.closePath(); c.fill();
+        c.restore();
+      }
     }
-    /* TOI au centre */
+
+    /* ── TOI au centre ── */
     c.fillStyle = "#EDEDF7";
     c.beginPath(); c.arc(R, R, 4, 0, 7); c.fill();
     c.strokeStyle = "rgba(237,237,247,.4)"; c.lineWidth = 1.6;
@@ -8377,12 +8527,20 @@ const Radar = (()=>{
                 : "Les coordonnées des pièces ne sont pas encore enregistrées.", "#39e08a");
     }else{
       const heat2 = heatOf(t.d);
-      const distTxt = t.d < 20 ? "moins de 20 m"
-        : "≈ " + (t.d < 100 ? Math.round(t.d/5)*5 : Math.round(t.d/10)*10) + " m";
-      const reste = CONFIG.stations.filter(s2=>!S.flashed[s2.code]).length;
-      setUI(heat2[1], distTxt,
-        `${reste} pièce${reste>1?"s":""} encore dans la nature` +
-        (accM != null ? ` · précision ±${Math.round(accM)} m` : ""), heat2[2]);
+      /* distance AU MÈTRE tant qu'elle est utile ; on n'arrondit que
+         quand l'arrondi est plus honnête que le chiffre */
+      const distTxt = t.d < 200 ? Math.round(t.d) + " m"
+        : t.d < 1000 ? Math.round(t.d/10)*10 + " m"
+        : (t.d/1000).toFixed(2) + " km";
+      const bits = [];
+      if(brg != null) bits.push(headLive()
+        ? `cap ${Math.round(brg)}° ${cardinal(brg)}`
+        : `${cardinal(brg)} (${Math.round(brg)}°)`);
+      if(accM != null) bits.push(`±${Math.round(accM)} m`);
+      bits.push(`portée ${portee >= 1000 ? (portee/1000)+" km" : portee+" m"}`);
+      if(!headLive()) bits.push(compassDenied ? "boussole refusée — nord en haut"
+                                             : "boussole absente — nord en haut");
+      setUI(heat2[1], distTxt, bits.join(" · "), heat2[2]);
       /* bips Geiger : la période dépend du palier */
       if(heat2[3] && now - lastBeep > heat2[3]){
         lastBeep = now;
@@ -8391,6 +8549,7 @@ const Radar = (()=>{
       }
     }
   }
+
   /* la boucle ne s'arrête QUE sur ordre explicite (stop) — la
      transition d'écran active map-screen avec un léger retard */
   function loopFrame(now){
@@ -8406,15 +8565,31 @@ const Radar = (()=>{
     }
     $("#btn-radar-on").textContent = "📡 Couper le radar";
     gpsErr = false;
+    /* maximumAge:0 — on veut la position de MAINTENANT. Avec 2 s de
+       tolérance, le blip retardait d'un pas de marche entier. */
     watchId = navigator.geolocation.watchPosition(p=>{
-      fix = [p.coords.latitude, p.coords.longitude];
-      accM = p.coords.accuracy; gpsErr = false;
+      const np = [p.coords.latitude, p.coords.longitude], na = p.coords.accuracy;
+      gpsErr = false;
+      /* un point nettement moins précis que le précédent est souvent
+         un raccrochage réseau : on le laisse passer seulement s'il
+         insiste, sinon le radar sautait de 40 m sans qu'on bouge */
+      if(fix && accM != null && na > accM*3 && na > 30 && ++badFix < 3) return;
+      badFix = 0;
+      /* lissage : d'autant plus ferme que la mesure est imprécise */
+      if(!fix){ fix = np; }
+      else{
+        const k = na <= 8 ? .85 : na <= 20 ? .55 : .3;
+        fix = [ fix[0] + (np[0]-fix[0])*k, fix[1] + (np[1]-fix[1])*k ];
+      }
+      accM = na;
     }, ()=>{ gpsErr = true; },
-    { enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
+    { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
+    startCompass();
   }
   function stopWatch(){
     if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} }
-    watchId = null; fix = null; accM = null;
+    stopCompass();
+    watchId = null; fix = null; accM = null; badFix = 0;
     $("#btn-radar-on").textContent = "📡 Activer le radar";
   }
 
@@ -13932,6 +14107,14 @@ const Tuto = (()=>{
 function buildCheat(){
   if(!TRICHE) return;
   const bar = $("#cheat"); bar.style.display="block";
+  const tab = $("#cheat-tab"); tab.style.display="block";
+  tab.addEventListener("click", ()=>{
+    const on = !bar.classList.contains("on");
+    bar.classList.toggle("on", on);
+    tab.classList.toggle("on", on);
+    document.body.classList.toggle("cheat-open", on);
+    AudioFX.nav && AudioFX.nav();
+  });
   CONFIG.stations.forEach(st=>{
     const b=document.createElement("button");
     b.textContent="⚡"+st.code;
@@ -20601,7 +20784,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v107</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v108</p>`);
     wire();
   }
   function wire(){
