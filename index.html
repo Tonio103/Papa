@@ -458,82 +458,111 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 .gtool:active{ transform:translateY(2px); box-shadow:inset 0 2px 0 rgba(255,255,255,.06); }
 .gtool:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
 
-/* ── QCM d'après-défi ─────────────────────────────────────────
-   Le reste du jeu est écrit en Baloo 2 / Nunito : des polices rondes
-   et grasses, faites pour des titres d'arcade. Sur trois paragraphes
-   de texte, elles deviennent lourdes et enfantines.
-   Le quiz est le seul endroit du jeu où on LIT vraiment, donc il a
-   sa propre typographie : la police système de l'appareil (SF Pro sur
-   iPhone, Roboto sur Android), en graisses normales, petite, aérée.
-   Sobre à côté du pixel — et c'est ce contraste qui fait sérieux. */
-.quiz-host{ position:relative; z-index:2; width:100%; display:flex;
-  flex-direction:column; align-items:center; gap:12px;
-  overflow-y:auto; max-height:100%; padding:2px; }
+/* ── QCM d'après-défi — parti pris ÉPURÉ / GALERIE ────────────
+   Le reste du jeu est une borne d'arcade : biseaux, reliefs, halos,
+   dégradés. Le quiz est le seul écran où on LIT, et où on réfléchit —
+   il prend donc le parti inverse, celui d'un cartel de musée :
 
-.quiz{ width:100%; max-width:340px; display:flex; flex-direction:column; gap:12px;
-  font-family:var(--f-lire); font-weight:400; letter-spacing:0;
-  background:rgba(10,10,26,.96);
-  border:1px solid #2a2a52; border-radius:14px; padding:16px 15px 15px;
-  box-shadow:0 14px 38px rgba(0,0,0,.55);
-  animation:quizIn .22s ease-out both; }
-@keyframes quizIn{ from{ opacity:0; transform:translateY(8px); } }
+     · aucun panneau, aucun relief, aucune ombre portée ;
+     · des filets d'un pixel pour séparer, jamais des boutons ;
+     · UNE seule couleur d'accent par écran — et c'est celle de
+       l'épreuve (var(--st)), si bien que chaque quiz porte la couleur
+       de son défi sans qu'on ait à le dire ;
+     · la police système, en 400, avec beaucoup d'interligne ;
+     · le pixel réservé au SEUL endroit où il fait sens : le score.
 
-.quiz-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.quiz-kick{ font-family:var(--f-pix); font-size:8px; color:var(--gris);
-  letter-spacing:1.5px; }
-.quiz-dots{ display:flex; gap:5px; }
-.quiz-dots i{ width:6px; height:6px; border-radius:50%; background:#2a2a52; display:block; }
-.quiz-dots i.done{ background:var(--cyan); }
-.quiz-dots i.now{ background:var(--jaune); }
+   Le décor animé du défi continue derrière, mais très assourdi : on
+   sait qu'il est là, il ne lit plus avec nous.                       */
 
-.quiz-q{ margin:0; font-size:16px; line-height:1.45; font-weight:600;
-  color:#f2f2fb; letter-spacing:-.1px; }
+.quiz-host{
+  position:absolute; inset:0; z-index:3;
+  display:flex; flex-direction:column; align-items:center;
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:26px 22px calc(26px + var(--sab));
+  background:rgba(7,7,20,.93);
+  backdrop-filter:blur(14px) saturate(.55);
+  -webkit-backdrop-filter:blur(14px) saturate(.55);
+}
+.quiz{
+  --acc:var(--st, var(--cyan));
+  width:100%; max-width:330px; margin:auto 0;
+  display:flex; flex-direction:column;
+  font-family:var(--f-lire); font-weight:400; color:#e7e7f2;
+  animation:quizIn .3s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes quizIn{ from{ opacity:0; transform:translateY(6px); } }
 
-.quiz-opts{ display:flex; flex-direction:column; gap:7px; }
+/* l'en-tête : un cartel, pas un titre */
+.quiz-top{ display:flex; align-items:baseline; justify-content:space-between;
+  gap:12px; margin-bottom:22px; }
+.quiz-kick{ font-family:var(--f-lire); font-size:10px; font-weight:600;
+  letter-spacing:2.2px; text-transform:uppercase; color:#61618a; }
+.quiz-dots{ display:flex; gap:6px; }
+.quiz-dots i{ width:5px; height:5px; border-radius:50%; background:#2b2b4e; display:block; }
+.quiz-dots i.done{ background:#61618a; }
+.quiz-dots i.now{ background:var(--acc); }
+
+.quiz-q{ margin:0 0 24px; font-size:19px; line-height:1.5; font-weight:500;
+  color:#f4f4fb; letter-spacing:-.2px; }
+
+/* les propositions : des lignes, pas des boutons */
+.quiz-opts{ display:flex; flex-direction:column;
+  border-top:1px solid #23233f; }
 .quiz-opt{
-  width:100%; text-align:left; cursor:pointer;
-  font-family:var(--f-lire); font-size:15px; font-weight:400; line-height:1.4;
-  letter-spacing:0; color:#dcdcec;
-  padding:11px 13px; border-radius:9px;
-  background:#15152e; border:1px solid #2c2c56; box-shadow:none;
-  transition:border-color .14s, background .14s;
+  width:100%; text-align:left; cursor:pointer; display:block;
+  font-family:var(--f-lire); font-size:15.5px; font-weight:400; line-height:1.45;
+  letter-spacing:0; color:#c9c9dd;
+  min-height:52px; padding:14px 2px 14px 16px;
+  background:none; border:0; border-bottom:1px solid #23233f; border-radius:0;
+  box-shadow:none; position:relative;
+  transition:color .16s, padding-left .16s;
 }
-.quiz-opt:hover:not(:disabled){ border-color:#454585; background:#1a1a38; }
-.quiz-opt:active:not(:disabled){ background:#101024; }
-.quiz-opt:disabled{ cursor:default; color:#6a6a90; border-color:#232346;
-  background:#111126; }
-/* après la réponse : la bonne s'allume toujours, même si on l'a ratée */
-.quiz-opt.bon{ color:#c9fff5; border-color:rgba(43,228,208,.75);
-  background:rgba(43,228,208,.11); font-weight:600; }
-.quiz-opt.faux{ color:#ffcfcf; border-color:rgba(255,63,63,.6);
-  background:rgba(255,63,63,.11); }
+/* le filet d'accent qui se déploie au survol : le seul mouvement */
+.quiz-opt::before{
+  content:""; position:absolute; left:0; top:14px; bottom:14px; width:2px;
+  background:var(--acc); transform:scaleY(0); transform-origin:center;
+  transition:transform .18s ease;
+}
+.quiz-opt:hover:not(:disabled){ color:#fff; }
+.quiz-opt:hover:not(:disabled)::before{ transform:scaleY(.5); }
+.quiz-opt:active:not(:disabled){ color:var(--acc); }
+.quiz-opt:disabled{ cursor:default; color:#4e4e70; }
+/* après la réponse : la bonne est la seule chose qui reste allumée */
+.quiz-opt.bon{ color:var(--acc); font-weight:600; }
+.quiz-opt.bon::before{ transform:scaleY(1); }
+.quiz-opt.faux{ color:#7a5a68; text-decoration:line-through;
+  text-decoration-color:rgba(255,63,63,.5); text-decoration-thickness:1px; }
 
-.quiz-info{ font-size:14px; line-height:1.6; color:#a9aac6; font-weight:400;
-  border-left:2px solid rgba(255,210,63,.55); padding:2px 0 2px 11px; }
-.quiz-info b{ display:block; margin-bottom:6px; font-weight:600; color:var(--jaune);
-  font-size:14px; line-height:1.45; }
+/* le cartel de réponse */
+.quiz-info{ margin-top:24px; }
 .quiz-info[hidden]{ display:none; }
+.quiz-verdict{ display:block; font-size:10px; font-weight:600; letter-spacing:2.2px;
+  text-transform:uppercase; color:var(--acc); margin-bottom:9px; }
+/* un échec ne s'écrit pas dans la couleur de la réussite */
+.quiz-verdict.rate{ color:#6f6f92; }
+.quiz-note{ display:block; font-size:14.5px; line-height:1.7; color:#9c9cba;
+  font-weight:400; }
 
-.quiz-score{ font-family:var(--f-pix); font-size:34px; text-align:center;
-  color:var(--jaune); text-shadow:0 0 16px rgba(255,210,63,.6); }
-.quiz-score small{ font-size:17px; opacity:.6; }
-/* Les boutons du quiz ne prennent PAS le gabarit arcade du reste du
-   jeu : un gros bouton dégradé à côté de trois lignes de texte sobre,
-   ça hurle. Ici, un simple trait cyan, dans la même typo que le texte. */
+/* l'action : un lien, aligné à droite, sans caisson */
 .quiz-next{
-  width:100%; margin-top:2px; cursor:pointer;
-  font-family:var(--f-lire); font-size:15px; font-weight:600; letter-spacing:0;
-  color:var(--cyan); text-align:center;
-  padding:12px 14px; border-radius:9px;
-  background:rgba(43,228,208,.09); border:1px solid rgba(43,228,208,.45);
-  box-shadow:none; text-shadow:none;
-  transition:background .14s, border-color .14s;
+  align-self:flex-end; margin-top:26px; cursor:pointer;
+  font-family:var(--f-lire); font-size:14px; font-weight:600;
+  letter-spacing:1.4px; text-transform:uppercase; color:var(--acc);
+  padding:10px 2px 10px 14px; min-height:44px;
+  background:none; border:0; border-radius:0; box-shadow:none; text-shadow:none;
+  transition:opacity .15s;
 }
-.quiz-next:hover{ background:rgba(43,228,208,.16); border-color:rgba(43,228,208,.8); }
-.quiz-next:active{ background:rgba(43,228,208,.05); }
-.quiz-go{ max-width:340px; color:var(--jaune);
-  background:rgba(255,210,63,.10); border-color:rgba(255,210,63,.5); }
-.quiz-go:hover{ background:rgba(255,210,63,.18); border-color:rgba(255,210,63,.85); }
+.quiz-next:hover{ opacity:.7; }
+.quiz-next:active{ opacity:.45; }
+
+/* le récapitulatif : le seul endroit où le pixel a le droit de parler */
+.quiz-recap{ text-align:center; }
+.quiz-score{ font-family:var(--f-pix); font-size:44px; line-height:1;
+  color:var(--acc); margin-bottom:18px; }
+.quiz-score small{ font-size:15px; opacity:.4; letter-spacing:1px; }
+.quiz-recap .quiz-verdict{ margin-bottom:10px; }
+.quiz-recap .quiz-note{ margin-bottom:4px; }
+.quiz-recap .quiz-next{ align-self:center; padding-left:0; }
 
 /* ── Voile de pause ───────────────────────────────────────── */
 #game-pause{
@@ -576,7 +605,7 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 #game-screen.plein #game-tools{ pointer-events:auto; }
 #game-screen.plein #game-title{
   font-size:12px; opacity:.72; text-shadow:0 2px 6px rgba(0,0,0,.9); }
-#game-screen.plein #game-box{
+#game-screen.plein #game-box{ position:relative;
   border:0; border-radius:0; margin:0; padding:0;
   outline:none; box-shadow:none; background:#0a0a18;
   padding-top:calc(46px + var(--sat));
@@ -1894,6 +1923,35 @@ button.b3{ border-color:rgba(255,255,255,.55) !important;
   opacity:.92;
 }
 #game-box > *:not(#gbg):not(#gbg-fg){ position:relative; z-index:1; }
+
+/* ── LE QUIZ S'EXTRAIT DU THÈME ARCADE ────────────────────────
+   Deux règles globales, plus loin dans la feuille, rattrapaient tout
+   ce que le quiz essayait de faire :
+
+     · `button{ border/border-radius/box-shadow … !important }` —
+       le thème reboutonne TOUS les boutons du jeu en caisson biseauté.
+       C'est voulu partout ailleurs ; pas ici, où une proposition de QCM
+       doit être une ligne de texte, pas un bouton d'arcade.
+     · `#game-box > *{ position:relative }` — sélecteur d'identifiant,
+       donc plus fort qu'une classe : il empêchait le voile du quiz de
+       se déployer sur toute la boîte.
+
+   D'où ce bloc, volontairement placé APRÈS les deux, et le seul du
+   fichier à lever le !important du thème. Il ne touche que le quiz. */
+/* attention au piège : `:not(#gbg)` compte comme un IDENTIFIANT, donc la
+   règle ci-dessus pèse (3,0,0) — plus lourd que tout sélecteur de classe.
+   Seul !important en vient à bout. */
+#game-box > .quiz-host{
+  position:absolute !important; inset:0 !important; z-index:4;
+}
+.quiz-opt, .quiz-next{
+  border:0 !important; border-radius:0 !important;
+  box-shadow:none !important; letter-spacing:inherit !important;
+  text-shadow:none !important;
+}
+.quiz-opt{ border-bottom:1px solid #23233f !important; }
+.quiz-opt:active, .quiz-next:active{ transform:none !important; box-shadow:none !important; }
+.quiz-next{ letter-spacing:1.4px !important; }
 #gbg-fg{
   position:absolute; inset:0; z-index:2;
   pointer-events:none; border-radius:10px;
@@ -7083,10 +7141,13 @@ function runQuiz(st, done){
     host.innerHTML = "";
     const card = document.createElement("div");
     card.className = "quiz";
+    const num = (n)=>String(n).padStart(2, "0");
     card.innerHTML =
-      `<div class="quiz-top"><span class="quiz-kick">QUESTION ${i+1}/${qs.length}</span>
-        <span class="quiz-dots">${qs.map((_,k)=>
-          `<i class="${k<i?'done':k===i?'now':''}"></i>`).join("")}</span></div>
+      `<div class="quiz-top">
+         <span class="quiz-kick">Question ${num(i+1)} / ${num(qs.length)}</span>
+         <span class="quiz-dots">${qs.map((_,k)=>
+           `<i class="${k<i?'done':k===i?'now':''}"></i>`).join("")}</span>
+       </div>
        <p class="quiz-q">${item.q}</p>
        <div class="quiz-opts"></div>
        <div class="quiz-info" hidden></div>`;
@@ -7110,7 +7171,7 @@ function runQuiz(st, done){
     if(o.bon){
       bons++; btn.classList.add("choisi");
       S.quiz[st.code + ":" + i] = true;
-      AudioFX.star(1); Juice.pop(card, "+10 PTS", "var(--cyan)");
+      AudioFX.star(1);
       S.points += 10;
     }else{
       btn.classList.add("faux");
@@ -7120,11 +7181,14 @@ function runQuiz(st, done){
     persist();
     const info = card.querySelector(".quiz-info");
     info.hidden = false;
-    info.innerHTML = `<b>${o.bon ? "Exact." : "La bonne réponse : " + bonTxt}</b>`
-                   + `<span>${item.info}</span>`;
+    /* pas de redite : la bonne réponse est déjà allumée dans la liste,
+       le cartel se contente de dire si c'est gagné, puis d'apprendre
+       quelque chose */
+    info.innerHTML = `<span class="quiz-verdict${o.bon ? "" : " rate"}">${o.bon ? "Exact" : "Raté — la bonne est surlignée"}</span>`
+                   + `<span class="quiz-note">${item.info}</span>`;
     const next = document.createElement("button");
     next.className = "quiz-next";
-    next.textContent = (i === qs.length-1) ? "→ Terminer" : "→ Question suivante";
+    next.textContent = (i === qs.length-1) ? "Terminer →" : "Suivante →";
     next.addEventListener("click", ()=>{ AudioFX.select(); i++; ask(); }, { once:true });
     card.appendChild(next);
     next.scrollIntoView({ block:"nearest", behavior:"smooth" });
@@ -7134,13 +7198,15 @@ function runQuiz(st, done){
     host.innerHTML = "";
     const gagne = bons*10;
     const card = document.createElement("div");
-    card.className = "quiz";
-    const mot = bons === qs.length ? "SANS UNE FAUTE !"
-              : bons >= 2 ? "BIEN VU." : "L'essentiel, c'est de savoir maintenant.";
+    card.className = "quiz quiz-recap";
+    const mot = bons === qs.length ? "Sans une faute"
+              : bons >= 2 ? "Bien vu"
+              : "L'essentiel, c'est de le savoir maintenant";
     card.innerHTML =
-      `<div class="quiz-score">${bons}<small>/${qs.length}</small></div>
-       <p class="quiz-q" style="text-align:center;">${mot}</p>
-       <p class="sub" style="text-align:center;">${gagne ? "+" + gagne + " points de culture" : "Aucun point cette fois"}</p>`;
+      `<div class="quiz-score">${bons}<small> / ${qs.length}</small></div>
+       <span class="quiz-verdict">${mot}</span>
+       <span class="quiz-note">${gagne ? "+" + gagne + " points de culture"
+                                       : "Aucun point cette fois-ci"}</span>`;
     host.appendChild(card);
     if(bons === qs.length) AudioFX.fragment();
     /* les 24 questions trouvées, toutes épreuves confondues */
@@ -7148,8 +7214,8 @@ function runQuiz(st, done){
     if(total >= 24) unlockSucces("savant");
     persist();
     const b = document.createElement("button");
-    b.className = "quiz-next quiz-go";
-    b.textContent = "→ Récupérer le fragment";
+    b.className = "quiz-next";
+    b.textContent = "Récupérer le fragment →";
     b.addEventListener("click", ()=>{ AudioFX.select(); done(); }, { once:true });
     host.appendChild(b);
   }
@@ -20380,7 +20446,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v102</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v103</p>`);
     wire();
   }
   function wire(){

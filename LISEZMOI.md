@@ -62,6 +62,47 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v103) — LE QUIZ REDESSINÉ : PARTI PRIS « GALERIE »
+
+Le quiz est le seul écran du jeu où on **lit** et où on **réfléchit**. Il prend
+donc le parti inverse du reste : là où le jeu est une borne d'arcade — biseaux,
+reliefs, halos, dégradés — le quiz est un **cartel de musée**.
+
+- **Aucun panneau, aucun relief, aucune ombre portée.** Le texte pose
+  directement sur un fond calme.
+- **Les propositions ne sont plus des boutons** mais des lignes séparées par un
+  filet d'un pixel. Un filet d'accent se déploie à gauche au toucher — le seul
+  mouvement de l'écran.
+- **Une seule couleur d'accent par écran**, et c'est **celle de l'épreuve**
+  (`var(--st)`) : chaque quiz porte donc la couleur de son défi sans qu'on ait
+  besoin de le dire. Jaune pour La Cavale, rose pour Le Spotting, etc.
+- **Le décor animé du défi continue derrière**, mais très assourdi (voile + flou
+  + désaturation) : on sait qu'il est là, il ne lit plus avec nous.
+- **Le pixel est réservé au seul endroit où il fait sens** : le score final.
+  Partout ailleurs, la police système, en 400, très aérée.
+- **Plus de redite** : la bonne réponse étant déjà allumée dans la liste, le
+  cartel se contente de dire *Exact* ou *Raté*, puis d'apprendre quelque chose.
+  Un échec ne s'écrit plus dans la couleur de la réussite.
+- **Le bouton est devenu un lien**, aligné à droite, en petites capitales
+  espacées — au lieu du gros bouton dégradé rose et orange qui hurlait
+  par-dessus le texte.
+
+### Deux règles globales qu'il a fallu désamorcer
+
+Le thème du jeu contient un `button{ border / border-radius / box-shadow …
+!important }` qui **reboutonne tous les boutons** en caisson biseauté. C'est
+voulu partout ailleurs ; pas pour une proposition de QCM, qui doit être une
+ligne de texte.
+
+Et surtout un piège de spécificité CSS : la règle
+`#game-box > *:not(#gbg):not(#gbg-fg){ position:relative }` pèse **(3,0,0)**,
+parce que **`:not(#gbg)` compte comme un identifiant**. Elle écrasait donc
+n'importe quel sélecteur de classe, et empêchait le voile du quiz de se
+déployer sur toute la boîte. C'est le seul endroit du fichier où on lève le
+`!important` du thème, et il ne touche que le quiz.
+
+sw v102→v103.
+
 ## Nouveautés (v102) — LA TYPOGRAPHIE DU QUIZ
 
 Le quiz était illisible : trop gros, trop gras, « ça fait dessins ».
