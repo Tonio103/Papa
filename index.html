@@ -8326,6 +8326,9 @@ const Radar = (()=>{
   const trail = [];      // les positions récentes, pour dessiner la piste
   const hist  = [];      // les distances récentes, pour la courbe d'approche
   const diag  = {};      // valeurs brutes, affichées en mode réglage
+  /* filtre de Kalman : origine locale, un état par axe, horodatage */
+  let kOrigin = null, kN = null, kE = null, kAt = 0;
+  let nFix = 0, bestAcc = null, t0Watch = 0;
   let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
 
   const loadSpots = ()=>{ let s = {};
@@ -8353,7 +8356,61 @@ const Radar = (()=>{
       Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLon/2)**2;
     return 2*R*Math.asin(Math.sqrt(h));
   }
-  function heatOf(d){ return HEAT.find(h=>d <= h[0]); }
+  /* ── LA VÉRITÉ SUR CE QU'ON SAIT ─────────────────────────────
+     Voilà, je crois, le vrai défaut : le radar parlait avec une
+     assurance qu'il n'avait pas.
+
+     Dans un village, entre des murs de pierre, le GPS d'un téléphone
+     donne couramment ±30 à ±50 m. À 60 m d'une pièce, la position
+     mesurée peut donc tomber à 20 m d'elle : le radar annonçait alors
+     « BRÛLANT », et une direction tirée d'un point faux — c'est-à-dire
+     n'importe laquelle. D'où « il dit que c'est près alors qu'on
+     s'éloigne, et ce n'est pas la bonne direction ».
+
+     Rien ne peut rendre le GPS plus précis. Ce qu'on peut faire, en
+     revanche, c'est ARRÊTER DE PRÉTENDRE : annoncer une fourchette
+     plutôt qu'un chiffre, ne déclarer « c'est là » que si la marge le
+     permet vraiment, et se taire sur la direction quand elle n'a plus
+     de sens. Un outil qui dit « je ne sais pas » est infiniment plus
+     utile qu'un outil qui se trompe avec aplomb. */
+  const ZONE = ["DANS LA ZONE", "#8fd0ff"];
+  function heatOf(d, acc){
+    const a = acc || 0;
+    /* le palier vient de la distance mesurée… */
+    let i = HEAT.findIndex(x=>d <= x[0]);
+    if(i < 0) i = HEAT.length - 1;
+    /* …mais on ne peut PAS annoncer un palier plus serré que la marge
+       d'erreur. Dire « brûlant » avec ±45 m de flou, c'est envoyer
+       fouiller un mur au hasard : le chiffre serait juste par accident
+       une fois sur trois. Chaque palier a donc sa précision minimale. */
+    let plancher = 0;
+    if(a > 18)  plancher = 1;
+    if(a > 30)  plancher = 2;
+    if(a > 60)  plancher = 3;
+    if(a > 120) plancher = 4;
+    return HEAT[Math.max(i, plancher)];
+  }
+  /* quand la marge d'erreur avale la distance, aucun mot de chaleur
+     n'est honnête : on dit simplement qu'on est dans la zone */
+  const dansZone = (d, acc)=> acc != null && d <= acc;
+  /* l'incertitude angulaire : à 30 m d'une cible située à 30 m, la
+     direction peut se tromper de 45°. Au-delà, elle ne veut plus rien
+     dire du tout. */
+  function brgSpread(d, acc){
+    if(!d || acc == null) return 0;
+    return Math.min(180, Math.atan2(acc, Math.max(1, d))*180/Math.PI);
+  }
+  /* la distance, écrite selon ce qu'on sait vraiment */
+  function distTxtOf(d, acc){
+    const a = acc || 0;
+    if(a >= 8 && a > d*0.22){
+      const lo = Math.max(0, Math.round((d - a)/5)*5), hi = Math.round((d + a)/5)*5;
+      return lo <= 0 ? "moins de " + hi + " m" : lo + "–" + hi + " m";
+    }
+    return d < 200 ? Math.round(d) + " m"
+         : d < 1000 ? Math.round(d/10)*10 + " m"
+         : (d/1000).toFixed(2) + " km";
+  }
 
   /* ── CAP VRAI vers la cible ─────────────────────────────────── */
   function bearingTo(a, b){
@@ -8581,7 +8638,7 @@ const Radar = (()=>{
     const W = cssW, R = W/2, RR = R - 12;
     const all = allTargets();
     const t = target();
-    const heat = t ? heatOf(t.d) : null;
+    const heat = t ? heatOf(t.d, accM) : null;
     const col = heat ? heat[2] : "#5b6699";
     const live = headLive();
     const up = live ? heading : 0;
@@ -8673,16 +8730,29 @@ const Radar = (()=>{
       c.beginPath(); c.arc(R, R, ar, 0, 7); c.stroke(); c.setLineDash([]);
     }
 
-    /* ── TOUTES les pièces, la cible en évidence ── */
+    /* ── TOUTES les pièces, la cible en évidence ──────────────
+       Quand la marge d'erreur est plus grande que la distance, le
+       point exact n'a plus de sens : on dessine un ARC d'incertitude
+       à la place, qui dit « elle est quelque part par là ». */
+    const spreadT = t ? brgSpread(t.d, accM) : 0;
     all.forEach(o=>{
       const actif = t && o.st.code === t.st.code;
       const rel = ((o.brg - up) - 90) * Math.PI/180;
       const rr = Math.min(RR, o.d/portee*RR);
       const bx = R + Math.cos(rel)*rr, by = R + Math.sin(rel)*rr;
       const cc = o.done ? "#4a5070" : (actif ? col : o.st.couleur);
-      if(actif){
+      if(actif && spreadT >= 40){
+        const a0 = rel - spreadT*Math.PI/180, a1 = rel + spreadT*Math.PI/180;
+        c.fillStyle = cc + "22";
+        c.beginPath(); c.moveTo(R, R); c.arc(R, R, Math.min(RR, rr*1.15), a0, a1); c.closePath(); c.fill();
+        c.strokeStyle = cc + "44"; c.lineWidth = 1;
+        c.beginPath(); c.arc(R, R, Math.min(RR, rr), a0, a1); c.stroke();
+      }
+      if(actif && spreadT < 40){
         c.strokeStyle = cc + "66"; c.lineWidth = 1.5;
         c.beginPath(); c.moveTo(R, R); c.lineTo(bx, by); c.stroke();
+      }
+      if(actif){
         const k = 1 + Math.sin(now/260)*.3;
         c.fillStyle = cc + "44";
         c.beginPath(); c.arc(bx, by, 12*k, 0, 7); c.fill();
@@ -8726,7 +8796,10 @@ const Radar = (()=>{
       setUI("POSITION REFUSÉE", "", "Autorise la localisation dans les réglages du téléphone.", "#ff8484");
       if(guide) guide.textContent = "";
     }else if(!fix){
-      setUI("RECHERCHE GPS…", "", "Autorise la position et sors à ciel ouvert.", "#7fd0ff");
+      { const el = Math.round((performance.now() - t0Watch)/1000);
+        setUI("RECHERCHE GPS…", el + " s",
+          nFix ? `${nFix} relevé${nFix>1?"s":""} · meilleure précision ±${Math.round(bestAcc)} m`
+               : "Sors à ciel ouvert, loin des murs. Le premier point prend 10 à 30 s.", "#7fd0ff"); }
       if(guide) guide.textContent = "";
     }else if(!t){
       const any = Object.keys(loadSpots()).length;
@@ -8736,14 +8809,16 @@ const Radar = (()=>{
       if(guide) guide.textContent = "";
     }else{
       pushHist(t.d);
-      const heat2 = heatOf(t.d);
-      const distTxt = t.d < 200 ? Math.round(t.d) + " m"
-        : t.d < 1000 ? Math.round(t.d/10)*10 + " m"
-        : (t.d/1000).toFixed(2) + " km";
+      const heat2 = heatOf(t.d, accM);
+      const zone = dansZone(t.d, accM);
+      const distTxt = distTxtOf(t.d, accM);
+      const spread = brgSpread(t.d, accM);
+      const fiable = spread < 40;
       const bits = [];
-      bits.push(live ? `cap ${Math.round(t.brg)}° ${cardinal(t.brg)}`
-                     : `${cardinal(t.brg)} (${Math.round(t.brg)}°)`);
-      if(accM != null) bits.push(`±${Math.round(accM)} m`);
+      if(fiable) bits.push(live ? `cap ${Math.round(t.brg)}° ${cardinal(t.brg)}`
+                                : `${cardinal(t.brg)} (${Math.round(t.brg)}°)`);
+      else bits.push(`direction \u00b1${Math.round(spread)}° : pas fiable`);
+      if(accM != null) bits.push(`GPS ±${Math.round(accM)} m`);
       const p = penteM();
       if(p != null && Math.abs(p) > 1)
         bits.push(p < 0 ? `−${Math.round(-p)} m/min` : `+${Math.round(p)} m/min`);
@@ -8751,10 +8826,13 @@ const Radar = (()=>{
                         : tiltBad ? "pose le téléphone à plat"
                         : "boussole absente");
       else if(headSrc === "gps") bits.push("cap déduit de ta marche");
-      setUI(heat2[1], distTxt, bits.join(" · "), heat2[2]);
+      setUI(zone ? ZONE[0] : heat2[1], distTxt, bits.join(" · "), zone ? ZONE[1] : heat2[2]);
       if(guide){
-        guide.textContent = guideTxt(t, up, live);
-        guide.style.color = heat2[2];
+        guide.textContent = fiable ? guideTxt(t, up, live)
+          : (t.d <= (accM||0)
+              ? "Tu es dans la zone. Cherche à vue : le GPS ne peut plus t'aider."
+              : "Avance d'une vingtaine de mètres : le GPS est trop flou pour donner un cap.");
+        guide.style.color = fiable ? (zone ? ZONE[1] : heat2[2]) : "#8fd0ff";
       }
       if(heat2[3] && now - lastBeep > heat2[3]){
         lastBeep = now;
@@ -8800,53 +8878,88 @@ const Radar = (()=>{
       return;
     }
     $("#btn-radar-on").textContent = "📡 Couper le radar";
-    gpsErr = false;
-    /* maximumAge:0 — on veut la position de MAINTENANT. Avec 2 s de
-       tolérance, le blip retardait d'un pas de marche entier. */
+    gpsErr = false; t0Watch = performance.now();
+    /* ── LE FILTRE ────────────────────────────────────────────
+       La version précédente lissait la position par moyenne
+       exponentielle. C'était une erreur, et une erreur MESURABLE :
+       un lissage de ce type ne peut pas suivre un déplacement
+       régulier. Il conserve un retard constant, proportionnel à la
+       vitesse. Mesuré sur le banc d'essai : en s'éloignant de 15 m
+       par seconde, le radar annonçait 116 m quand la vraie distance
+       était de 150 m — 34 m de retard qui ne se rattrapaient JAMAIS.
+       D'où « je m'éloigne et il dit que c'est près ».
+
+       On passe donc à un filtre de Kalman à VITESSE : l'état n'est
+       plus seulement « où je suis » mais « où je suis ET à quelle
+       allure je vais ». Un tel filtre suit un déplacement régulier
+       sans retard, tout en continuant de gommer le tremblement quand
+       on est immobile — et il se règle tout seul sur la précision
+       annoncée par le GPS, au lieu d'un coefficient choisi à la main.
+
+       Travail en MÈTRES autour d'une origine locale : à cette
+       échelle, un degré de latitude vaut une constante, et on évite
+       de filtrer des degrés dont la valeur en mètres change avec la
+       latitude. */
+    function kfNew(m, r){ return { p:m, v:0, P00:r, P01:0, P10:0, P11:1 }; }
+    function kfStep(s, m, r, dt){
+      const q = 1.2;                       // bruit de manœuvre (marche à pied)
+      /* prédiction : on avance à la vitesse estimée */
+      s.p += s.v*dt;
+      s.P00 += dt*(2*s.P01 + dt*s.P11) + q*dt*dt*dt/3;
+      s.P01 += dt*s.P11 + q*dt*dt/2;
+      s.P10  = s.P01;
+      s.P11 += q*dt;
+      /* correction par la mesure, pondérée par sa précision */
+      const y = m - s.p, S = s.P00 + r;
+      const k0 = s.P00/S, k1 = s.P10/S;
+      s.p += k0*y; s.v += k1*y;
+      const a = s.P00, b2 = s.P01;
+      s.P00 -= k0*a; s.P01 -= k0*b2;
+      s.P10 -= k1*a; s.P11 -= k1*b2;
+    }
     watchId = navigator.geolocation.watchPosition(p=>{
-      const np = [p.coords.latitude, p.coords.longitude], na = p.coords.accuracy;
-      gpsErr = false;
-      /* un point nettement moins précis que le précédent est souvent
-         un raccrochage réseau : on le laisse passer seulement s'il
-         insiste, sinon le radar sautait de 40 m sans qu'on bouge */
-      if(fix && accM != null && na > accM*3 && na > 30 && ++badFix < 3) return;
-      badFix = 0;
-      /* lissage : d'autant plus ferme que la mesure est imprécise */
-      if(!fix){ fix = np; }
-      else{
-        const k = na <= 8 ? .85 : na <= 20 ? .55 : .3;
-        fix = [ fix[0] + (np[0]-fix[0])*k, fix[1] + (np[1]-fix[1])*k ];
-      }
-      accM = na;
-      gpsSpeed = (typeof p.coords.speed === "number" && p.coords.speed >= 0) ? p.coords.speed : null;
-      /* la piste : un point toutes les ~3 s, 2 minutes de mémoire */
+      const lat = p.coords.latitude, lon = p.coords.longitude;
+      const na = (typeof p.coords.accuracy === "number" && p.coords.accuracy > 0)
+                 ? p.coords.accuracy : 30;
+      gpsErr = false; nFix++;
+      if(bestAcc == null || na < bestAcc) bestAcc = na;
+
+      if(!kOrigin){ kOrigin = [lat, lon]; }
+      const mLat = 111320, mLon = 111320*Math.cos(kOrigin[0]*Math.PI/180);
+      const mN = (lat - kOrigin[0])*mLat, mE = (lon - kOrigin[1])*mLon;
+      const r = na*na;                      // variance de la mesure
       const tn = performance.now();
+      const dt = kAt ? Math.min(10, Math.max(.05, (tn - kAt)/1000)) : .5;
+      kAt = tn;
+
+      if(!kN){ kN = kfNew(mN, r); kE = kfNew(mE, r); }
+      else{
+        /* saut absurde (téléportation réseau) : on repart à zéro
+           plutôt que de traîner une aberration pendant une minute */
+        const saut = Math.hypot(mN - kN.p, mE - kE.p);
+        if(saut > Math.max(150, na*6)){ kN = kfNew(mN, r); kE = kfNew(mE, r); }
+        else{ kfStep(kN, mN, r, dt); kfStep(kE, mE, r, dt); }
+      }
+      fix = [ kOrigin[0] + kN.p/mLat, kOrigin[1] + kE.p/mLon ];
+      accM = na;
+      /* la vitesse vient maintenant du filtre : elle existe même
+         quand le navigateur ne fournit pas coords.speed */
+      gpsSpeed = Math.hypot(kN.v, kE.v);
+      /* la piste : un point toutes les ~3 s, 2 minutes de mémoire */
       if(!trail.length || tn - (trail.tLast || 0) > 3000){
         trail.push([fix[0], fix[1]]); trail.tLast = tn;
         if(trail.length > 40) trail.shift();
       }
       /* ── LE CAP DE SECOURS ────────────────────────────────────
-         Quand la boussole se tait — refusée, absente, ou téléphone
-         tenu debout — on déduit la direction du DÉPLACEMENT.
-
-         On pourrait croire que `coords.heading` suffit : c'est un
-         piège. Beaucoup de navigateurs le laissent à null en
-         permanence, y compris en marchant. On le prend s'il existe,
-         mais on sait aussi le calculer soi-même, en remontant la
-         piste jusqu'à un point assez éloigné pour que le cap veuille
-         dire quelque chose — « assez éloigné » voulant dire : plus
-         loin que l'incertitude du GPS, sinon on mesurerait le bruit
-         plutôt que la marche. */
+         Quand la boussole se tait, on déduit la direction du
+         déplacement. Le filtre donne directement le vecteur vitesse :
+         c'est plus propre et plus réactif que de remonter la piste. */
       if(!compassLive()){
         let brg = null;
-        if(typeof p.coords.heading === "number" && !isNaN(p.coords.heading)
-           && gpsSpeed != null && gpsSpeed > 0.7) brg = p.coords.heading;
-        if(brg == null){
-          const minD = Math.max(8, (accM || 10) * 1.5);
-          for(let i = trail.length - 2; i >= 0; i--){
-            if(distM(trail[i], fix) >= minD){ brg = bearingTo(trail[i], fix); break; }
-          }
-        }
+        if(gpsSpeed > 0.45) brg = (Math.atan2(kE.v, kN.v)*180/Math.PI + 360) % 360;
+        else if(typeof p.coords.heading === "number" && !isNaN(p.coords.heading)
+                && typeof p.coords.speed === "number" && p.coords.speed > 0.7)
+          brg = p.coords.heading;
         if(brg != null) pushHeading(brg, "gps");
       }
     }, ()=>{ gpsErr = true; },
@@ -8857,6 +8970,7 @@ const Radar = (()=>{
     if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} }
     stopCompass();
     watchId = null; fix = null; accM = null; badFix = 0; gpsSpeed = null;
+    kOrigin = null; kN = null; kE = null; kAt = 0; nFix = 0; bestAcc = null;
     trail.length = 0; hist.length = 0;
     $("#btn-radar-on").textContent = "📡 Activer le radar";
   }
@@ -21062,7 +21176,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v109</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v110</p>`);
     wire();
   }
   function wire(){
