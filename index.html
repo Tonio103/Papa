@@ -403,6 +403,18 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
   }
   @keyframes scanline{ from{ transform:translateY(-100%); } to{ transform:translateY(340%); } }
 }
+/* la lampe : n'apparaît que si l'appareil sait vraiment l'allumer */
+#btn-torch{
+  position:absolute; right:10px; bottom:10px; z-index:3;
+  width:46px; height:46px; font-size:22px; line-height:1;
+  background:rgba(6,6,24,.72); color:#fff; border:2px solid var(--line);
+  border-radius:50%; cursor:pointer; padding:0;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  transition:box-shadow .18s, border-color .18s, background .18s;
+}
+#btn-torch.on{ border-color:var(--jaune); background:rgba(255,214,64,.22);
+  box-shadow:0 0 16px rgba(255,214,64,.75); }
+#btn-torch:active{ transform:translateY(1px); }
 #manual{ display:flex; gap:8px; margin-top:14px; }
 #manual input{
   flex:1; font-family:var(--f-pix); font-size:14px; text-transform:uppercase;
@@ -426,6 +438,123 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 
 /* ── Mini-jeu ─────────────────────────────────────────────── */
 #game-title{ text-align:center; }
+/* barre du défi : titre à gauche, pause et sortie à droite */
+#game-bar{ display:flex; align-items:center; gap:8px; }
+#game-bar #game-title{ flex:1; text-align:left; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#game-tools{ display:flex; gap:6px; flex:none; }
+.gtool{
+  width:38px; height:38px; padding:0; flex:none;
+  font-family:var(--f-pix); font-size:13px; line-height:1;
+  background:linear-gradient(180deg,#1b1b3a,#101024); color:var(--blanc);
+  border:2px solid var(--line); cursor:pointer;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.06), 0 3px 0 rgba(0,0,0,.5);
+}
+.gtool:active{ transform:translateY(2px); box-shadow:inset 0 2px 0 rgba(255,255,255,.06); }
+.gtool:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+
+/* ── QCM d'après-défi ─────────────────────────────────────── */
+.quiz-host{ position:relative; z-index:2; width:100%; display:flex;
+  flex-direction:column; align-items:center; gap:12px;
+  overflow-y:auto; max-height:100%; padding:2px; }
+/* la carte est OPAQUE : le décor animé du défi continue de vivre
+   derrière, mais il ne doit jamais passer à travers le texte */
+.quiz{ width:100%; max-width:340px; display:flex; flex-direction:column; gap:10px;
+  background:linear-gradient(180deg, rgba(14,14,34,.97), rgba(8,8,22,.97));
+  border:2px solid var(--line); border-radius:16px; padding:14px 13px;
+  box-shadow:0 12px 34px rgba(0,0,0,.6), inset 0 2px 0 rgba(255,255,255,.05);
+  animation:quizIn .25s ease-out both; }
+@keyframes quizIn{ from{ opacity:0; transform:translateY(10px); } }
+.quiz-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.quiz-kick{ font-family:var(--f-pix); font-size:10px; color:var(--cyan); letter-spacing:1px; }
+.quiz-dots{ display:flex; gap:5px; }
+.quiz-dots i{ width:8px; height:8px; background:#26264c; display:block;
+  border:1px solid #35356a; }
+.quiz-dots i.done{ background:var(--cyan); border-color:var(--cyan); }
+.quiz-dots i.now{ background:var(--jaune); border-color:var(--jaune); }
+.quiz-q{ margin:0; font-size:17px; line-height:1.35; }
+.quiz-opts{ display:flex; flex-direction:column; gap:8px; }
+.quiz-opt{
+  width:100%; text-align:left; font-family:var(--f-txt); font-size:16px;
+  line-height:1.3; padding:11px 12px; cursor:pointer; color:var(--blanc);
+  background:linear-gradient(180deg,#191936,#101024);
+  border:2px solid var(--line); box-shadow:0 3px 0 rgba(0,0,0,.5);
+  transition:border-color .14s, background .14s, transform .08s;
+}
+.quiz-opt:active:not(:disabled){ transform:translateY(2px); box-shadow:none; }
+.quiz-opt:disabled{ cursor:default; opacity:.55; }
+/* après la réponse : la bonne s'allume toujours, même si on l'a ratée */
+.quiz-opt.bon{ opacity:1; border-color:var(--cyan); color:#eafffb;
+  background:linear-gradient(180deg,#12433f,#0c2b29);
+  box-shadow:0 0 14px rgba(43,228,208,.4); }
+.quiz-opt.faux{ opacity:1; border-color:var(--rouge); color:#ffe6e6;
+  background:linear-gradient(180deg,#48151f,#2a0d13); animation:shake .3s; }
+.quiz-opt.choisi{ font-weight:bold; }
+.quiz-info{ font-size:15px; line-height:1.45; color:#cfd0e6;
+  border-left:3px solid var(--jaune); padding:9px 11px; background:rgba(255,210,63,.09); }
+.quiz-info b{ display:block; margin-bottom:5px; color:var(--jaune); }
+.quiz-info span{ display:block; }
+.quiz-info[hidden]{ display:none; }
+.quiz-score{ font-family:var(--f-pix); font-size:40px; text-align:center;
+  color:var(--jaune); text-shadow:0 0 18px rgba(255,210,63,.7); }
+.quiz-score small{ font-size:20px; opacity:.65; }
+
+/* ── Voile de pause ───────────────────────────────────────── */
+#game-pause{
+  position:absolute; inset:0; z-index:40; display:flex;
+  align-items:center; justify-content:center;
+  padding:calc(12px + var(--sat)) 14px calc(12px + var(--sab));
+  /* assez sombre pour lire la carte, assez clair pour qu'on voie que
+     le défi est toujours là, figé, et qu'on ne l'a pas perdu */
+  background:rgba(4,4,16,.62);
+  backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+}
+#game-pause[hidden]{ display:none; }
+#game-pause-card{
+  width:min(340px, 100%); text-align:center;
+  background:linear-gradient(180deg, var(--panel2), #0c0c1e);
+  border:3px solid var(--line); border-radius:20px;
+  padding:22px 18px; display:flex; flex-direction:column; gap:10px;
+  box-shadow:0 18px 50px rgba(0,0,0,.7), inset 0 2px 0 rgba(255,255,255,.05);
+}
+#game-pause-card h2{ margin:0; font-size:16px; color:var(--cyan);
+  text-shadow:0 0 12px rgba(43,228,208,.55); }
+#game-pause-card .sub{ margin:0 0 4px; }
+#pause-glyph{ font-family:var(--f-pix); font-size:34px; color:var(--jaune);
+  text-shadow:0 0 18px rgba(255,210,63,.7); letter-spacing:4px; }
+@media (prefers-reduced-motion: no-preference){
+  #game-pause{ animation:pauseIn .18s ease-out both; }
+  @keyframes pauseIn{ from{ opacity:0; } }
+  #pause-glyph{ animation:pauseBeat 1.6s ease-in-out infinite; }
+  @keyframes pauseBeat{ 50%{ opacity:.45; transform:scale(.94); } }
+}
+
+/* ── PLEIN ÉCRAN : le défi occupe tout, le reste s'efface ─── */
+#game-screen.plein .screen-inner{ padding:0; gap:0; }
+#game-screen.plein #game-bar{
+  position:absolute; z-index:20; left:0; right:0;
+  top:var(--sat); padding:6px calc(8px + var(--sar)) 6px calc(8px + var(--sal));
+  background:linear-gradient(180deg, rgba(4,4,16,.72), transparent);
+  pointer-events:none;                       /* le défi reste cliquable dessous */
+}
+#game-screen.plein #game-tools{ pointer-events:auto; }
+#game-screen.plein #game-title{
+  font-size:12px; opacity:.72; text-shadow:0 2px 6px rgba(0,0,0,.9); }
+#game-screen.plein #game-box{
+  border:0; border-radius:0; margin:0; padding:0;
+  outline:none; box-shadow:none; background:#0a0a18;
+  padding-top:calc(46px + var(--sat));
+  padding-bottom:calc(6px + var(--sab));
+}
+#game-screen.plein #hint-txt{
+  position:absolute; z-index:20; left:10px; right:10px;
+  bottom:calc(52px + var(--sab)); margin:0; pointer-events:none;
+  text-shadow:0 2px 8px rgba(0,0,0,.95); }
+#game-screen.plein #hint-bar{
+  position:absolute; z-index:20; left:0; right:0;
+  bottom:calc(6px + var(--sab)); margin:0; }
+/* le HUD général disparaît : plus rien ne mord sur le jeu */
+body.plein-jeu #hud{ display:none; }
 #game-box{
   background:linear-gradient(180deg, var(--panel2), #101024);
   border:3px solid var(--line); padding:16px; margin-top:12px;
@@ -2367,6 +2496,8 @@ button.b2{ color:#04231d !important; }
     <div id="cam-wrap">
       <video id="cam" playsinline muted></video>
       <div id="cam-frame"></div>
+      <button id="btn-torch" type="button" hidden aria-pressed="false"
+              aria-label="Allumer la lampe">🔦</button>
     </div>
     <div id="scan-msg"></div>
     <div id="manual">
@@ -2397,12 +2528,29 @@ button.b2{ color:#04231d !important; }
 <!-- ═══ ÉCRAN 5 : MINI-JEU ═══ -->
 <section id="game-screen" class="screen">
   <div class="screen-inner">
-    <h2 id="game-title"></h2>
+    <div id="game-bar">
+      <h2 id="game-title"></h2>
+      <div id="game-tools">
+        <button id="btn-pause" class="gtool" type="button" aria-label="Mettre en pause">❚❚</button>
+        <button id="btn-quit"  class="gtool" type="button" aria-label="Quitter le défi">✕</button>
+      </div>
+    </div>
     <div id="game-box"></div>
     <div id="hint-txt"></div>
     <div id="hint-bar">
       <button id="btn-hint" class="b3" hidden>💡 Indice</button>
       <button id="btn-skip" class="b3" hidden>Passer (−50% pts)</button>
+    </div>
+  </div>
+  <!-- voile de pause : au-dessus du défi, jamais dans son flux -->
+  <div id="game-pause" hidden>
+    <div id="game-pause-card">
+      <div id="pause-glyph">❚❚</div>
+      <h2>EN PAUSE</h2>
+      <p class="sub" id="pause-sub">Le défi est gelé. Rien ne bouge, rien ne se perd.</p>
+      <button id="btn-resume" class="b1">▶ Reprendre</button>
+      <button id="btn-restart" class="b3">↺ Recommencer le défi</button>
+      <button id="btn-leave" class="b3">✕ Quitter — retour à la chasse</button>
     </div>
   </div>
 </section>
@@ -3652,6 +3800,15 @@ function showNow(id){
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
   }
+  /* filet de sécurité : par quelque chemin qu'on quitte un défi, on
+     rend le temps au monde normal et on sort du plein écran. Sans ça,
+     un écran atteint autrement que par quitGame() laisserait la couche
+     de pause branchée sur toute l'application. */
+  if(id !== "game-screen"){
+    if(typeof GamePause !== "undefined" && GamePause.isHooked()) GamePause.unhook();
+    const gp = $("#game-pause"); if(gp) gp.hidden = true;
+    if(typeof leaveFull === "function") leaveFull();
+  }
   updateTabbar(id);
   AudioFX.duck((id==="game-screen" || id==="msg-screen") ? .16 : .5);   // musique en retrait
 }
@@ -3973,6 +4130,9 @@ function renderHub(){
 const Scanner = (()=>{
   let stream=null, raf=null, workCv=null, wctx=null;
   let t0 = 0, hint = 0, native = null, lastScan = 0, pass = 0;
+  /* état de l'ambiance : luminosité moyenne, part de pixels cramés
+     (= reflet), et la lampe de l'appareil */
+  let lum = 128, blown = 0, torchCan = false, torchOn = false, autoTorch = false;
   const video = ()=>$("#cam");
 
   /* LE LECTEUR NATIF, quand le navigateur en a un (Android/Chrome) :
@@ -3998,6 +4158,8 @@ const Scanner = (()=>{
     msg("");
     initNative();
     t0 = performance.now(); hint = 0; lastScan = 0; pass = 0;
+    lum = 128; blown = 0; torchCan = false; torchOn = false; autoTorch = false;
+    syncTorch();
     if(!native && typeof jsQR !== "function"){
       msg("Lecteur de QR indisponible — utilise la saisie du code juste en dessous.", true);
       return;
@@ -4018,14 +4180,20 @@ const Scanner = (()=>{
       }
       video().srcObject = stream;
       await video().play();
-      /* mise au point continue quand l'appareil sait le faire : un QR
-         tenu à 15 cm est sinon souvent flou */
+      /* On demande à l'appareil tout ce qu'il sait faire de mieux :
+         mise au point continue (un QR tenu à 15 cm est sinon flou),
+         exposition et balance des blancs continues — ce sont elles qui
+         rattrapent un passage nuage/soleil ou un néon de rue. */
       try{
         const tr = stream.getVideoTracks()[0];
         const caps = tr.getCapabilities ? tr.getCapabilities() : {};
         const adv = [];
         if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({ focusMode:"continuous" });
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode:"continuous" });
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({ whiteBalanceMode:"continuous" });
         if(adv.length) await tr.applyConstraints({ advanced:adv });
+        torchCan = !!caps.torch;   // la lampe n'est pas toujours exposée
+        syncTorch();
       }catch(e){}
       loop();
     }catch(e){
@@ -4041,8 +4209,143 @@ const Scanner = (()=>{
     }
   }
 
-  /* lit une zone de l'image vidéo, en deux passes de contraste */
-  function readZone(v, sx, sy, sw, sh, outW){
+  /* ─────────────────────────────────────────────────────────────
+     PRÉTRAITEMENTS — c'est ce qui fait la différence dehors.
+
+     jsQR décide du noir et du blanc avec un seuil quasi global.
+     Ça marche sur une feuille bien éclairée, et ça s'effondre dès
+     que la lumière n'est plus uniforme :
+       · un REFLET sur le plastique crame une zone en blanc pur ;
+         le seuil global monte, et tout le reste du code bascule en
+         noir d'un coup ;
+       · sous la PLUIE, les gouttes brouillent les bords des modules
+         et écrasent le contraste ;
+       · dans le NOIR, tout l'histogramme se tasse dans les valeurs
+         basses : il reste de l'information, mais plus assez d'écart
+         pour que le seuil tombe au bon endroit.
+
+     On répond aux trois avec deux traitements, appliqués seulement
+     quand les passes normales ont déjà échoué (voir la boucle) :
+       · seuil ADAPTATIF local — chaque pixel est comparé à la
+         moyenne de son voisinage, pas à celle de l'image. Un reflet
+         ne contamine plus que lui-même ;
+       · ÉTIREMENT de contraste sur les centiles — on retrouve toute
+         la dynamique d'une image sombre ou délavée.
+     ───────────────────────────────────────────────────────────── */
+  let grayBuf = null, intBuf = null;
+
+  /* niveaux de gris + mesure de l'ambiance (luminosité, cramé) */
+  function toGray(d, w, h){
+    const n = w*h;
+    if(!grayBuf || grayBuf.length < n) grayBuf = new Uint8ClampedArray(n);
+    const g = grayBuf;
+    let sum = 0, blown = 0;
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      /* luma perceptuelle, en entiers : ~3x plus rapide que la version flottante */
+      const y = (d[p]*77 + d[p+1]*150 + d[p+2]*29) >> 8;
+      g[i] = y; sum += y; if(y > 245) blown++;
+    }
+    return { mean: sum/n, blown: blown/n };
+  }
+  function writeBack(d, g, n){
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      const y = g[i]; d[p] = d[p+1] = d[p+2] = y; d[p+3] = 255;
+    }
+  }
+
+  /* seuil adaptatif de Bradley-Roth : la réponse aux reflets.
+     Une image intégrale donne la moyenne de n'importe quelle
+     fenêtre en temps constant — donc le tout reste à quelques
+     millisecondes, même à 640 px de large. */
+  function adaptive(d, w, h){
+    const n = w*h;
+    toGray(d, w, h);
+    const g = grayBuf;
+    const need = (w+1)*(h+1);
+    if(!intBuf || intBuf.length < need) intBuf = new Int32Array(need);
+    const I = intBuf, W1 = w+1;
+    for(let x = 0; x <= w; x++) I[x] = 0;
+    for(let y = 0; y < h; y++){
+      let row = 0;
+      I[(y+1)*W1] = 0;
+      for(let x = 0; x < w; x++){
+        row += g[y*w + x];
+        I[(y+1)*W1 + x+1] = I[y*W1 + x+1] + row;
+      }
+    }
+    /* fenêtre ~ 1/12 de la largeur : plus grand qu'un module de QR,
+       plus petit qu'une tache de reflet */
+    const s = Math.max(2, w/12 | 0), T = 14;
+    for(let y = 0; y < h; y++){
+      const y1 = y-s < 0 ? 0 : y-s, y2 = y+s >= h ? h-1 : y+s;
+      const r1 = y1*W1, r2 = (y2+1)*W1, hh = y2-y1+1;
+      for(let x = 0; x < w; x++){
+        const x1 = x-s < 0 ? 0 : x-s, x2 = x+s >= w ? w-1 : x+s;
+        const count = hh*(x2-x1+1);
+        const sum = I[r2 + x2+1] - I[r1 + x2+1] - I[r2 + x1] + I[r1 + x1];
+        g[y*w + x] = (g[y*w + x]*count*100 <= sum*(100-T)) ? 0 : 255;
+      }
+    }
+    writeBack(d, g, n);
+  }
+
+  /* CORRECTION DE CHAMP PLAT — le meilleur outil des trois, et de loin.
+
+     On estime l'éclairage de la scène par un gros flou de l'image
+     (le flou est fait par le GPU via ctx.filter, donc quasi gratuit),
+     puis on le SOUSTRAIT. Ce qui reste, c'est le code seul, débarrassé
+     de la façon dont il était éclairé : le reflet, l'ombre portée de
+     la main et le dégradé d'une lampe rasante disparaissent tous les
+     trois d'un coup, parce que ce sont tous des variations LENTES de
+     luminosité — exactement ce que le flou capture.
+     C'est la seule passe qui rattrape un reflet en bande sur le code. */
+  let blurCv = null, bctx = null;
+  function flatField(d, w, h){
+    if(!blurCv){ blurCv = document.createElement("canvas");
+      bctx = blurCv.getContext("2d", { willReadFrequently:true }); }
+    if(blurCv.width !== w || blurCv.height !== h){ blurCv.width = w; blurCv.height = h; }
+    bctx.clearRect(0, 0, w, h);
+    bctx.filter = "blur(" + Math.max(3, w/28) + "px)";
+    bctx.drawImage(workCv, 0, 0);
+    bctx.filter = "none";
+    const bd = bctx.getImageData(0, 0, w, h).data, n = w*h;
+    toGray(d, w, h);
+    const g = grayBuf;
+    for(let i = 0, p = 0; i < n; i++, p += 4){
+      const bg = (bd[p]*77 + bd[p+1]*150 + bd[p+2]*29) >> 8;
+      /* on ré-centre sur le gris moyen et on amplifie l'écart local */
+      const v = 128 + (g[i]-bg)*1.9;
+      g[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    writeBack(d, g, n);
+  }
+
+  /* étirement de contraste sur les centiles : la réponse au noir
+     et à la pluie. On ignore 2 % de chaque bout de l'histogramme —
+     sinon un seul pixel cramé ou un seul pixel noir suffirait à
+     annuler tout le gain. */
+  function stretch(d, w, h){
+    const n = w*h; toGray(d, w, h);
+    const g = grayBuf, hist = new Uint32Array(256);
+    for(let i = 0; i < n; i++) hist[g[i]]++;
+    const cut = n*0.02;
+    let lo = 0, hi = 255, acc = 0;
+    for(let i = 0; i < 256; i++){ acc += hist[i]; if(acc > cut){ lo = i; break; } }
+    acc = 0;
+    for(let i = 255; i >= 0; i--){ acc += hist[i]; if(acc > cut){ hi = i; break; } }
+    if(hi - lo < 8) return;                      // image uniforme : rien à sauver
+    const k = 255/(hi-lo);
+    for(let i = 0; i < n; i++){
+      const v = (g[i]-lo)*k;
+      g[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    writeBack(d, g, n);
+  }
+
+  /* lit une zone de l'image vidéo. `prep` choisit le prétraitement ;
+     les deux sens de contraste sont toujours tentés, car un QR
+     plastifié sous un reflet renvoie parfois une image inversée. */
+  function readZone(v, sx, sy, sw, sh, outW, prep){
     if(typeof jsQR !== "function") return null;
     if(!workCv){ workCv = document.createElement("canvas");
       wctx = workCv.getContext("2d", { willReadFrequently:true }); }
@@ -4051,11 +4354,40 @@ const Scanner = (()=>{
     if(workCv.width !== w || workCv.height !== h){ workCv.width = w; workCv.height = h; }
     wctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
     const img = wctx.getImageData(0, 0, w, h);
-    let q = jsQR(img.data, w, h, { inversionAttempts:"dontInvert" });
-    /* un QR plastifié sous un reflet renvoie parfois un contraste
-       inversé : on retente à l'envers avant d'abandonner */
-    if(!q) q = jsQR(img.data, w, h, { inversionAttempts:"onlyInvert" });
+    if(prep === "flat") flatField(img.data, w, h);
+    else if(prep === "adapt") adaptive(img.data, w, h);
+    else if(prep === "stretch") stretch(img.data, w, h);
+    else if(prep === "mesure"){ const s = toGray(img.data, w, h); lum = s.mean; blown = s.blown; }
+    /* jsQR lève parfois sur une image très dégradée (il croit avoir
+       trouvé un motif de repérage et déraille en le mesurant). Ça ne
+       doit jamais faire perdre les autres passes de la même image. */
+    const q = safeQR(img.data, w, h, "dontInvert") || safeQR(img.data, w, h, "onlyInvert");
     return (q && q.data) ? q.data : null;
+  }
+  function safeQR(data, w, h, inv){
+    try{ return jsQR(data, w, h, { inversionAttempts:inv }); }catch(e){ return null; }
+  }
+
+  /* ─── LA LAMPE ────────────────────────────────────────────────
+     Le seul vrai remède au noir : ajouter de la lumière. Tous les
+     appareils ne l'exposent pas (Safari iOS, notamment), d'où le
+     bouton qui n'apparaît que s'il sert à quelque chose. */
+  async function setTorch(on){
+    if(!stream) return false;
+    try{
+      const tr = stream.getVideoTracks()[0];
+      const caps = tr.getCapabilities ? tr.getCapabilities() : {};
+      if(!caps.torch) return false;
+      await tr.applyConstraints({ advanced:[{ torch: !!on }] });
+      torchOn = !!on; syncTorch();
+      return true;
+    }catch(e){ return false; }
+  }
+  function syncTorch(){
+    const b = $("#btn-torch"); if(!b) return;
+    b.hidden = !torchCan;
+    b.classList.toggle("on", torchOn);
+    b.setAttribute("aria-pressed", torchOn ? "true" : "false");
   }
 
   async function loop(){
@@ -4080,43 +4412,86 @@ const Scanner = (()=>{
           if(found && found.length && found[0].rawValue) data = found[0].rawValue;
         }catch(e){ native = false; }
       }
-      /* 2) jsQR — on alterne TROIS cadrages d'une image à l'autre :
-            l'image entière, puis deux gros plans de plus en plus serrés
-            sur le centre. Chaque resserrage augmente la résolution utile
-            du QR : le cadrage à 60 % rattrape les codes un peu loin, celui
-            à 35 % rattrape ceux photographiés à bout de bras. Comme le
-            viseur invite déjà à centrer le code, ces deux zones tombent
-            juste là où il se trouve neuf fois sur dix. */
+      /* 2) jsQR — on ESCALADE.
+
+            Les trois premières passes alternent des cadrages : l'image
+            entière, puis deux gros plans de plus en plus serrés sur le
+            centre. Chaque resserrage augmente la résolution utile du QR.
+            Comme le viseur invite déjà à centrer le code, ces zones
+            tombent là où il se trouve neuf fois sur dix.
+
+            Si rien n'est lu au bout d'une seconde et demie, c'est que
+            les conditions ne sont pas bonnes : on ajoute alors trois
+            passes prétraitées. Elles coûtent environ deux fois plus
+            cher, d'où l'escalade — le cas facile reste aussi rapide
+            qu'avant, et le cas difficile dispose de tout l'arsenal.
+
+            L'ordre des passes « mauvais temps » suit leur rendement
+            mesuré : champ plat d'abord (c'est elle qui rattrape les
+            reflets et les ombres portées), seuil adaptatif ensuite
+            (la pluie battante dans la pénombre). */
       if(!data){
         const W0 = v.videoWidth, H0 = v.videoHeight;
-        if(pass === 0){
-          data = readZone(v, 0, 0, W0, H0, 640);
-        } else {
-          const f = (pass === 1) ? .6 : .35;
-          const cw = Math.round(W0*f), ch = Math.round(H0*f);
-          data = readZone(v, (W0-cw)/2, (H0-ch)/2, cw, ch, 640);
+        const dur = (dt) => { const cw = Math.round(W0*dt), ch = Math.round(H0*dt);
+                              return [ (W0-cw)/2, (H0-ch)/2, cw, ch ]; };
+        const nPasses = (now - t0) > 1500 ? 6 : 3;
+        let z;
+        switch(pass){
+          /* passes rapides */
+          case 0: data = readZone(v, 0, 0, W0, H0, 640); break;
+          case 1: z = dur(.6);  data = readZone(v, z[0], z[1], z[2], z[3], 640, "mesure"); break;
+          case 2: z = dur(.35); data = readZone(v, z[0], z[1], z[2], z[3], 640); break;
+          /* passes « mauvais temps » */
+          case 3: z = dur(.6);  data = readZone(v, z[0], z[1], z[2], z[3], 640, "flat"); break;
+          case 4: data = readZone(v, 0, 0, W0, H0, 640, "flat"); break;
+          default: z = dur(.6); data = readZone(v, z[0], z[1], z[2], z[3], 640, "adapt"); break;
         }
-        pass = (pass + 1) % 3;
+        pass = (pass + 1) % nPasses;
       }
     }catch(e){ /* on ne casse jamais la boucle */ }
 
     if(data){
       if(raf) cancelAnimationFrame(raf);
       raf = null;
+      setTorch(false);
       handleCode(data);
       return;
     }
-    /* AUCUN SILENCE : on guide au lieu de laisser dans le doute */
+
     const el = now - t0;
+    /* LA LAMPE, toute seule. À la tombée du jour, aucun traitement ne
+       remplace un peu de lumière : dès qu'on constate que l'image est
+       sombre, on l'allume — une fois, sans harceler. */
+    if(!autoTorch && torchCan && !torchOn && el > 1800 && lum < 60){
+      autoTorch = true;
+      setTorch(true).then(ok=>{ if(ok) msg("Il fait sombre : lampe allumée."); });
+    }
+
+    /* AUCUN SILENCE — et le conseil colle à ce que voit la caméra */
     if(hint === 0 && el > 6000){
-      hint = 1; msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
+      hint = 1;
+      /* un QR normal a déjà ~1/4 de pixels blancs dans le viseur : il
+         faut donc un seuil haut pour ne diagnostiquer « reflet » que
+         quand il y a vraiment de la lumière parasite */
+      if(blown > .45)
+        msg("Un reflet écrase le code : incline le téléphone de côté, ou fais-toi de l'ombre.");
+      else if(lum < 60)
+        msg(torchCan ? "Il fait sombre — approche encore, la lampe est allumée."
+                     : "Il fait sombre : éclaire le QR avec la lampe d'un autre téléphone.");
+      else
+        msg("Approche à ~15 cm, bien à plat, et évite l'ombre de ta main.");
     } else if(hint === 1 && el > 14000){
-      hint = 2; msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
+      hint = 2;
+      msg("Toujours rien ? Le code est écrit sous le QR — tape-le juste en dessous.", true);
     }
   }
   function stop(){
     if(raf) cancelAnimationFrame(raf);
     raf = null;
+    /* on éteint la lampe AVANT de couper la piste : sinon elle reste
+       allumée jusqu'à ce qu'on quitte la page */
+    if(torchOn){ try{ stream.getVideoTracks()[0].applyConstraints({ advanced:[{ torch:false }] }); }catch(e){} }
+    torchOn = false; torchCan = false; syncTorch();
     if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
   }
   function msg(txt, err){
@@ -4124,7 +4499,7 @@ const Scanner = (()=>{
     m.textContent = txt;
     m.className = err ? "err" : "ok";
   }
-  return { start, stop, msg };
+  return { start, stop, msg, setTorch, toggleTorch: ()=>setTorch(!torchOn) };
 })();
 
 /* Un code arrive (QR ou clavier) → on décide.
@@ -6173,7 +6548,10 @@ const GameBG = (()=>{
     }
   }
   function frame(now){
-    if(!cv || hidden){ raf = requestAnimationFrame(frame); return; }
+    /* cv.parentElement peut être null si l'écran a vidé son conteneur
+       sous nos pieds : on attend qu'on nous rebranche plutôt que de
+       lever à chaque image */
+    if(!cv || !cv.parentElement || hidden){ raf = requestAnimationFrame(frame); return; }
     const r = cv.parentElement.getBoundingClientRect();
     if(Math.abs(r.width - W) > 1 || Math.abs(r.height - H) > 1) resize();
     clockB(now);
@@ -6358,6 +6736,137 @@ function stubGame(box, api){
 CONFIG.stations.forEach(st=>{ if(!MiniGames[st.code]) MiniGames[st.code]=stubGame; });
 
 /* ═══════════════════════════════════════════════════════════
+   10ter. PAUSE — geler un mini-jeu, quel qu'il soit
+
+   Les huit défis n'ont pas de boucle commune : entre eux, ils
+   utilisent 24 requestAnimationFrame, 24 setTimeout et 5 setInterval,
+   chacun avec sa propre notion du temps. Plutôt que d'ajouter un test
+   « si en pause » dans les huit (invasif, et une omission = un jeu qui
+   continue de tourner sous l'écran de pause), on gèle LE TEMPS
+   LUI-MÊME, le temps d'un défi :
+
+     · requestAnimationFrame — les images demandées pendant la pause
+       sont mises de côté et rejouées à la reprise ;
+     · setTimeout / setInterval — on note le temps qu'il leur restait,
+       on les désarme, et on les réarme à la reprise avec ce reste ;
+     · performance.now() — renvoie le temps AMPUTÉ des pauses. C'est
+       ce qui évite qu'un jeu calculant `now - dernièreImage` reçoive
+       un delta géant à la reprise et téléporte tout son contenu.
+
+   Tout est rendu à l'identique quand le défi se termine.
+   ─────────────────────────────────────────────────────────── */
+const GamePause = (()=>{
+  const RAF = window.requestAnimationFrame.bind(window);
+  const CAF = window.cancelAnimationFrame.bind(window);
+  const ST  = window.setTimeout.bind(window);
+  const SI  = window.setInterval.bind(window);
+  const CT  = window.clearTimeout.bind(window);
+  const CI  = window.clearInterval.bind(window);
+  const NOW = performance.now.bind(performance);
+
+  let hooked = false, paused = false;
+  let held = [];                 // images demandées pendant la pause
+  const timers = new Map();      // nos identifiants → minuteries vivantes
+  let seq = 1 << 26;             // hors de portée des identifiants natifs
+  let pausedAt = 0, offset = 0;  // temps total passé en pause
+
+  const clock = ()=> NOW() - offset - (paused ? NOW() - pausedAt : 0);
+
+  function arm(id, rec, delay){
+    if(paused) return;
+    rec.due = NOW() + delay;
+    if(rec.every == null){
+      rec.real = ST(()=>{ timers.delete(id); rec.fn.apply(null, rec.args); }, delay);
+    }else if(delay === rec.every){
+      rec.real = SI(()=>{ rec.due = NOW() + rec.every; rec.fn.apply(null, rec.args); }, rec.every);
+      rec.isInterval = true;
+    }else{
+      /* reprise d'un intervalle en cours de période : on solde le
+         reste avec un timeout, puis on repart sur la période pleine */
+      rec.isInterval = false;
+      rec.real = ST(()=>{ rec.fn.apply(null, rec.args); arm(id, rec, rec.every); }, delay);
+    }
+  }
+  function disarm(rec){
+    if(rec.real == null) return;
+    if(rec.isInterval) CI(rec.real); else CT(rec.real);
+    rec.real = null;
+  }
+
+  function hook(){
+    if(hooked) return; hooked = true;
+    paused = false; held = []; timers.clear(); offset = 0;
+
+    window.requestAnimationFrame = function(cb){
+      if(!paused) return RAF(cb);
+      const id = seq++; held.push({ id, cb }); return id;
+    };
+    window.cancelAnimationFrame = function(id){
+      const i = held.findIndex(h=>h.id === id);
+      if(i >= 0){ held.splice(i, 1); return; }
+      CAF(id);
+    };
+    window.setTimeout = function(fn, delay){
+      if(typeof fn !== "function") return ST.apply(null, arguments);
+      const id = seq++, rec = { fn, args:[].slice.call(arguments, 2),
+        every:null, due:0, real:null, isInterval:false };
+      timers.set(id, rec); arm(id, rec, delay || 0); return id;
+    };
+    window.setInterval = function(fn, delay){
+      if(typeof fn !== "function") return SI.apply(null, arguments);
+      const id = seq++, rec = { fn, args:[].slice.call(arguments, 2),
+        every: delay || 0, due:0, real:null, isInterval:false };
+      timers.set(id, rec); arm(id, rec, rec.every); return id;
+    };
+    window.clearTimeout = function(id){
+      const rec = timers.get(id);
+      if(rec){ disarm(rec); timers.delete(id); return; }
+      CT(id);
+    };
+    window.clearInterval = function(id){
+      const rec = timers.get(id);
+      if(rec){ disarm(rec); timers.delete(id); return; }
+      CI(id);
+    };
+    performance.now = clock;
+  }
+
+  function unhook(){
+    if(!hooked) return;
+    if(paused) resume();
+    /* on rend les minuteries encore vivantes au monde normal, sinon
+       une victoire différée resterait bloquée derrière notre couche */
+    timers.forEach((rec)=>disarm(rec));
+    timers.clear(); held = [];
+    window.requestAnimationFrame = RAF; window.cancelAnimationFrame = CAF;
+    window.setTimeout = ST; window.setInterval = SI;
+    window.clearTimeout = CT; window.clearInterval = CI;
+    performance.now = NOW;
+    hooked = false; paused = false; offset = 0;
+  }
+
+  function pause(){
+    if(!hooked || paused) return;
+    paused = true; pausedAt = NOW();
+    timers.forEach((rec)=>{ rec.left = Math.max(0, rec.due - pausedAt); disarm(rec); });
+  }
+  function resume(){
+    if(!hooked || !paused) return;
+    const slept = NOW() - pausedAt;
+    offset += slept;
+    paused = false;
+    /* le chrono du défi ne doit pas compter le temps en pause */
+    if(typeof gameT0 === "number" && gameT0) gameT0 += slept;
+    timers.forEach((rec, id)=>arm(id, rec, rec.left || 0));
+    const q = held; held = [];
+    q.forEach(h=>RAF(h.cb));
+    /* le décor animé du défi n'a rien de spécial à faire : sa boucle
+       passe par requestAnimationFrame, donc il gèle et repart tout seul */
+  }
+  return { hook, unhook, pause, resume, isPaused: ()=>paused, isHooked: ()=>hooked };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    11. HINTS + lancement d'un défi
    ─────────────────────────────────────────────────────────── */
 let hintTimers = [];
@@ -6370,6 +6879,294 @@ function clearHints(){
   $("#btn-skip").hidden = true;
   $("#hint-txt").textContent = "";
 }
+/* ═══════════════════════════════════════════════════════════
+   10quater. LE QCM — 24 questions, trois par épreuve
+
+   Après chaque défi réussi, trois questions sur Invader et le street
+   art. Les réponses sont VRAIES et vérifiables : le but est qu'il
+   apprenne réellement quelque chose sur ce qu'il pratique depuis 2023.
+   Chaque question est rattachée au thème de son épreuve — la matière
+   pour La Palette, le jeu d'arcade pour Le Binaire, le pochoir pour
+   Le Pochoir — pour que ça ne tombe pas de nulle part.
+
+   `ok` désigne la bonne réponse dans l'ordre où elle est écrite ;
+   les propositions sont mélangées à l'affichage.
+   ─────────────────────────────────────────────────────────── */
+const QUIZ = {
+  /* ── LA PALETTE : la matière et la couleur ── */
+  LV_01: [
+    { q:"Avec quoi Invader colle-t-il ses œuvres dans la rue ?",
+      r:["Des carreaux de céramique", "De la peinture acrylique",
+         "Du papier collé", "Des autocollants en vinyle"], ok:0,
+      info:"Le carrelage résiste à la pluie, au gel et au soleil. C'est ce qui permet à une pièce de tenir des années dehors — et c'est aussi ce qui la rend si difficile à décoller." },
+    { q:"Comment appelle-t-on les petits carreaux d'une mosaïque ?",
+      r:["Des tesselles", "Des tessons", "Des cabochons", "Des pixels"], ok:0,
+      info:"Du latin tessella, « petit cube ». Chez Invader, une tesselle vaut exactement un pixel : c'est tout son art." },
+    { q:"D'où vient le pseudonyme « Invader » ?",
+      r:["Du jeu d'arcade Space Invaders", "D'un film de science-fiction",
+         "D'un groupe de rock", "De son vrai nom de famille"], ok:0,
+      info:"Le jeu lui a donné ses créatures ET son nom. Il n'a jamais révélé son identité." },
+  ],
+  /* ── LE BINAIRE : le jeu d'arcade d'origine ── */
+  LV_02: [
+    { q:"En quelle année le jeu Space Invaders est-il sorti ?",
+      r:["1978", "1972", "1985", "1991"], ok:0,
+      info:"Édité par Taito. Le jeu a été un tel raz-de-marée au Japon qu'une légende tenace — fausse — raconte qu'il y aurait provoqué une pénurie de pièces de 100 yens." },
+    { q:"Dans Space Invaders, pourquoi les aliens accélèrent-ils quand il en reste peu ?",
+      r:["La machine calculait plus vite avec moins d'ennemis à afficher",
+         "Le programmeur l'avait voulu dès le départ",
+         "La difficulté monte avec le score",
+         "Parce que la musique s'accélère"], ok:0,
+      info:"C'était une limite technique, pas une intention. Nishikado a trouvé que ça rendait le jeu bien meilleur — et l'a gardée." },
+    { q:"Qui a conçu Space Invaders ?",
+      r:["Tomohiro Nishikado", "Shigeru Miyamoto", "Nolan Bushnell", "Hideo Kojima"], ok:0,
+      info:"Miyamoto a créé Mario, Bushnell a fondé Atari, Kojima a fait Metal Gear. Trois grands noms — mais pas celui-là." },
+  ],
+  /* ── LE SPOTTING : chasser les pièces ── */
+  LV_03: [
+    { q:"Comment s'appelle l'application créée par Invader pour « flasher » ses mosaïques ?",
+      r:["FlashInvaders", "InvaderMap", "SpaceHunt", "TileHunter"], ok:0,
+      info:"Sortie en 2014. On photographie une pièce, l'appli la reconnaît et compte les points. C'est très exactement le principe du jeu que tu es en train de jouer." },
+    { q:"Dans FlashInvaders, que rapporte une mosaïque flashée ?",
+      r:["Des points, variables selon la pièce", "De l'argent réel",
+         "Rien, c'est juste un album", "Un autocollant à imprimer"], ok:0,
+      info:"De 10 à 100 points selon la taille de la pièce et la difficulté d'aller la chercher." },
+    { q:"Qu'est-ce qu'un « Invasion Guide » ?",
+      r:["Une carte publiée par Invader recensant ses pièces d'une ville",
+         "Un manuel pour apprendre le graffiti",
+         "Un documentaire sur son travail",
+         "Un magazine de street art"], ok:0,
+      info:"Un plan-guide, ville par ville. Il en existe pour Paris, Londres, Hong Kong, Los Angeles et bien d'autres." },
+  ],
+  /* ── RUBIKCUBISME ── */
+  LV_04: [
+    { q:"Comment Invader a-t-il baptisé son art fait de Rubik's Cubes ?",
+      r:["Le Rubikcubisme", "Le cubisme numérique", "Le pixel art", "Le néo-cubisme"], ok:0,
+      info:"Un clin d'œil au cubisme de Picasso et Braque. Il a lancé la série au début des années 2000, en refaisant des chefs-d'œuvre de la peinture à coups de cubes." },
+    { q:"Qui a inventé le Rubik's Cube ?",
+      r:["Ernő Rubik, un architecte hongrois", "Un ingénieur japonais",
+         "Un mathématicien américain", "Un professeur de physique allemand"], ok:0,
+      info:"En 1974, pour faire comprendre la géométrie dans l'espace à ses étudiants. Il lui a fallu un mois pour résoudre son propre cube." },
+    { q:"Combien un Rubik's Cube a-t-il de combinaisons possibles ?",
+      r:["Plus de 43 milliards de milliards", "Environ un million",
+         "Environ trois milliards", "Exactement cent mille"], ok:0,
+      info:"43 252 003 274 489 856 000, précisément. Et pourtant, depuis n'importe laquelle d'entre elles, 20 mouvements suffisent toujours à le résoudre." },
+  ],
+  /* ── LE SIMON : les séries, les villes, la mémoire ── */
+  LV_05: [
+    { q:"Comment Invader appelle-t-il le fait de poser des pièces dans une ville ?",
+      r:["Une invasion", "Une tournée", "Une exposition", "Un raid"], ok:0,
+      info:"Chaque ville envahie reçoit son code, et chaque pièce son numéro. Paris est la plus envahie de toutes." },
+    { q:"Environ combien de villes Invader a-t-il envahies dans le monde ?",
+      r:["Plus de 80", "Environ 5", "Environ 20", "Plus de 500"], ok:0,
+      info:"De Paris à Tokyo, en passant par Mombasa, Katmandou et Los Angeles." },
+    { q:"Une mosaïque d'Invader a été installée…",
+      r:["dans la Station spatiale internationale", "au fond de la fosse des Mariannes",
+         "sur la Lune", "sur la planète Mars"], ok:0,
+      info:"Il avait déjà envoyé une pièce dans la stratosphère en 2012, accrochée à un ballon météo : l'opération « Space One »." },
+  ],
+  /* ── LA CAVALE : l'illégalité, la fuite ── */
+  LV_06: [
+    { q:"Pourquoi Invader travaille-t-il masqué et anonyme ?",
+      r:["Parce que poser une œuvre dans la rue sans autorisation est illégal",
+         "Par timidité", "Par superstition", "C'est une exigence de sa galerie"], ok:0,
+      info:"Il n'a jamais montré son visage. Ses rares interviews se font lunettes noires et masque — et il a été arrêté plusieurs fois, dans plusieurs pays." },
+    { q:"En 2018, une œuvre de Banksy s'est autodétruite…",
+      r:["juste après avoir été adjugée aux enchères", "pendant un vernissage",
+         "dans la réserve d'un musée", "au contrôle de la douane"], ok:0,
+      info:"« Girl with Balloon », chez Sotheby's à Londres : une broyeuse était cachée dans le cadre. L'œuvre à moitié déchiquetée a pris de la valeur." },
+    { q:"Que veut dire « faire un flop » dans le vocabulaire du graffiti ?",
+      r:["Peindre une pièce vite faite, en deux couleurs",
+         "Se faire attraper", "Rater sa bombe", "Repeindre par-dessus quelqu'un"], ok:0,
+      info:"Aussi appelé « throw-up ». Un contour et un remplissage, en quelques secondes : c'est la réponse du graffeur au fait que le temps passé devant le mur, c'est du risque." },
+  ],
+  /* ── LA COOP : collectifs et collaborations ── */
+  LV_07: [
+    { q:"Quel artiste français colle d'immenses portraits en noir et blanc sur les façades ?",
+      r:["JR", "Invader", "Banksy", "Shepard Fairey"], ok:0,
+      info:"Il a fait « disparaître » la pyramide du Louvre en 2016 grâce à un collage en trompe-l'œil, et habillé la façade du Panthéon de portraits d'anonymes." },
+    { q:"Qui a créé l'affiche « HOPE » de la campagne d'Obama, en 2008 ?",
+      r:["Shepard Fairey, alias Obey", "Keith Haring", "Banksy", "Jean-Michel Basquiat"], ok:0,
+      info:"Le même artiste que le visage placardé partout dans le monde avec le mot OBEY : celui du catcheur André the Giant." },
+    { q:"Où Keith Haring a-t-il commencé à dessiner, au début des années 1980 ?",
+      r:["Sur les panneaux publicitaires vides du métro de New York",
+         "Sur les trains de Berlin", "Sur les murs de Paris", "Sur les plages de Rio"], ok:0,
+      info:"À la craie blanche, sur le papier noir qui recouvrait les emplacements libres. Des centaines de dessins, effacés au fur et à mesure — c'est là qu'il s'est fait connaître." },
+  ],
+  /* ── LE POCHOIR ── */
+  LV_08: [
+    { q:"Qui est considéré comme le père du pochoir dans la rue ?",
+      r:["Blek le Rat", "Banksy", "Miss.Tic", "C215"], ok:0,
+      info:"Français, il a commencé à Paris en 1981, et sa signature était un rat. Banksy a reconnu son influence : « à chaque fois que je crois avoir inventé quelque chose, Blek le Rat l'a fait vingt ans avant »." },
+    { q:"Pourquoi le pochoir est-il l'outil favori des artistes de rue ?",
+      r:["Il permet de peindre un motif détaillé en quelques secondes",
+         "Il coûte moins cher que la peinture",
+         "Il est autorisé par la loi",
+         "Il résiste mieux à la pluie"], ok:0,
+      info:"Le gabarit est découpé tranquillement à l'atelier. Devant le mur, il ne reste qu'à poser et pulvériser — le temps d'exposition est réduit au minimum." },
+    { q:"L'artiste française Miss.Tic accompagnait toujours ses pochoirs…",
+      r:["de jeux de mots poétiques", "de sa date de naissance",
+         "d'un code-barres", "d'un numéro de série"], ok:0,
+      info:"Une silhouette de femme et une phrase à double sens. Elle a marqué les murs de Ménilmontant et de la Butte-aux-Cailles pendant quarante ans." },
+  ],
+};
+
+/* Lance les trois questions de l'épreuve, puis appelle `done()`.
+   Le quiz s'intercale entre la victoire du mini-jeu et la révélation
+   du fragment : on a gagné, on souffle, on apprend, puis on récolte. */
+function runQuiz(st, done){
+  const qs = QUIZ[st.code];
+  if(!qs || !qs.length){ done(); return; }
+  /* on rend d'abord le temps au monde normal : le quiz n'est plus le jeu */
+  GamePause.unhook(); hidePause(); leaveFull();
+  $("#game-tools").hidden = true;
+  runCleanup(); clearHints();
+
+  const box = $("#game-box");
+  box.innerHTML = "";
+  if(typeof GameBG !== "undefined") GameBG.start(st.code, st.couleur, box);
+  /* le quiz vit dans SON conteneur : vider la boîte à chaque question
+     arracherait le canvas du décor, qui continuerait à tourner à vide */
+  const host = document.createElement("div");
+  host.className = "quiz-host";
+  box.appendChild(host);
+
+  S.quiz = S.quiz || {};                 // { "LV_01:0": true } → questions déjà trouvées
+  let i = 0, bons = 0;
+
+  function ask(){
+    if(i >= qs.length) return recap();
+    const item = qs[i];
+    /* on mélange les propositions à chaque passage : réviser un défi
+       ne doit pas se réduire à retenir « c'est la première » */
+    const opts = item.r.map((txt, k)=>({ txt, bon: k === item.ok }));
+    for(let k = opts.length-1; k > 0; k--){
+      const j = Math.floor(Math.random()*(k+1)); const t = opts[k]; opts[k] = opts[j]; opts[j] = t;
+    }
+    host.innerHTML = "";
+    const card = document.createElement("div");
+    card.className = "quiz";
+    card.innerHTML =
+      `<div class="quiz-top"><span class="quiz-kick">QUESTION ${i+1}/${qs.length}</span>
+        <span class="quiz-dots">${qs.map((_,k)=>
+          `<i class="${k<i?'done':k===i?'now':''}"></i>`).join("")}</span></div>
+       <p class="quiz-q">${item.q}</p>
+       <div class="quiz-opts"></div>
+       <div class="quiz-info" hidden></div>`;
+    const zone = card.querySelector(".quiz-opts");
+    opts.forEach(o=>{
+      const b = document.createElement("button");
+      b.className = "quiz-opt"; b.type = "button"; b.textContent = o.txt;
+      b.addEventListener("click", ()=>answer(o, b, card, zone), { once:true });
+      zone.appendChild(b);
+    });
+    host.appendChild(card);
+  }
+
+  function answer(o, btn, card, zone){
+    [...zone.children].forEach(b=>{ b.disabled = true; });
+    const item = qs[i];
+    const bonTxt = item.r[item.ok];
+    [...zone.children].forEach(b=>{
+      if(b.textContent === bonTxt) b.classList.add("bon");
+    });
+    if(o.bon){
+      bons++; btn.classList.add("choisi");
+      S.quiz[st.code + ":" + i] = true;
+      AudioFX.star(1); Juice.pop(card, "+10 PTS", "var(--cyan)");
+      S.points += 10;
+    }else{
+      btn.classList.add("faux");
+      AudioFX.err();
+      try{ navigator.vibrate && navigator.vibrate([40,50,40]); }catch(e){}
+    }
+    persist();
+    const info = card.querySelector(".quiz-info");
+    info.hidden = false;
+    info.innerHTML = `<b>${o.bon ? "Exact." : "La bonne réponse : " + bonTxt}</b>`
+                   + `<span>${item.info}</span>`;
+    const next = document.createElement("button");
+    next.className = "b1"; next.style.marginTop = "10px";
+    next.textContent = (i === qs.length-1) ? "→ Terminer" : "→ Question suivante";
+    next.addEventListener("click", ()=>{ AudioFX.select(); i++; ask(); }, { once:true });
+    card.appendChild(next);
+    next.scrollIntoView({ block:"nearest", behavior:"smooth" });
+  }
+
+  function recap(){
+    host.innerHTML = "";
+    const gagne = bons*10;
+    const card = document.createElement("div");
+    card.className = "quiz";
+    const mot = bons === qs.length ? "SANS UNE FAUTE !"
+              : bons >= 2 ? "BIEN VU." : "L'essentiel, c'est de savoir maintenant.";
+    card.innerHTML =
+      `<div class="quiz-score">${bons}<small>/${qs.length}</small></div>
+       <p class="quiz-q" style="text-align:center;">${mot}</p>
+       <p class="sub" style="text-align:center;">${gagne ? "+" + gagne + " points de culture" : "Aucun point cette fois"}</p>`;
+    host.appendChild(card);
+    if(bons === qs.length) AudioFX.fragment();
+    /* les 24 questions trouvées, toutes épreuves confondues */
+    const total = Object.keys(S.quiz || {}).length;
+    if(total >= 24) unlockSucces("savant");
+    persist();
+    const b = document.createElement("button");
+    b.textContent = "→ Récupérer le fragment";
+    b.addEventListener("click", ()=>{ AudioFX.select(); done(); }, { once:true });
+    host.appendChild(b);
+  }
+  ask();
+}
+
+/* ── PLEIN ÉCRAN ──────────────────────────────────────────────
+   Deux niveaux, parce qu'aucun n'est disponible partout :
+   la mise en page plein cadre (toujours), et le vrai plein écran du
+   navigateur qui escamote sa propre barre d'adresse (Chrome/Android,
+   ordinateurs — Safari iOS ne l'accorde pas hors vidéo, d'où le
+   « au mieux » : si c'est refusé, la mise en page suffit). */
+function enterFull(){
+  $("#game-screen").classList.add("plein");
+  document.body.classList.add("plein-jeu");
+  try{
+    const el = document.documentElement;
+    if(!document.fullscreenElement && el.requestFullscreen)
+      el.requestFullscreen({ navigationUI:"hide" }).catch(()=>{});
+  }catch(e){}
+}
+function leaveFull(){
+  $("#game-screen").classList.remove("plein");
+  document.body.classList.remove("plein-jeu");
+  try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+}
+
+/* ── PAUSE & SORTIE ──────────────────────────────────────────── */
+function showPause(){
+  if(!$("#game-screen").classList.contains("active")) return;
+  if(!GamePause.isHooked() || GamePause.isPaused()) return;
+  GamePause.pause();
+  $("#game-pause").hidden = false;
+  /* on ne propose « recommencer » que si ça a un sens */
+  $("#btn-restart").hidden = !currentStation;
+  AudioFX.duck(.08);
+  setTimeout(()=>{ const b = $("#btn-resume"); if(b) b.focus(); }, 30);
+}
+function hidePause(){
+  $("#game-pause").hidden = true;
+  if(GamePause.isPaused()) GamePause.resume();
+  AudioFX.duck(.16);
+}
+function quitGame(){
+  GamePause.unhook();
+  $("#game-pause").hidden = true;
+  leaveFull();
+  runCleanup();
+  clearHints();
+  if(typeof GameBG !== "undefined") GameBG.stop();
+  $("#game-box").innerHTML = "";
+  AudioFX.back && AudioFX.back();
+  renderHub(); show("hub-screen");
+}
+
 function startGame(st, onWin){
   currentStation = st;
   gameT0 = Date.now(); hintUsedThisGame = false;
@@ -6378,6 +7175,13 @@ function startGame(st, onWin){
   $("#game-title").textContent = `${st.code} — ${st.nom}`;
   /* l'écran de défi prend la couleur de la station (cadre + titre) */
   $("#game-screen").style.setProperty("--st", st.couleur);
+  enterFull();                       // le défi prend tout l'écran
+  hidePause();
+  $("#game-tools").hidden = false;    // pause & sortie : seulement pendant le jeu
+  /* On gèle le temps AVANT de lancer quoi que ce soit : ainsi le décor
+     animé comme le mini-jeu lui-même passent par notre couche, et la
+     pause les arrête tous les deux sans qu'ils aient à le savoir. */
+  GamePause.unhook(); GamePause.hook();
   const box = $("#game-box"); box.innerHTML="";
   /* le décor vivant du défi : chaque station a le sien */
   if(typeof GameBG !== "undefined") GameBG.start(st.code, st.couleur, box);
@@ -6389,8 +7193,10 @@ function startGame(st, onWin){
        victoire… chaque geste peut faire réagir le fond */
     bg: (typeof GameBG !== "undefined") ? GameBG : {
       pulse(){}, burst(){}, flash(){}, shake(){}, good(){}, bad(){}, win(){} },
-    /* onWin (mode tournée) court-circuite la victoire normale */
-    win(opts){ onWin ? onWin(opts) : winGame(st, false, opts); },
+    /* onWin (mode tournée) court-circuite la victoire normale — et le
+       quiz avec elle : la tournée est un contre-la-montre, on ne
+       l'interrompt pas pour poser des questions. */
+    win(opts){ onWin ? onWin(opts) : runQuiz(st, ()=>winGame(st, false, opts)); },
   };
   runCleanup();
   const ret = MiniGames[st.code](box, api);
@@ -6404,6 +7210,12 @@ function startGame(st, onWin){
   hintTimers.push(setTimeout(()=>{ $("#btn-skip").hidden=false; }, d2));
 }
 function winGame(st, skipped, opts={}){
+  /* on rend le temps au monde normal AVANT la fête : les animations de
+     victoire ne doivent plus dépendre de la couche de pause */
+  GamePause.unhook();
+  hidePause();
+  leaveFull();
+  $("#game-tools").hidden = true;     // plus rien à mettre en pause
   runCleanup();
   clearHints();
   const wasDone = !!S.done[st.code];         // rejoue-t-il un défi déjà fini ?
@@ -13043,6 +13855,34 @@ $("#btn-manual").addEventListener("click", ()=>{
 $("#manual-in").addEventListener("keydown", e=>{
   if(e.key==="Enter"){ e.preventDefault(); $("#btn-manual").click(); }
 });
+$("#btn-torch").addEventListener("click", ()=>{ AudioFX.tick && AudioFX.tick(); Scanner.toggleTorch(); });
+
+/* ── Pause & sortie d'un défi ─────────────────────────────── */
+$("#btn-pause").addEventListener("click", ()=>{ AudioFX.select(); showPause(); });
+$("#btn-quit").addEventListener("click",  ()=>{ AudioFX.select(); showPause(); });
+$("#btn-resume").addEventListener("click", ()=>{ AudioFX.select(); hidePause(); });
+$("#btn-leave").addEventListener("click",  ()=>quitGame());
+$("#btn-restart").addEventListener("click", ()=>{
+  AudioFX.select();
+  const st = currentStation;
+  $("#game-pause").hidden = true;
+  GamePause.unhook();
+  if(st) startGame(st);
+});
+/* Échap : d'abord la pause, puis la reprise — le geste naturel sur
+   ordinateur, et c'est aussi ce que renvoie la sortie du plein écran */
+addEventListener("keydown", e=>{
+  if(e.key !== "Escape") return;
+  if(!$("#game-screen").classList.contains("active")) return;
+  e.preventDefault();
+  if($("#game-pause").hidden) showPause(); else hidePause();
+});
+/* le téléphone se verrouille, on change d'appli, on répond au
+   téléphone : le défi se met en pause tout seul plutôt que de tourner
+   dans le vide — et de faire perdre une partie en cours */
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden && $("#game-screen").classList.contains("active")) showPause();
+});
 $("#btn-challenge").addEventListener("click", ()=>{
   if(flashSpin){ flashSpin(); flashSpin = null; }     // coupe la rotation
   startGame(currentStation);
@@ -13092,6 +13932,7 @@ const SUCCES = [
   { id:"traversee",ico:"🚦", nom:"Roi de la rue",   desc:"10 traversées dans Traversée" },
   { id:"dedale",   ico:"🏙", nom:"Sans un accroc",  desc:"Série de 8 traversées sans te faire toucher" },
   { id:"goldrush",ico:"🥇",nom:"Chasseur d'or",    desc:"3 médailles d'or (défis chrono)" },
+  { id:"savant", ico:"🎓", nom:"Docteur ès Invaders", desc:"Trouver les 24 questions du quiz" },
 ];
 S.succes = S.succes || {};
 S.stars  = S.stars  || {};
@@ -19501,7 +20342,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v98</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v100</p>`);
     wire();
   }
   function wire(){
