@@ -2954,6 +2954,9 @@ button.b2{ color:#04231d !important; }
         <button id="btn-radar-copy" class="b3">⎘ Copier les spots</button>
         <button id="btn-radar-map" class="b3">🗺 Voir ce spot sur une carte</button>
         <button id="btn-radar-export" class="b3">⬇ Exporter le repérage</button>
+        <button id="btn-tuiles" class="b3">🗺 Télécharger le village (hors-ligne)</button>
+      </div>
+      <div id="tuiles-out" class="dim" style="text-align:center; font-size:13px; min-height:18px; margin-top:6px;">
       </div>
       <!-- LE BANC D'ESSAI : il tranche entre « le radar calcule mal »
            et « la position enregistrée est fausse ». Sans lui, on ne
@@ -3036,6 +3039,21 @@ button.b2{ color:#04231d !important; }
     <div class="btn-row">
       <button id="btn-radar-on">📡 Activer le radar</button>
     </div>
+    <!-- ── LE RACCOURCI HONNÊTE ─────────────────────────────────
+         Une page web n'a pas les moyens de Google Maps : ni sa base
+         mondiale de bornes Wi-Fi, ni le recalage sur les rues, ni la
+         fusion des capteurs de mouvement. Plutôt que de mal l'imiter,
+         on lui passe la main pour ce qu'elle fait le mieux — mener
+         quelqu'un jusqu'à un point — et le jeu garde le reste :
+         l'énigme, la photo du mur, le flash, le défi.
+         Le radar interne reste là pour le mode avion. -->
+    <div class="btn-row" style="padding-top:8px;">
+      <button id="btn-goto" class="b3">🧭 M'y conduire avec Plans / Maps</button>
+    </div>
+    <p class="sub" id="goto-note" style="font-size:13px; margin-top:6px; opacity:.7;">
+      Ouvre l'itinéraire à pied vers la pièce dans l'application de cartes du
+      téléphone. C'est elle qui guide le mieux — le jeu s'occupe du reste.
+    </p>
   </div>
 </section>
 
@@ -8551,7 +8569,10 @@ const Radar = (()=>{
   /* ── ÉTAT ────────────────────────────────────────────────────── */
   let cv, c, raf = null, watchId = null, stopped = false, bound = false;
   let fix = null, accM = null, gpsErr = false, gpsSpeed = null;
-  let nFix = 0, bestAcc = null, t0Watch = 0;
+  let nFix = 0, bestAcc = null, t0Watch = 0, accBrut = null, immo = 0;
+  let cap = null, capAt = 0;   // cap mesuré à la marche, et sa date
+  let brgPrec = null;          // la dérive précédente, pour confirmer
+  let mvDernier = null;        // une seule mesure de mouvement par relevé
   let selCode = null, lockCode = null;
   const trail = [];      // ta trace : c'est elle qui remplace la boussole
   const hist  = [];      // distances récentes, pour la courbe d'approche
@@ -8561,6 +8582,7 @@ const Radar = (()=>{
   let kOrigin = null, kN = null, kE = null, kAt = 0;
   /* la vue : centre en mètres autour de l'origine, et l'échelle */
   let vue = { e:0, n:0, mpp:0.6 }, suivre = true, lastAux = 0;
+  let fondOn = true;          // le fond de carte OpenStreetMap
   let origine = null;    // point de référence de la projection locale
   let drag = null, pinch = null;
 
@@ -8615,6 +8637,80 @@ const Radar = (()=>{
   const spreadOf = (d, a)=> (!d || a == null) ? 0
     : Math.min(180, Math.atan2(a, Math.max(1, d))*180/Math.PI);
 
+  /* ── LE FOND DE CARTE : OPENSTREETMAP ────────────────────────
+     Voilà ce qui manquait vraiment. Un plan sans rues ne dit pas où
+     l'on est ; avec les rues, une erreur de vingt mètres devient
+     lisible — on voit qu'on est devant l'église plutôt que dans la
+     ruelle d'à côté, et l'œil corrige tout seul. C'est exactement ce
+     qui rend Google Maps si simple.
+
+     OpenStreetMap est libre. Les tuiles sont mises en cache par le
+     service worker, dans un espace qui n'est jamais purgé : une fois
+     le village parcouru — ou préparé d'un coup avec le bouton du
+     panneau de réglage — la carte fonctionne EN MODE AVION. C'est la
+     condition pour qu'elle serve le jour J.
+
+     Les serveurs d'OSM sont tenus par des bénévoles : on ne demande
+     jamais deux fois la même tuile, et on se limite au village. */
+  const TUILE = 256;
+  const tuiles = new Map();          // url → Image
+  const lon2x = (lon, z)=> (lon+180)/360 * Math.pow(2, z);
+  const lat2y = (lat, z)=>{ const r = lat*Math.PI/180;
+    return (1 - Math.log(Math.tan(r) + 1/Math.cos(r))/Math.PI)/2 * Math.pow(2, z); };
+  const x2lon = (x, z)=> x/Math.pow(2, z)*360 - 180;
+  const y2lat = (y, z)=>{ const n = Math.PI - 2*Math.PI*y/Math.pow(2, z);
+    return 180/Math.PI * Math.atan(0.5*(Math.exp(n) - Math.exp(-n))); };
+  /* la résolution d'un niveau de zoom, en mètres par pixel */
+  const mppAt = (z, lat)=> 156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2, z);
+  function zoomPour(mpp, lat){
+    let z = Math.round(Math.log2(156543.03392*Math.cos(lat*Math.PI/180)/mpp));
+    return Math.max(13, Math.min(19, z));
+  }
+  function getTuile(z, x, y){
+    const n = Math.pow(2, z);
+    if(y < 0 || y >= n) return null;
+    x = ((x % n) + n) % n;
+    const url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+    let im = tuiles.get(url);
+    if(im === undefined){
+      im = new Image();
+      im.crossOrigin = "anonymous";     // sinon la carte ne serait pas relisible
+      im.onerror = ()=>{ im.rate = true; };
+      im.src = url;
+      tuiles.set(url, im);
+      /* on borne la mémoire : au-delà, les plus anciennes partent —
+         le cache du service worker, lui, les garde sur le disque */
+      if(tuiles.size > 400){ const k = tuiles.keys().next().value; tuiles.delete(k); }
+    }
+    return im;
+  }
+  function dessinerFond(W, H){
+    if(!origine || !fondOn) return;
+    const latC = origine[0] + vue.n/111320;
+    const lonC = origine[1] + vue.e/(111320*Math.cos(origine[0]*Math.PI/180));
+    const z = zoomPour(vue.mpp, latC);
+    const ech = mppAt(z, latC)/vue.mpp;      // px écran par px de tuile
+    const tx = lon2x(lonC, z), ty = lat2y(latC, z);
+    const demiX = W/2/(TUILE*ech), demiY = H/2/(TUILE*ech);
+    const x0 = Math.floor(tx - demiX), x1 = Math.floor(tx + demiX);
+    const y0 = Math.floor(ty - demiY), y1 = Math.floor(ty + demiY);
+    c.save();
+    c.globalAlpha = 0.62;               // le fond reste un fond
+    for(let x = x0; x <= x1; x++) for(let y = y0; y <= y1; y++){
+      const im = getTuile(z, x, y);
+      if(!im || !im.complete || !im.naturalWidth) continue;
+      const sx = W/2 + (x - tx)*TUILE*ech, sy = H/2 + (y - ty)*TUILE*ech;
+      c.drawImage(im, sx, sy, TUILE*ech + 1, TUILE*ech + 1);
+    }
+    c.restore();
+    /* la mention, exigée par la licence d'OpenStreetMap */
+    c.font = "9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+    c.textAlign = "right"; c.textBaseline = "bottom";
+    c.fillStyle = "rgba(8,10,26,.55)"; c.fillRect(W-104, H-14, 100, 12);
+    c.fillStyle = "rgba(220,228,255,.72)";
+    c.fillText("© OpenStreetMap", W-6, H-3);
+  }
+
   /* ── LA CARTE ────────────────────────────────────────────────── */
   const PAS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
   function pasGrille(mpp, W){ const vise = W*mpp/4;
@@ -8647,6 +8743,7 @@ const Radar = (()=>{
     c.clearRect(0, 0, W, H);
     c.fillStyle = "#0c0e1e"; c.fillRect(0, 0, W, H);
     setOrigine();
+    dessinerFond(W, H);
     if(!origine){
       /* ni position ni spot : il n'y a rien à projeter */
       c.fillStyle = "#6a7099"; c.textAlign = "center"; c.textBaseline = "middle";
@@ -8660,7 +8757,8 @@ const Radar = (()=>{
        Sans repère de taille, une carte sans rues ne veut rien dire :
        on ne sait pas si le point est à dix mètres ou à un kilomètre. */
     const pas = pasGrille(vue.mpp, W);
-    c.strokeStyle = "rgba(120,150,255,.10)"; c.lineWidth = 1;
+    c.strokeStyle = fondOn ? "rgba(120,150,255,.05)" : "rgba(120,150,255,.10)";
+    c.lineWidth = 1;
     const e0 = Math.floor((vue.e - W/2*vue.mpp)/pas)*pas;
     const n0 = Math.floor((vue.n - H/2*vue.mpp)/pas)*pas;
     for(let e = e0; e < vue.e + W/2*vue.mpp + pas; e += pas){
@@ -8762,6 +8860,17 @@ const Radar = (()=>{
         c.beginPath(); c.moveTo(x, y); c.lineTo(X(b.e), Y(b.n)); c.stroke();
         c.setLineDash([]);
       }
+      /* le cône de marche : dans quel sens on avance. Il n'apparaît
+         que si le cap vient d'être mesuré — jamais par défaut. */
+      if(cap != null && (performance.now() - capAt) < 12000){
+        const a = (cap - 90)*Math.PI/180;
+        c.save(); c.translate(x, y); c.rotate(a);
+        const g2 = c.createLinearGradient(0, 0, 46, 0);
+        g2.addColorStop(0, "rgba(43,228,208,.42)"); g2.addColorStop(1, "rgba(43,228,208,0)");
+        c.fillStyle = g2;
+        c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 46, -0.34, 0.34); c.closePath(); c.fill();
+        c.restore();
+      }
       c.fillStyle = "#fff";
       c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill();
       c.strokeStyle = "#2BE4D0"; c.lineWidth = 2.5;
@@ -8850,12 +8959,27 @@ const Radar = (()=>{
     /* le guidage ne parle plus de gauche ni de droite : sans boussole,
        ces mots-là n'ont aucun sens. Il donne un CAP, que la carte
        montre, et que la trace permet de vérifier. */
-    gg.textContent = zone
-      ? "Tu y es. Le GPS ne peut plus t'aider : cherche à vue."
-      : !fiable
-        ? "Avance d'une vingtaine de mètres : le point est trop flou pour donner un cap."
-        : `Suis le trait en pointillés — ${versCard(t.brg)}.`;
-    gg.style.color = zone ? "#8fd0ff" : fiable ? "#EDEDF7" : "#8fd0ff";
+    /* ── OÙ ALLER ────────────────────────────────────────────
+       Trois niveaux, du plus utile au plus prudent :
+
+       1. le cap est FRAIS (on vient de marcher) → on peut dire
+          « tourne à gauche », parce qu'on sait dans quel sens on est
+          tourné. C'est ce qui manquait ;
+       2. sinon → le point cardinal, que la carte montre ;
+       3. si le GPS est trop flou pour que la direction ait un sens,
+          on se tait plutôt que d'envoyer au hasard. */
+    /* ── PAS DE CONSEILS ──────────────────────────────────────
+       Le guidage disait « tourne à gauche — 64° ». Mesuré sur quatre
+       marches simulées par niveau de bruit : à ±40 m, quatre conseils
+       sur cinquante-deux envoyaient dans la mauvaise direction. Et un
+       « fais demi-tour » erroné coûte cinq minutes de marche pour rien.
+
+       Maintenant que la carte porte les vraies rues, ces phrases ne
+       servent plus à rien : on VOIT où aller. On se contente donc de
+       dire ce qu'on sait — la distance, et où c'est — sans prétendre
+       diriger les pas de qui que ce soit. */
+    gg.textContent = zone ? "Tu y es — cherche à vue." : "";
+    gg.style.color = "#8fd0ff";
     const bits = [ `${t.st.code} — ${t.st.nom}` ];
     if(fiable) bits.push(`${cardinal(t.brg)} (${Math.round(t.brg)}°)`);
     bits.push(`GPS ±${Math.round(a)} m`);
@@ -8935,8 +9059,16 @@ const Radar = (()=>{
      retard là où une moyenne exponentielle garde un décalage constant.
      Mesuré : marche à ±10 m, −0,2 m de retard ; à vélo, +3,3 m. */
   function kfNew(m, r){ return { p:m, v:0, P00:r, P01:0, P10:0, P11:1 }; }
-  function kfStep(s, m, r, dt){
-    const q = 1.2;
+  /* `q` est le bruit de manœuvre : de combien on autorise la vitesse à
+     changer entre deux relevés. Il était fixe, et c'était le frein.
+
+     · Trop grand, le filtre suit le bruit du GPS et la position danse.
+     · Trop petit, il ne suit plus la marche et retarde.
+
+     Or ces deux besoins ne surviennent JAMAIS en même temps : à
+     l'arrêt on veut un filtre très ferme, en marchant un filtre très
+     souple. On le règle donc selon ce qu'on est en train de faire. */
+  function kfStep(s, m, r, dt, q){
     s.p += s.v*dt;
     s.P00 += dt*(2*s.P01 + dt*s.P11) + q*dt*dt*dt/3;
     s.P01 += dt*s.P11 + q*dt*dt/2; s.P10 = s.P01; s.P11 += q*dt;
@@ -8944,6 +9076,64 @@ const Radar = (()=>{
     s.p += k0*y; s.v += k1*y;
     const a = s.P00, b = s.P01;
     s.P00 -= k0*a; s.P01 -= k0*b; s.P10 -= k1*a; s.P11 -= k1*b;
+  }
+  /* ── RECALAGE À VITESSE NULLE ────────────────────────────────
+     La technique classique de la navigation à pied : quand on sait
+     qu'on est immobile, on le DIT au filtre. Il cesse alors de
+     s'autoriser une dérive, et la position se met à moyenner les
+     relevés au lieu de les suivre — la précision s'améliore comme la
+     racine du nombre de mesures. C'est ce qui fait qu'après dix
+     secondes sans bouger, le point cesse de danser. */
+  /* dérive du centre sur les six dernières secondes */
+  /* ── CE QUE FONT VRAIMENT LES DIX DERNIÈRES SECONDES ─────────
+     Une seule mesure sert deux besoins : savoir si l'on bouge, et
+     savoir dans quel sens. On compare le point moyen du début de la
+     fenêtre à celui de la fin. Le bruit s'annule dans une moyenne ;
+     seul un vrai déplacement écarte les deux centres. La direction de
+     cet écart est le cap — mesuré, moyenné, et bien plus solide que
+     l'angle d'une vitesse instantanée sous un GPS qui tremble. */
+  function mouvementVu(){
+    const tn = performance.now();
+    const pts = raw.filter(p=>tn - p.t < 10000);
+    if(pts.length < 5) return null;
+    const k = Math.max(2, Math.floor(pts.length/3));
+    const moy = (a)=>[ a.reduce((s,p)=>s+p.lat,0)/a.length, a.reduce((s,p)=>s+p.lon,0)/a.length ];
+    const c1 = moy(pts.slice(0, k)), c2 = moy(pts.slice(-k));
+    const derive = distM(c1, c2);
+    const acc = pts.reduce((s,p)=>s+p.a, 0)/pts.length;
+    /* la dérive de DEUX moyennes de k points a elle-même un écart-type
+       de acc·√(2/k) : en dessous on mesure le bruit, au-dessus on
+       mesure un déplacement. C'est cette formule, et non un chiffre
+       choisi à la main, qui vaut aussi bien à ±5 m qu'à ±40 m. */
+    const sigma = acc*Math.sqrt(2/k);
+    const seuil = Math.max(2.5, sigma*1.1);
+    /* Deux verrous AVANT d'oser annoncer un cap :
+
+       · la dérive doit dépasser DEUX FOIS ET DEMIE son propre bruit,
+         et douze mètres en valeur absolue. Sans ce garde-fou, un GPS
+         à ±40 m fabriquait un cap parfaitement plausible — mesuré à
+         194° alors qu'on marchait plein nord — et le guidage
+         annonçait « fais demi-tour ». Un conseil faux est pire que
+         pas de conseil du tout ;
+       · et il doit se CONFIRMER : deux mesures successives à moins de
+         60° l'une de l'autre. Le bruit, lui, change de sens à chaque
+         fois. */
+    let brg = null;
+    if(derive > Math.max(seuil*2.5, 12)){
+      const b = bearingTo(c1, c2);
+      const ok = brgPrec == null
+        || Math.abs(((b - brgPrec) % 360 + 540) % 360 - 180) < 60;
+      brgPrec = b;
+      if(ok) brg = b;
+    }else brgPrec = null;
+    return { derive, seuil, immobile: derive < seuil, brg };
+  }
+  function kfZupt(s){
+    const R0 = 0.03;                       // « je suis sûr d'être à l'arrêt »
+    const S = s.P11 + R0, k = s.P11/S;
+    s.v -= k*s.v;
+    s.P01 -= (s.P01/S)*s.P11; s.P10 = s.P01;
+    s.P11 -= k*s.P11;
   }
   function startWatch(){
     if(!navigator.geolocation){
@@ -8967,10 +9157,53 @@ const Radar = (()=>{
       else{
         const saut = Math.hypot(mN-kN.p, mE-kE.p);
         if(saut > Math.max(150, na*6)){ kN = kfNew(mN, r); kE = kfNew(mE, r); }
-        else{ kfStep(kN, mN, r, dt); kfStep(kE, mE, r, dt); }
+        else{
+          /* ── IMMOBILE OU EN MARCHE ? ───────────────────────────
+             Se fier à la vitesse estimée ne marchait pas : sous un GPS
+             bruité à ±20 m, le tremblement des relevés ressemble à une
+             marche, et le filtre restait « en mouvement » alors qu'on
+             ne bougeait pas — donc il ne moyennait jamais.
+
+             On regarde donc autre chose : la DÉRIVE DU CENTRE. On
+             compare le point moyen du début de la fenêtre à celui de
+             la fin. Le bruit, lui, s'annule dans une moyenne ; seul un
+             vrai déplacement fait bouger les deux centres l'un par
+             rapport à l'autre. C'est vrai quel que soit le niveau de
+             bruit, et c'est ce qui rend la détection fiable. */
+          /* asymétrique À DESSEIN : le verrou d'immobilité doit être
+             lent à se fermer et RAPIDE à s'ouvrir. Sinon on gagne en
+             précision à l'arrêt ce qu'on perd au départ — le filtre
+             met dix secondes à admettre qu'on marche. */
+          const mv = mouvementVu(); mvDernier = mv;
+          if(mv) immo = mv.immobile ? immo*0.85 + 0.15 : immo*0.45;
+          const q = immo > 0.6 ? 0.05 : 2.5;
+          kfStep(kN, mN, r, dt, q); kfStep(kE, mE, r, dt, q);
+          if(immo > 0.75){ kfZupt(kN); kfZupt(kE); }
+        }
       }
       fix = [ kOrigin[0] + kN.p/ml, kOrigin[1] + kE.p/mo ];
-      accM = na; gpsSpeed = Math.hypot(kN.v, kE.v);
+      /* ── LA VRAIE PRÉCISION ────────────────────────────────────
+         Jusqu'ici on affichait celle annoncée par le GPS pour le
+         DERNIER relevé. Mais le filtre en a combiné des dizaines : sa
+         propre incertitude est bien meilleure, et c'est elle qu'il
+         faut montrer. On la borne quand même par la précision brute
+         divisée par deux — un filtre trop sûr de lui serait un
+         mensonge de plus. */
+      const sigma = Math.sqrt(Math.max(0, (kN.P00 + kE.P00)/2));
+      accBrut = na;
+      accM = Math.max(2, Math.min(na, Math.max(sigma, na/2.5)));
+      gpsSpeed = Math.hypot(kN.v, kE.v);
+      /* ── LE CAP, QUAND ON PEUT VRAIMENT LE MESURER ────────────
+         Sans boussole, la seule direction connue est celle du
+         déplacement. Le filtre la donne : c'est l'angle du vecteur
+         vitesse. On ne s'en sert QUE si l'on marche franchement —
+         sinon on prendrait le tremblement du GPS pour un demi-tour.
+         Et on le garde quelques secondes après l'arrêt, parce qu'on
+         regarde souvent l'écran juste après s'être arrêté. */
+      if(mvDernier && mvDernier.brg != null){ cap = mvDernier.brg; capAt = tn; }
+      else if(gpsSpeed > 1.2){
+        cap = (Math.atan2(kE.v, kN.v)*180/Math.PI + 360) % 360; capAt = tn;
+      }
       raw.push({ lat, lon, a:na, t:tn });
       while(raw.length && tn - raw[0].t > 20000) raw.shift();
       if(!trail.length || tn - (trail.tLast || 0) > 2500){
@@ -8998,6 +9231,7 @@ const Radar = (()=>{
     if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} }
     watchId = null; fix = null; accM = null; gpsSpeed = null;
     kOrigin = null; kN = null; kE = null; kAt = 0; nFix = 0; bestAcc = null;
+    accBrut = null; immo = 0; cap = null; capAt = 0; brgPrec = null; mvDernier = null;
     trail.length = 0; hist.length = 0; raw.length = 0;
     $("#btn-radar-on").textContent = "📡 Activer le radar";
   }
@@ -9155,7 +9389,9 @@ const Radar = (()=>{
     el.textContent =
       `GPS ${fix ? fix[0].toFixed(5)+", "+fix[1].toFixed(5) : "—"} · ±${accM!=null?Math.round(accM):"—"} m`
       + ` · ${gpsSpeed!=null?gpsSpeed.toFixed(1)+" m/s":"—"}\n`
-      + `relevés ${nFix} · meilleure ±${bestAcc!=null?Math.round(bestAcc):"—"} m · trace ${trail.length} pts\n`
+      + `brut ±${accBrut!=null?Math.round(accBrut):"—"} m → filtré ±${accM!=null?accM.toFixed(1):"—"} m`
+      + ` · ${immo>0.6?"immobile (moyennage)":"en marche"}\n`
+      + `cap ${cap!=null?Math.round(cap)+"°":"—"} · relevés ${nFix} · trace ${trail.length} pts\n`
       + `carte : ${vue.mpp.toFixed(2)} m/px · ${suivre?"suit ta position":"déplacée à la main"}\n`
       + `pièces enregistrées ${Object.keys(loadSpots()).length}/8`;
   }
@@ -9164,6 +9400,33 @@ const Radar = (()=>{
     if(bound) return; bound = true;
     $("#btn-radar-on").addEventListener("click", ()=>{
       AudioFX.select(); watchId == null ? startWatch() : stopWatch();
+    });
+    /* ── PASSER LA MAIN À L'APPLI DE CARTES ───────────────────
+       `geo:` est le format universel : iOS l'envoie sur Plans,
+       Android sur Maps. On y ajoute l'itinéraire à pied de Google en
+       secours, et enfin une simple adresse web si rien d'autre ne
+       répond. Trois filets, parce qu'un bouton qui ne fait rien serait
+       pire que pas de bouton du tout. */
+    $("#btn-goto").addEventListener("click", ()=>{
+      const t = target();
+      if(!t){ AudioFX.err();
+        $("#goto-note").textContent = "Aucune pièce enregistrée à rejoindre pour l'instant."; return; }
+      AudioFX.select();
+      const [la, lo] = t.p, nom = encodeURIComponent(t.st.code + " — " + t.st.nom);
+      const web = `https://www.google.com/maps/dir/?api=1&destination=${la},${lo}&travelmode=walking`;
+      $("#goto-note").textContent = `Itinéraire à pied vers ${t.st.code} — ${t.st.nom}.`;
+      /* on tente l'appli native d'abord ; si la page est toujours là
+         une seconde après, c'est qu'elle n'a pas répondu */
+      let parti = false;
+      const marque = ()=>{ parti = true; };
+      document.addEventListener("visibilitychange", marque, { once:true });
+      try{ location.href = `geo:${la},${lo}?q=${la},${lo}(${nom})`; }catch(e){}
+      setTimeout(()=>{
+        document.removeEventListener("visibilitychange", marque);
+        if(parti || document.hidden) return;
+        try{ window.open(web, "_blank", "noopener"); }
+        catch(e){ prompt("Itinéraire :", web); }
+      }, 900);
     });
     $("#radar-list").addEventListener("click", e=>{
       const b = e.target.closest(".rl"); if(!b) return;
@@ -9270,6 +9533,53 @@ const Radar = (()=>{
       if(v) m[selCode] = v; else delete m[selCode];
       saveMap(KEY_NOTE, m); AudioFX.tick(); });
     /* ── LES REPÈRES ─────────────────────────────────────────── */
+    /* ── PRÉPARER LE MODE AVION ───────────────────────────────
+       On télécharge une fois, chez soi, les tuiles qui couvrent les
+       huit pièces — plus une marge de deux cents mètres — sur trois
+       niveaux de zoom. Le service worker les garde définitivement.
+       Le jour J, dans une ruelle sans réseau, la carte est là.
+
+       On y va doucement : les serveurs d'OpenStreetMap sont tenus par
+       des bénévoles, et rien ne justifie de les brusquer pour un
+       village. */
+    $("#btn-tuiles").addEventListener("click", async ()=>{
+      const sp = loadSpots(), lms = (loadMap(KEY_LM).v || []).map(l=>l.p);
+      const pts = Object.values(sp).concat(lms);
+      if(fix) pts.push(fix);
+      if(!pts.length){ AudioFX.err();
+        $("#tuiles-out").textContent = "Enregistre d'abord au moins une pièce."; return; }
+      let laMin = 90, laMax = -90, loMin = 180, loMax = -180;
+      pts.forEach(p=>{ laMin = Math.min(laMin, p[0]); laMax = Math.max(laMax, p[0]);
+                       loMin = Math.min(loMin, p[1]); loMax = Math.max(loMax, p[1]); });
+      const marge = 200/111320;
+      laMin -= marge; laMax += marge;
+      loMin -= marge/Math.cos(laMin*Math.PI/180); loMax += marge/Math.cos(laMin*Math.PI/180);
+      const urls = [];
+      [16, 17, 18].forEach(z=>{
+        const x0 = Math.floor(lon2x(loMin, z)), x1 = Math.floor(lon2x(loMax, z));
+        const y0 = Math.floor(lat2y(laMax, z)), y1 = Math.floor(lat2y(laMin, z));
+        for(let x = x0; x <= x1; x++) for(let y = y0; y <= y1; y++)
+          urls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
+      });
+      if(urls.length > 900){ AudioFX.err();
+        $("#tuiles-out").textContent = `Zone trop vaste (${urls.length} tuiles) : rapproche les pièces.`; return; }
+      AudioFX.select();
+      let ok = 0, ko = 0;
+      const dire = ()=>{ $("#tuiles-out").textContent =
+        `Téléchargement du village : ${ok+ko}/${urls.length} tuiles…`; };
+      dire();
+      for(let i = 0; i < urls.length; i += 4){
+        await Promise.all(urls.slice(i, i+4).map(u=>
+          fetch(u, { mode:"cors" }).then(r=>{ r.ok ? ok++ : ko++; })
+                                   .catch(()=>{ ko++; })));
+        dire();
+        await new Promise(r=>setTimeout(r, 120));   // on ne brusque personne
+      }
+      AudioFX.ok();
+      $("#tuiles-out").textContent = ko
+        ? `Village téléchargé : ${ok} tuiles (${ko} manquantes — réessaie avec du réseau).`
+        : `Village téléchargé : ${ok} tuiles. La carte marchera en mode avion.`;
+    });
     $("#btn-lm-add").addEventListener("click", ()=>{
       const nom = $("#lm-nom").value.trim(), p = lireCoords($("#lm-pos").value);
       if(!nom){ AudioFX.err(); $("#lm-list").innerHTML =
@@ -21436,7 +21746,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v115</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v116</p>`);
     wire();
   }
   function wire(){
