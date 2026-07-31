@@ -62,6 +62,74 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v116) — UN VRAI FOND DE CARTE, ET PLUS DE CONSEILS
+
+### OpenStreetMap
+
+C'est ce qui manquait vraiment. Un plan sans rues ne dit pas où l'on est ; avec
+les rues, **une erreur de vingt mètres devient lisible** — on voit qu'on est
+devant l'église plutôt que dans la ruelle d'à côté, et l'œil corrige tout seul.
+C'est exactement ce qui rend Google Maps si simple.
+
+OpenStreetMap est libre. Le zoom des tuiles suit celui de la carte (niveaux 13
+à 19), la mention légale est affichée, et le fond reste discret sous les pièces.
+
+### Et ça marche en mode avion
+
+Les tuiles sont rangées par le service worker dans **leur propre cache, qui
+n'est jamais purgé**. C'était indispensable : le cache du jeu porte le numéro de
+version et se vide à chaque mise à jour — effacer le fond de carte à chaque
+correction de bug aurait ruiné le repérage.
+
+Un bouton **🗺 Télécharger le village** prend les tuiles couvrant les huit
+pièces, plus 200 m de marge, sur trois niveaux de zoom. Mesuré sur un village :
+**54 tuiles**. Le téléchargement va doucement, quatre par quatre — les serveurs
+d'OpenStreetMap sont tenus par des bénévoles.
+
+### Plus aucun conseil
+
+Le guidage disait « tourne à gauche — 64° ». Mesuré sur quatre marches simulées
+par niveau de bruit, cap vrai plein nord :
+
+| GPS | erreur de cap moyenne | conseils trompeurs |
+|---|---|---|
+| ±8 m | 12° | 0 sur 52 |
+| ±20 m | 27° | 1 sur 52 |
+| ±40 m | 39° | **4 sur 52** |
+
+Un « fais demi-tour » erroné coûte cinq minutes de marche pour rien. Et
+maintenant que la carte porte les vraies rues, ces phrases ne servent plus :
+**on voit où aller**. Le jeu se contente donc de dire ce qu'il sait — la
+distance, et où c'est.
+
+### La position elle-même est plus stable
+
+Deux ajouts au filtre :
+
+- **le bruit de manœuvre s'adapte** : très ferme à l'arrêt, très souple en
+  marche. Ces deux besoins ne surviennent jamais en même temps ;
+- **le recalage à vitesse nulle**, la technique classique de la navigation à
+  pied : quand on sait qu'on est immobile, on le dit au filtre, qui se met à
+  moyenner au lieu de suivre.
+
+L'immobilité est détectée par la **dérive du centre** : on compare le point
+moyen du début d'une fenêtre de dix secondes à celui de la fin. Le bruit
+s'annule dans une moyenne ; seul un vrai déplacement écarte les deux centres. Le
+seuil est calculé — `précision × √(2/n)` — et non choisi à la main, ce qui le
+rend valable aussi bien à ±5 m qu'à ±40 m.
+
+| GPS brut | le point affiché bouge de |
+|---|---|
+| ±8 m | **±0,8 m** |
+| ±20 m | **±3,3 m** |
+| ±40 m | **±2,3 m** |
+
+Et la précision annoncée est désormais celle **du filtre**, pas celle du dernier
+relevé — bornée par la précision brute divisée par 2,5, parce qu'un filtre trop
+sûr de lui serait un mensonge de plus.
+
+sw v115→v116.
+
 ## Nouveautés (v115) — REMPLIR LA CARTE
 
 Une carte sans rien dessus ne dit pas où l'on est. Deux ajouts la remplissent,
