@@ -62,6 +62,39 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v117) — LA PHOTO EN GRAND, ET DANS LA PELLICULE
+
+La photo du mur est ce qui fait vraiment trouver une pièce sur les vingt
+derniers mètres. Or une vignette de deux cents pixels de haut ne suffit pas :
+c'est justement le détail — un volet, un angle, une fissure — qu'on cherche à
+reconnaître.
+
+**Toucher une photo l'ouvre maintenant en plein écran**, depuis les deux
+endroits où elle apparaît : le panneau « cherche à vue » pendant la chasse, et
+l'aperçu du panneau de réglage.
+
+En grand :
+
+- **pincer pour zoomer** jusqu'à ×6, et faire glisser pour se promener dedans.
+  L'image est bornée à ses propres limites — un coup de pouce ne la fait plus
+  disparaître de l'écran ;
+- **double-touche** pour agrandir d'un coup, et re-double-touche pour revenir ;
+- **⬇ Enregistrer** met la photo dans la pellicule du téléphone, nommée
+  `mur-LV_01.jpg`. On peut ainsi la consulter sans ouvrir le jeu, ou l'envoyer
+  à quelqu'un ;
+- le **repère écrit** s'affiche en légende, au-dessus ;
+- on referme par **✕**, par **Échap**, ou en touchant à côté de l'image.
+
+Deux détails qui comptent : le zoom part du **centre** — sinon l'image s'échappe
+par le coin au premier agrandissement — et le fond est **franchement opaque**,
+parce qu'une photo qu'on examine mérite un écran à elle.
+
+Enfin, les vignettes sont branchées **une bonne fois au niveau du document**
+plutôt qu'une par une : la carte les crée et les détruit en permanence, et un
+écouteur posé sur chacune finirait fatalement par en oublier.
+
+sw v116→v117.
+
 ## Nouveautés (v116) — UN VRAI FOND DE CARTE, ET PLUS DE CONSEILS
 
 ### OpenStreetMap
