@@ -667,6 +667,49 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 
 
 
+
+/* ── Visionneuse de photo ─────────────────────────────────── */
+#lightbox{
+  position:fixed; inset:0; z-index:200; display:flex;
+  align-items:center; justify-content:center;
+  /* franchement opaque : une photo qu'on examine mérite un écran à
+     elle, pas un voile derrière lequel le réglage continue de crier */
+  background:#05060f; overflow:hidden; touch-action:none;
+  padding:calc(58px + var(--sat)) 0 calc(96px + var(--sab));
+}
+#lightbox[hidden]{ display:none; }
+#lb-img{ max-width:100%; max-height:100%; object-fit:contain; display:block;
+  /* le zoom part du CENTRE, sinon l'image s'échappe par le coin
+     supérieur gauche au premier agrandissement */
+  transform-origin:50% 50%; will-change:transform; user-select:none;
+  -webkit-user-drag:none; }
+#lb-bar{ position:absolute; left:0; right:0; top:var(--sat); z-index:2;
+  padding:12px calc(14px + var(--sar)) 12px calc(14px + var(--sal));
+  background:linear-gradient(180deg, rgba(4,5,14,.9), transparent); pointer-events:none; }
+#lb-titre{ font-family:var(--f-lire); font-size:11px; font-weight:600;
+  letter-spacing:2px; text-transform:uppercase; color:#8fd0ff; }
+#lb-note{ font-family:var(--f-lire); font-size:15px; line-height:1.45;
+  color:#EDEDF7; margin-top:4px; }
+#lb-actions{ position:absolute; left:0; right:0; bottom:0; z-index:2;
+  display:flex; gap:10px; justify-content:center;
+  padding:14px calc(14px + var(--sar)) calc(16px + var(--sab)) calc(14px + var(--sal));
+  background:linear-gradient(0deg, rgba(4,5,14,.92), transparent); }
+.lb-b{
+  flex:1; max-width:190px; text-align:center; cursor:pointer;
+  font-family:var(--f-lire) !important; font-size:15px !important;
+  font-weight:600 !important; letter-spacing:0 !important; text-decoration:none;
+  color:#EDEDF7 !important; padding:13px 16px !important;
+  background:rgba(255,255,255,.09) !important; border-radius:12px !important;
+  border:1px solid rgba(255,255,255,.22) !important; box-shadow:none !important;
+  display:flex; align-items:center; justify-content:center;
+}
+.lb-b:active{ background:rgba(255,255,255,.16) !important; }
+#lb-hint{ position:absolute; left:0; right:0; bottom:calc(78px + var(--sab)); z-index:2;
+  text-align:center; font-family:var(--f-lire); font-size:12px; color:#7b8199;
+  pointer-events:none; transition:opacity .4s; }
+/* les vignettes annoncent qu'elles s'ouvrent */
+#radar-zone img, #photo-prev img{ cursor:zoom-in; }
+
 /* ── Repères du village ───────────────────────────────────── */
 #radar-lm{ margin:10px 0 4px; padding:12px; text-align:left;
   border:1px solid rgba(255,255,255,.12); border-radius:14px;
@@ -3277,6 +3320,22 @@ button.b2{ color:#04231d !important; }
 </nav>
 
 <!-- ═══ BARRE DE TRICHE (?triche=1) ═══ -->
+<!-- ═══ VISIONNEUSE DE PHOTO ═══════════════════════════════════
+     Une vignette de 200 px de haut ne suffit pas à reconnaître un mur :
+     c'est justement le détail qu'on cherche. On peut donc l'ouvrir en
+     grand, zoomer dessus, et l'emporter. -->
+<div id="lightbox" hidden>
+  <img id="lb-img" alt="">
+  <div id="lb-bar">
+    <div id="lb-titre"></div>
+    <div id="lb-note"></div>
+  </div>
+  <div id="lb-actions">
+    <a id="lb-dl" class="lb-b" download>⬇ Enregistrer</a>
+    <button id="lb-close" class="lb-b" type="button">✕ Fermer</button>
+  </div>
+  <div id="lb-hint">Pince pour zoomer · double-touche pour agrandir</div>
+</div>
 <div id="cheat"></div>
 <button id="cheat-tab" type="button" aria-label="Outils de réglage">⚙</button>
 
@@ -8502,6 +8561,126 @@ function fireworks(){
    pièce, « Enregistrer la pièce ici », puis « Copier les spots »
    → coller dans CONFIG.map.spots.
    ─────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   VISIONNEUSE DE PHOTO
+
+   La photo du mur est ce qui fait vraiment trouver une pièce sur les
+   vingt derniers mètres. Or une vignette de deux cents pixels de haut
+   ne suffit pas : c'est justement le détail — un volet, un angle, une
+   fissure — qu'on cherche à reconnaître. Il faut donc pouvoir
+   l'ouvrir en grand, zoomer, et l'emporter dans sa pellicule pour la
+   consulter sans le jeu.
+   ─────────────────────────────────────────────────────────── */
+const Photo = (()=>{
+  let box, img, z = 1, ox = 0, oy = 0;      // zoom et décalage
+  let drag = null, pinch = null, dernierTap = 0, base = null;
+
+  function poser(){
+    /* la transformation est appliquée en une fois : c'est ce qui
+       permet au navigateur de la confier au processeur graphique */
+    img.style.transform = `translate(${ox}px, ${oy}px) scale(${z})`;
+  }
+  function recadrer(){
+    /* on empêche l'image de partir hors de l'écran : au zoom 1 elle
+       est centrée, au-delà on borne le déplacement à ses propres
+       bords — sinon on la perd d'un coup de pouce */
+    if(!base) return;
+    if(z <= 1.01){ z = 1; ox = 0; oy = 0; poser(); return; }
+    const dx = Math.max(0, (base.w*z - base.vw)/2);
+    const dy = Math.max(0, (base.h*z - base.vh)/2);
+    ox = Math.max(-dx, Math.min(dx, ox));
+    oy = Math.max(-dy, Math.min(dy, oy));
+    poser();
+  }
+  function mesurer(){
+    const r = img.getBoundingClientRect();
+    base = { w:r.width/z, h:r.height/z, vw:innerWidth, vh:innerHeight };
+  }
+  function open(data, titre, note, nomFichier){
+    box = box || $("#lightbox"); img = img || $("#lb-img");
+    if(!data) return;
+    img.src = data;
+    $("#lb-titre").textContent = titre || "";
+    $("#lb-note").textContent = note || "";
+    const a = $("#lb-dl");
+    a.href = data;
+    a.download = (nomFichier || "photo") + ".jpg";
+    z = 1; ox = 0; oy = 0; poser();
+    box.hidden = false;
+    const h = $("#lb-hint"); h.style.opacity = "1";
+    setTimeout(()=>{ h.style.opacity = "0"; }, 3200);
+    img.decode ? img.decode().then(mesurer).catch(mesurer) : setTimeout(mesurer, 60);
+  }
+  function close(){ if(box) box.hidden = true; }
+
+  function pts(e){ return [...(e.touches || [])].map(t=>({ x:t.clientX, y:t.clientY })); }
+  function onDown(e){
+    const t = pts(e);
+    if(t.length === 2){
+      pinch = { d:Math.hypot(t[0].x-t[1].x, t[0].y-t[1].y), z,
+                cx:(t[0].x+t[1].x)/2, cy:(t[0].y+t[1].y)/2, ox, oy };
+      drag = null; return;
+    }
+    const p = t[0] || { x:e.clientX, y:e.clientY };
+    drag = { x:p.x, y:p.y, ox, oy, bouge:false };
+    /* double-touche : le geste attendu pour agrandir d'un coup */
+    const now = Date.now();
+    if(now - dernierTap < 320){
+      z = z > 1.2 ? 1 : 2.6; ox = 0; oy = 0; mesurer(); recadrer(); dernierTap = 0;
+    }else dernierTap = now;
+  }
+  function onMove(e){
+    const t = pts(e);
+    if(pinch && t.length === 2){
+      const d = Math.hypot(t[0].x-t[1].x, t[0].y-t[1].y);
+      if(d > 8){
+        z = Math.max(1, Math.min(6, pinch.z * d/pinch.d));
+        ox = pinch.ox; oy = pinch.oy; mesurer(); recadrer();
+      }
+      e.preventDefault(); return;
+    }
+    if(!drag) return;
+    const p = t[0] || { x:e.clientX, y:e.clientY };
+    const dx = p.x - drag.x, dy = p.y - drag.y;
+    if(Math.abs(dx) + Math.abs(dy) > 6) drag.bouge = true;
+    if(z > 1.01){ ox = drag.ox + dx; oy = drag.oy + dy; recadrer(); e.preventDefault(); }
+  }
+  function onUp(){ drag = null; pinch = null; }
+
+  function wire(){
+    box = $("#lightbox"); img = $("#lb-img");
+    $("#lb-close").addEventListener("click", close);
+    /* toucher le fond referme — mais pas l'image ni les boutons */
+    box.addEventListener("click", e=>{ if(e.target === box) close(); });
+    img.addEventListener("touchstart", onDown, { passive:true });
+    img.addEventListener("touchmove", onMove, { passive:false });
+    img.addEventListener("touchend", onUp);
+    img.addEventListener("mousedown", onDown);
+    addEventListener("mousemove", onMove);
+    addEventListener("mouseup", onUp);
+    addEventListener("keydown", e=>{ if(e.key === "Escape" && !box.hidden) close(); });
+    /* ── UN SEUL BRANCHEMENT POUR TOUTES LES VIGNETTES ────────
+       Les photos sont créées et détruites en permanence par la carte.
+       Plutôt que de rebrancher un écouteur à chaque fois — et d'en
+       oublier —, on écoute une bonne fois au niveau du document et on
+       regarde ce qui a été touché. */
+    document.addEventListener("click", e=>{
+      const im = e.target.closest("#radar-zone img, #photo-prev img");
+      if(!im) return;
+      const zone = e.target.closest("#radar-zone");
+      const code = zone
+        ? (($("#radar-zone .z-t") || {}).textContent || "").replace(/.*—\s*/, "").trim()
+        : (window.__spotSel || "");
+      const note = zone ? (($("#radar-zone .z-n") || {}).textContent || "")
+                        : (($("#note-in") || {}).value || "");
+      AudioFX.select();
+      open(im.src, code ? "Le mur de " + code : "Photo du lieu", note,
+           "mur-" + (code || "piece"));
+    });
+  }
+  return { open, close, wire };
+})();
+
 /* ═══════════════════════════════════════════════════════════════
    RADAR — réécrit de zéro autour d'une CARTE, non plus d'un cadran.
 
@@ -9331,7 +9510,8 @@ const Radar = (()=>{
   function majPhoto(){
     const prev = $("#photo-prev"); if(!prev) return;
     const img = loadMap(KEY_IMG)[selCode], note = loadMap(KEY_NOTE)[selCode] || "";
-    prev.innerHTML = img ? `<img src="${img}" alt="">`
+    window.__spotSel = selCode;          // pour nommer le fichier téléchargé
+    prev.innerHTML = img ? `<img src="${img}" alt="Photo du lieu de ${selCode}">`
       : "<span class='none'>Aucune photo pour cette pièce.</span>";
     const ni = $("#note-in"); if(ni && document.activeElement !== ni) ni.value = note;
   }
@@ -9398,6 +9578,7 @@ const Radar = (()=>{
 
   function wire(){
     if(bound) return; bound = true;
+    Photo.wire();
     $("#btn-radar-on").addEventListener("click", ()=>{
       AudioFX.select(); watchId == null ? startWatch() : stopWatch();
     });
@@ -21746,7 +21927,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v116</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v117</p>`);
     wire();
   }
   function wire(){
