@@ -62,6 +62,42 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v115) — REMPLIR LA CARTE
+
+Une carte sans rien dessus ne dit pas où l'on est. Deux ajouts la remplissent,
+sans une seule tuile téléchargée — le jeu reste entièrement hors-ligne.
+
+### Les repères du village
+
+L'église, le pont, la place, le parking. **Trois ou quatre suffisent** à rendre
+la carte lisible : on ne cherche plus « où suis-je », on voit tout de suite
+qu'on est au-dessus de la mairie.
+
+Même méthode que pour les pièces, et les mêmes sept formats acceptés : appui
+long dans Google Maps, copier, coller avec un nom. Ils apparaissent en losanges
+discrets, nommés.
+
+Les pièges sont arrêtés : nom manquant, coordonnées illisibles, point à des
+centaines de kilomètres.
+
+### Les chemins déjà parcourus
+
+**On dessine une carte à chaque sortie sans le savoir : ses propres pas.** Le
+jeu les garde désormais d'une fois sur l'autre, allégés à un point tous les 6 m
+et plafonnés à quarante trajets.
+
+Après deux ou trois tours de repérage, le tracé des ruelles apparaît tout seul —
+et le jour de la chasse, la carte n'est plus vide. Un bouton permet de tout
+effacer.
+
+### L'export emporte tout
+
+Le fichier de repérage contient maintenant les positions, les repères écrits,
+les photos, **les repères du village et les chemins parcourus**. Tout le travail
+de terrain tient dans un seul fichier, transposable sur un autre téléphone.
+
+sw v114→v115.
+
 ## Nouveautés (v114) — LE RADAR REFAIT DE ZÉRO : UNE CARTE ⚠
 
 ### Pourquoi tout reprendre

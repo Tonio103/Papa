@@ -666,6 +666,27 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 #paste-out .ko{ color:#ff8484; }
 
 
+
+/* ── Repères du village ───────────────────────────────────── */
+#radar-lm{ margin:10px 0 4px; padding:12px; text-align:left;
+  border:1px solid rgba(255,255,255,.12); border-radius:14px;
+  background:rgba(200,210,240,.045); }
+#lm-nom{ flex:0 0 34%; min-width:0; }
+#lm-pos{ flex:1; min-width:0; }
+#lm-nom, #lm-pos{ font-family:var(--f-lire); font-size:14px; text-align:left;
+  letter-spacing:0; text-transform:none; background:#0d0d22; color:var(--blanc);
+  border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:10px 11px; }
+#lm-nom:focus, #lm-pos:focus{ outline:none; border-color:#c8d2f0; }
+#lm-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+#lm-list .lm{ display:flex; align-items:center; gap:7px;
+  font-family:var(--f-lire) !important; font-size:13px !important;
+  font-weight:400 !important; letter-spacing:0 !important;
+  padding:7px 10px !important; border-radius:999px !important;
+  background:rgba(255,255,255,.05) !important; color:#c4c9de !important;
+  border:1px solid rgba(255,255,255,.13) !important; box-shadow:none !important; }
+#lm-list .lm u{ text-decoration:none; color:#ff8484; font-size:15px; }
+#lm-list .none{ font-family:var(--f-lire); font-size:13px; color:#7b8199; }
+
 /* ── Photo et repère du lieu ──────────────────────────────── */
 #radar-photo{ margin:10px 0 4px; padding:12px; text-align:left;
   border:1px solid rgba(255,255,255,.12); border-radius:14px;
@@ -2960,6 +2981,25 @@ button.b2{ color:#04231d !important; }
         <div id="paste-out"></div>
         <div class="btn-row" style="gap:8px; padding-top:6px;">
           <button id="btn-paste-me" class="b3">⎘ Copier ma position (pour la vérifier dans Maps)</button>
+        </div>
+      </div>
+      <!-- Trois ou quatre repères suffisent à rendre la carte lisible.
+           Même méthode que pour les pièces : on les montre du doigt
+           dans Google Maps, on colle. -->
+      <div id="radar-lm">
+        <div class="rc-t">Repères du village</div>
+        <div class="rc-s">L'église, le pont, la place, le parking. Ils
+          apparaîtront en losanges sur la carte, et c'est ce qui permet de
+          savoir d'un coup d'œil où l'on est. Même méthode : appui long dans
+          Google Maps, copier, coller ici avec un nom.</div>
+        <div class="btn-row" style="gap:8px;">
+          <input id="lm-nom" placeholder="Église" autocomplete="off" maxlength="18">
+          <input id="lm-pos" placeholder="44.40458, 4.13214" autocomplete="off" spellcheck="false">
+          <button id="btn-lm-add" class="b3">Ajouter</button>
+        </div>
+        <div id="lm-list"></div>
+        <div class="btn-row" style="gap:8px; padding-top:6px;">
+          <button id="btn-path-del" class="b3">✕ Effacer les chemins parcourus</button>
         </div>
       </div>
       <div id="radar-photo">
@@ -8471,6 +8511,8 @@ const Radar = (()=>{
   const KEY = "invasionLesVans:spots";
   const KEY_IMG = "invasionLesVans:spotshots";
   const KEY_NOTE = "invasionLesVans:spotnotes";
+  const KEY_LM   = "invasionLesVans:reperes";   // repères du village
+  const KEY_PATH = "invasionLesVans:chemins";   // les rues déjà parcourues
   const loadMap = (k)=>{ try{ return JSON.parse(localStorage.getItem(k) || "{}"); }catch(e){ return {}; } };
   const saveMap = (k, v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } };
   const loadSpots = ()=> Object.assign({}, CONFIG.map.spots, loadMap(KEY));
@@ -8627,6 +8669,44 @@ const Radar = (()=>{
     for(let n = n0; n < vue.n + H/2*vue.mpp + pas; n += pas){
       const y = Y(n); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
     }
+
+    /* ── LES CHEMINS DÉJÀ PARCOURUS ───────────────────────────
+       Une carte sans rues ne dit pas grand-chose. Or on en dessine
+       une à chaque sortie, sans le savoir : ses propres pas. On les
+       garde donc d'une fois sur l'autre. Après deux ou trois tours de
+       repérage, le tracé des ruelles apparaît tout seul — et le jour
+       de la chasse, la carte n'est plus vide. */
+    const chemins = loadMap(KEY_PATH).v || [];
+    if(chemins.length){
+      c.lineWidth = 5; c.lineCap = "round"; c.lineJoin = "round";
+      c.strokeStyle = "rgba(150,175,235,.13)";
+      chemins.forEach(ch=>{
+        if(ch.length < 2) return;
+        c.beginPath();
+        ch.forEach((p,i)=>{ const m = toM(p);
+          i ? c.lineTo(X(m.e), Y(m.n)) : c.moveTo(X(m.e), Y(m.n)); });
+        c.stroke();
+      });
+    }
+
+    /* ── LES REPÈRES DU VILLAGE ───────────────────────────────
+       L'église, le pont, la place. Trois ou quatre suffisent à rendre
+       la carte lisible : on ne cherche plus « où suis-je », on voit
+       tout de suite qu'on est au-dessus de la mairie. */
+    const lms = loadMap(KEY_LM).v || [];
+    lms.forEach(l=>{
+      const m = toM(l.p), x = X(m.e), y = Y(m.n);
+      c.strokeStyle = "rgba(200,210,240,.55)"; c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(x, y-6); c.lineTo(x+6, y); c.lineTo(x, y+6); c.lineTo(x-6, y);
+      c.closePath(); c.stroke();
+      c.fillStyle = "rgba(12,14,30,.75)";
+      c.beginPath(); c.arc(x, y, 2.4, 0, 7); c.fill();
+      c.font = "10px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "rgba(0,0,0,.7)"; c.fillText(l.n, x+1, y+15);
+      c.fillStyle = "rgba(200,210,240,.8)"; c.fillText(l.n, x, y+14);
+    });
 
     /* ── ta TRACE : elle remplace la boussole ──────────────────
        Deux points suffisent à savoir dans quel sens on marche. Une
@@ -8899,7 +8979,22 @@ const Radar = (()=>{
       }
     }, ()=>{ gpsErr = true; }, { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
   }
+  /* ── GARDER LE CHEMIN ─────────────────────────────────────
+     On allège avant de ranger : un point tous les 6 m suffit à
+     dessiner une rue, et le stockage d'un navigateur n'est pas
+     extensible. Quarante chemins au maximum, les plus vieux partent. */
+  function rangerChemin(){
+    if(trail.length < 4) return;
+    const out = [];
+    trail.forEach(p=>{ if(!out.length || distM(out[out.length-1], p) > 6) out.push(p); });
+    if(out.length < 4) return;
+    const box = loadMap(KEY_PATH); const v = box.v || [];
+    v.push(out);
+    while(v.length > 40) v.shift();
+    saveMap(KEY_PATH, { v });
+  }
   function stopWatch(){
+    rangerChemin();
     if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} }
     watchId = null; fix = null; accM = null; gpsSpeed = null;
     kOrigin = null; kN = null; kE = null; kAt = 0; nFix = 0; bestAcc = null;
@@ -8976,7 +9071,7 @@ const Radar = (()=>{
       b.addEventListener("click", ()=>{ selCode = st.code; AudioFX.nav(); buildChips(); });
       host.appendChild(b);
     });
-    majPhoto();
+    majPhoto(); majReperes();
     const el = $("#radar-spot"); if(!el) return;
     const loc = loadMap(KEY)[selCode], code = (CONFIG.map.spots || {})[selCode];
     const f = (p)=>`${p[0].toFixed(5)}, ${p[1].toFixed(5)}`;
@@ -8990,6 +9085,14 @@ const Radar = (()=>{
       el.innerHTML = `<b>${selCode} : ${f(code)}</b><br>gravée dans le jeu — visible par tous.`;
       el.style.color = "#39e08a";
     }else{ el.textContent = `${selCode} : aucune position enregistrée`; el.style.color = ""; }
+  }
+  function majReperes(){
+    const host = $("#lm-list"); if(!host) return;
+    const v = loadMap(KEY_LM).v || [];
+    host.innerHTML = v.length
+      ? v.map((l, i)=>`<button class="lm" data-i="${i}">`
+          + `${String(l.n).replace(/[<>&]/g, ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]))}<u>✕</u></button>`).join("")
+      : "<span class='none'>Aucun repère. Trois ou quatre suffisent.</span>";
   }
   function majPhoto(){
     const prev = $("#photo-prev"); if(!prev) return;
@@ -9109,6 +9212,7 @@ const Radar = (()=>{
     });
     $("#btn-radar-export").addEventListener("click", ()=>{
       const paquet = { spots:loadSpots(), notes:loadMap(KEY_NOTE), photos:loadMap(KEY_IMG),
+                       reperes:(loadMap(KEY_LM).v || []), chemins:(loadMap(KEY_PATH).v || []),
                        le:new Date().toISOString().slice(0,10) };
       const txt = JSON.stringify(paquet); AudioFX.select();
       try{
@@ -9165,6 +9269,35 @@ const Radar = (()=>{
       const m = loadMap(KEY_NOTE), v = $("#note-in").value.trim();
       if(v) m[selCode] = v; else delete m[selCode];
       saveMap(KEY_NOTE, m); AudioFX.tick(); });
+    /* ── LES REPÈRES ─────────────────────────────────────────── */
+    $("#btn-lm-add").addEventListener("click", ()=>{
+      const nom = $("#lm-nom").value.trim(), p = lireCoords($("#lm-pos").value);
+      if(!nom){ AudioFX.err(); $("#lm-list").innerHTML =
+        "<span class='none'>Donne-lui un nom : « Église », « Pont », « Place ».</span>"; return; }
+      if(!p){ AudioFX.err(); $("#lm-list").innerHTML =
+        "<span class='none'>Coordonnées illisibles — colle-les depuis Google Maps.</span>"; return; }
+      if(distM(p, [44.404, 4.133])/1000 > 150){ AudioFX.err();
+        $("#lm-list").innerHTML = "<span class='none'>Ce point est très loin des Vans : vérifie-le.</span>"; return; }
+      const box = loadMap(KEY_LM), v = box.v || [];
+      v.push({ n:nom, p:[ +p[0].toFixed(6), +p[1].toFixed(6) ] });
+      saveMap(KEY_LM, { v });
+      $("#lm-nom").value = ""; $("#lm-pos").value = "";
+      AudioFX.ok(); majReperes(); suivre = true;
+    });
+    $("#lm-list").addEventListener("click", e=>{
+      const b = e.target.closest(".lm"); if(!b) return;
+      const i = +b.dataset.i;
+      const box = loadMap(KEY_LM), v = box.v || [];
+      v.splice(i, 1); saveMap(KEY_LM, { v });
+      AudioFX.back(); majReperes();
+    });
+    $("#btn-path-del").addEventListener("click", ()=>{
+      saveMap(KEY_PATH, { v:[] }); AudioFX.back();
+      $("#radar-sub").textContent = "Chemins parcourus effacés.";
+    });
+    $("#lm-pos").addEventListener("keydown", e=>{
+      if(e.key === "Enter"){ e.preventDefault(); $("#btn-lm-add").click(); } });
+
     $("#btn-cal-a").addEventListener("click", ()=>{
       const pm = pointMoyen();
       if(!pm){ AudioFX.err(); $("#radar-cal-out").innerHTML = "<span class='ko'>Pas encore de position.</span>"; return; }
@@ -21303,7 +21436,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v114</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v115</p>`);
     wire();
   }
   function wire(){
