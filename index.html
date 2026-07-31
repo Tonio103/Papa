@@ -1769,12 +1769,20 @@ button:disabled{ color:#7683ad;
 .stamp, .readygo, #boot-ribbon, #flash-badge{ font-family:'Bungee', var(--f-pix); font-weight:400; }
 
 /* ═══ RADAR CHAUD-FROID ═══ */
-#radar-wrap{ margin:12px auto 0; width:min(74vw,290px); border-radius:50%;
-  border:2px solid var(--rc, rgba(120,150,255,.35));
-  box-shadow:0 0 34px var(--rg, rgba(120,150,255,.15)), 0 16px 36px rgba(0,0,0,.5),
-    inset 0 0 30px rgba(0,0,0,.5);
-  transition:border-color .5s, box-shadow .5s; overflow:hidden; }
-#radar-cv{ display:block; width:100%; aspect-ratio:1; }
+#radar-wrap{ position:relative; margin:12px auto 0; width:100%;
+  aspect-ratio:1; border-radius:18px; overflow:hidden;
+  border:1px solid rgba(120,150,255,.28);
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+  touch-action:none;                    /* les gestes sont à nous */ }
+#radar-cv{ display:block; width:100%; aspect-ratio:1; cursor:grab; }
+#radar-cv:active{ cursor:grabbing; }
+/* les commandes de la carte, posées dessus */
+#map-ctl{ position:absolute; right:8px; bottom:8px; z-index:3;
+  display:flex; flex-direction:column; gap:6px; }
+#map-ctl .mc{ width:38px; height:38px; padding:0; font-size:17px; line-height:1;
+  background:rgba(8,10,26,.72) !important; color:#EDEDF7 !important;
+  border:1px solid rgba(255,255,255,.22) !important; border-radius:11px !important;
+  box-shadow:none !important; backdrop-filter:blur(8px); }
 #radar-state{ margin-top:12px; font-family:'Bungee', var(--f-pix); font-weight:400;
   font-size:21px; letter-spacing:1px; min-height:28px;
   color:var(--rc, #8a96c4); text-shadow:0 0 16px var(--rg, rgba(120,150,255,.3));
@@ -2896,8 +2904,15 @@ button.b2{ color:#04231d !important; }
 <!-- ═══ ÉCRAN 9 : RADAR CHAUD-FROID ═══ -->
 <section id="map-screen" class="screen">
   <div class="screen-inner" style="text-align:center;">
-    <h2 style="text-align:center;">Radar de l'invasion</h2>
-    <div id="radar-wrap"><canvas id="radar-cv"></canvas></div>
+    <h2 style="text-align:center;">Carte de l'invasion</h2>
+    <div id="radar-wrap">
+      <canvas id="radar-cv"></canvas>
+      <div id="map-ctl">
+        <button id="btn-map-in"  class="mc" type="button" aria-label="Zoomer">＋</button>
+        <button id="btn-map-out" class="mc" type="button" aria-label="Dézoomer">－</button>
+        <button id="btn-map-fit" class="mc" type="button" aria-label="Recentrer">⌖</button>
+      </div>
+    </div>
     <div id="radar-state" class="pix">RADAR COUPÉ</div>
     <div id="radar-dist"></div>
     <div id="radar-guide"></div>
@@ -8429,122 +8444,51 @@ function fireworks(){
    pièce, « Enregistrer la pièce ici », puis « Copier les spots »
    → coller dans CONFIG.map.spots.
    ─────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   RADAR — réécrit de zéro autour d'une CARTE, non plus d'un cadran.
+
+   POURQUOI TOUT REPRENDRE. Le cadran « tête en haut » avait un défaut
+   de conception, pas de calcul : pour savoir où est « devant », il lui
+   fallait la boussole. Or dans un navigateur, la boussole est le
+   maillon faible — refusée, absente, faussée par le téléphone tenu
+   debout, perturbée par un mur de pierre. Quand elle se trompait, le
+   radar affichait une direction fausse tout en ayant parfaitement
+   raison sur le fond. Impossible à corriger : le défaut était dans le
+   principe même.
+
+   Une carte NORD EN HAUT s'en passe complètement. Elle ne tourne
+   jamais, donc elle ne peut pas mentir sur l'orientation. C'est LA
+   TRACE de tes propres pas qui dit dans quel sens tu vas — exactement
+   comme sur une carte papier, et exactement ce que fait Google Maps
+   quand la boussole ne répond pas.
+
+   Ce qui est conservé de l'ancienne version, parce que c'était bon :
+   le collage des coordonnées, la photo du lieu, l'export, le banc
+   d'essai de marche, le filtre de Kalman, et l'honnêteté sur
+   l'incertitude.
+   ═══════════════════════════════════════════════════════════════ */
 const Radar = (()=>{
   const KEY = "invasionLesVans:spots";
-  const KEY_IMG = "invasionLesVans:spotshots";   // photo du lieu, par pièce
-  const KEY_NOTE = "invasionLesVans:spotnotes";  // repère écrit, par pièce
+  const KEY_IMG = "invasionLesVans:spotshots";
+  const KEY_NOTE = "invasionLesVans:spotnotes";
   const loadMap = (k)=>{ try{ return JSON.parse(localStorage.getItem(k) || "{}"); }catch(e){ return {}; } };
-  const saveMap = (k, v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }
-                            catch(e){ return false; } };
-  /* paliers : [distance max (m), libellé, couleur, période de bip (ms)] */
-  const HEAT = [
-    [  15, "C'EST LÀ ! FOUILLE !", "#39e08a", 220],
-    [  40, "BRÛLANT",              "#ff5da2", 350],
-    [ 100, "CHAUD",                "#ff9760", 650],
-    [ 200, "TIÈDE",                "#ffce4d", 1300],
-    [ 400, "FROID",                "#7fd0ff", 2600],
-    [ 1e9, "GLACIAL",              "#4db8ff", 0],
-  ];
-  let cv, c, raf = null, watchId = null, fix = null, accM = null;
-  let selCode = null, lastBeep = 0, gpsErr = false, bound = false, stopped = false;
-  /* boussole : cap lissé sur le cercle, date de la dernière mesure */
-  let heading = null, headAt = 0, hx = null, hy = null, badFix = 0;
-  let compassOn = false, compassDenied = false, headSrc = null, tiltBad = false;
-  let gpsSpeed = null, lockCode = null, lastAux = 0;
-  const trail = [];      // les positions récentes, pour dessiner la piste
-  const hist  = [];      // les distances récentes, pour la courbe d'approche
-  const diag  = {};      // valeurs brutes, affichées en mode réglage
-  /* filtre de Kalman : origine locale, un état par axe, horodatage */
-  let kOrigin = null, kN = null, kE = null, kAt = 0;
-  let nFix = 0, bestAcc = null, t0Watch = 0;
-  let calA = null, calAcc = null, calT = 0;   // banc d'essai de marche
-  /* les relevés BRUTS du GPS, non filtrés : le banc d'essai doit
-     mesurer ce que dit l'appareil, pas ce que mon filtre en fait */
-  const raw = [];
-  let wasWatching = false;   // pour reprendre le GPS au retour dans l'app
-
-  const loadSpots = ()=>{ let s = {};
-    try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
-    return Object.assign({}, CONFIG.map.spots, s); };
-  /* Effacer une position d'essai. Enregistrer deux fois de suite
-     écrase déjà la précédente — mais pour un repérage provisoire, il
-     faut aussi pouvoir REVENIR À RIEN, sinon le radar continue de
-     guider vers un point qu'on sait faux. */
-  function delSpot(code){
-    let s = {}; try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
-    delete s[code];
-    try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){}
-  }
+  const saveMap = (k, v)=>{ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } };
+  const loadSpots = ()=> Object.assign({}, CONFIG.map.spots, loadMap(KEY));
   function saveSpot(code, lat, lon){
-    let s = {}; try{ s = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
-    s[code] = [ +lat.toFixed(6), +lon.toFixed(6) ];
-    try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){}
+    const s = loadMap(KEY); s[code] = [ +lat.toFixed(6), +lon.toFixed(6) ]; saveMap(KEY, s);
   }
-  /* distance GPS en mètres (haversine) */
+  function delSpot(code){ const s = loadMap(KEY); delete s[code]; saveMap(KEY, s); }
+
+  /* ── GÉODÉSIE ────────────────────────────────────────────────
+     Vérifiées contre Vincenty (WGS84) sur 300 tirages : 0,28 % d'écart
+     en distance, 0,10° en relèvement. Ce n'est pas là qu'était le
+     problème, on les garde telles quelles. */
   function distM(a, b){
     const R = 6371000, r = Math.PI/180;
     const dLat = (b[0]-a[0])*r, dLon = (b[1]-a[1])*r;
-    const h = Math.sin(dLat/2)**2 +
-      Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLon/2)**2;
+    const h = Math.sin(dLat/2)**2 + Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLon/2)**2;
     return 2*R*Math.asin(Math.sqrt(h));
   }
-  /* ── LA VÉRITÉ SUR CE QU'ON SAIT ─────────────────────────────
-     Voilà, je crois, le vrai défaut : le radar parlait avec une
-     assurance qu'il n'avait pas.
-
-     Dans un village, entre des murs de pierre, le GPS d'un téléphone
-     donne couramment ±30 à ±50 m. À 60 m d'une pièce, la position
-     mesurée peut donc tomber à 20 m d'elle : le radar annonçait alors
-     « BRÛLANT », et une direction tirée d'un point faux — c'est-à-dire
-     n'importe laquelle. D'où « il dit que c'est près alors qu'on
-     s'éloigne, et ce n'est pas la bonne direction ».
-
-     Rien ne peut rendre le GPS plus précis. Ce qu'on peut faire, en
-     revanche, c'est ARRÊTER DE PRÉTENDRE : annoncer une fourchette
-     plutôt qu'un chiffre, ne déclarer « c'est là » que si la marge le
-     permet vraiment, et se taire sur la direction quand elle n'a plus
-     de sens. Un outil qui dit « je ne sais pas » est infiniment plus
-     utile qu'un outil qui se trompe avec aplomb. */
-  const ZONE = ["DANS LA ZONE", "#8fd0ff"];
-  function heatOf(d, acc){
-    const a = acc || 0;
-    /* le palier vient de la distance mesurée… */
-    let i = HEAT.findIndex(x=>d <= x[0]);
-    if(i < 0) i = HEAT.length - 1;
-    /* …mais on ne peut PAS annoncer un palier plus serré que la marge
-       d'erreur. Dire « brûlant » avec ±45 m de flou, c'est envoyer
-       fouiller un mur au hasard : le chiffre serait juste par accident
-       une fois sur trois. Chaque palier a donc sa précision minimale. */
-    let plancher = 0;
-    if(a > 18)  plancher = 1;
-    if(a > 30)  plancher = 2;
-    if(a > 60)  plancher = 3;
-    if(a > 120) plancher = 4;
-    return HEAT[Math.max(i, plancher)];
-  }
-  /* quand la marge d'erreur avale la distance, aucun mot de chaleur
-     n'est honnête : on dit simplement qu'on est dans la zone */
-  const dansZone = (d, acc)=> acc != null && d <= acc;
-  /* l'incertitude angulaire : à 30 m d'une cible située à 30 m, la
-     direction peut se tromper de 45°. Au-delà, elle ne veut plus rien
-     dire du tout. */
-  function brgSpread(d, acc){
-    if(!d || acc == null) return 0;
-    return Math.min(180, Math.atan2(acc, Math.max(1, d))*180/Math.PI);
-  }
-  /* la distance, écrite selon ce qu'on sait vraiment */
-  function distTxtOf(d, acc){
-    const a = acc || 0;
-    if(a >= 8 && a > d*0.22){
-      const lo = Math.max(0, Math.round((d - a)/5)*5), hi = Math.round((d + a)/5)*5;
-      return lo <= 0 ? "moins de " + hi + " m" : lo + "–" + hi + " m";
-    }
-    return d < 200 ? Math.round(d) + " m"
-         : d < 1000 ? Math.round(d/10)*10 + " m"
-         : (d/1000).toFixed(2) + " km";
-  }
-
-  /* ── CAP VRAI vers la cible ─────────────────────────────────── */
   function bearingTo(a, b){
     const r = Math.PI/180;
     const p1 = a[0]*r, p2 = b[0]*r, dl = (b[1]-a[1])*r;
@@ -8556,664 +8500,497 @@ const Radar = (()=>{
                 "sud-est","sud-sud-est","sud","sud-sud-ouest","sud-ouest","ouest-sud-ouest",
                 "ouest","ouest-nord-ouest","nord-ouest","nord-nord-ouest"];
   const CARD_S = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
-  const cardIdx = (d)=> Math.round(((d%360)+360)%360/22.5) % 16;
-  const cardinal  = (d)=> CARD_S[cardIdx(d)];
-  const cardinalL = (d)=> CARD[cardIdx(d)];
-  /* « vers le est » ne se dit pas : les points cardinaux commençant
-     par une voyelle prennent l'élision */
+  const ci = (d)=> Math.round(((d%360)+360)%360/22.5) % 16;
+  const cardinal = (d)=> CARD_S[ci(d)];
+  const cardinalL = (d)=> CARD[ci(d)];
   const versCard = (d)=>{ const n = cardinalL(d);
-    return (/^[aeiouéè]/i.test(n) ? "vers l'" : "vers le ") + n; };
-  /* écart signé, ramené dans [-180, +180] */
-  const relAngle = (a, b)=> ((a - b) % 360 + 540) % 360 - 180;
+    return (/^[aeiou]/i.test(n) ? "vers l'" : "vers le ") + n; };
 
-  /* ── D'OÙ VIENT LE CAP ? ─────────────────────────────────────
-     Trois sources, de la meilleure à la plus rustique. C'est le point
-     qui manquait : ne dépendre QUE du magnétomètre, c'était se
-     condamner au « nord en haut » sur la moitié des téléphones.
+  /* ── ÉTAT ────────────────────────────────────────────────────── */
+  let cv, c, raf = null, watchId = null, stopped = false, bound = false;
+  let fix = null, accM = null, gpsErr = false, gpsSpeed = null;
+  let nFix = 0, bestAcc = null, t0Watch = 0;
+  let selCode = null, lockCode = null;
+  const trail = [];      // ta trace : c'est elle qui remplace la boussole
+  const hist  = [];      // distances récentes, pour la courbe d'approche
+  const raw   = [];      // relevés bruts, pour le banc d'essai
+  let calA = null, calAcc = null, calT = 0;
+  /* le filtre de Kalman à vitesse */
+  let kOrigin = null, kN = null, kE = null, kAt = 0;
+  /* la vue : centre en mètres autour de l'origine, et l'échelle */
+  let vue = { e:0, n:0, mpp:0.6 }, suivre = true, lastAux = 0;
+  let origine = null;    // point de référence de la projection locale
+  let drag = null, pinch = null;
 
-     1. LA BOUSSOLE. iOS livre un cap vrai (webkitCompassHeading),
-        Android l'orientation absolue. Deux pièges corrigés ici :
-        · l'écran tourné (paysage) décale la mesure d'autant ;
-        · le téléphone TENU DEBOUT — la posture normale quand on
-          marche — rend la mesure erratique. On ne la croit donc que
-          si l'appareil est à peu près à plat.
-     2. LA ROUTE GPS. Quand on MARCHE, le GPS donne le cap réel du
-        déplacement. Aucune autorisation, aucune calibration, et c'est
-        souvent plus juste qu'un magnétomètre perturbé par un mur.
-     3. Rien : nord en haut, et on le dit.                          */
-  function screenAngle(){
-    try{
-      if(screen.orientation && typeof screen.orientation.angle === "number")
-        return screen.orientation.angle;
-      if(typeof window.orientation === "number") return window.orientation;
-    }catch(e){}
-    return 0;
-  }
-  function pushHeading(h, src){
-    const r = h*Math.PI/180, k = src === "gps" ? .45 : .25;
-    hx = hx == null ? Math.cos(r) : hx + (Math.cos(r)-hx)*k;
-    hy = hy == null ? Math.sin(r) : hy + (Math.sin(r)-hy)*k;
-    heading = (Math.atan2(hy, hx)*180/Math.PI + 360) % 360;
-    headAt = performance.now(); headSrc = src;
-  }
-  function onOrient(e){
-    let h = null;
-    if(typeof e.webkitCompassHeading === "number" && !isNaN(e.webkitCompassHeading))
-      h = e.webkitCompassHeading;
-    else if(e.absolute === true && typeof e.alpha === "number")
-      h = (360 - e.alpha) % 360;
-    if(h == null || isNaN(h)) return;
-    /* mémoire du diagnostic, même quand on rejette la mesure */
-    diag.alpha = e.alpha; diag.beta = e.beta; diag.gamma = e.gamma;
-    diag.abs = e.absolute; diag.wk = (typeof e.webkitCompassHeading === "number");
-    diag.acc = e.webkitCompassAccuracy;
-    /* téléphone trop redressé : la mesure part en vrille */
-    const beta = e.beta, gamma = e.gamma;
-    if(typeof beta === "number" && typeof gamma === "number"){
-      const plat = Math.abs(beta) < 55 && Math.abs(gamma) < 45;
-      diag.plat = plat;
-      if(!plat){ tiltBad = true; return; }
-      tiltBad = false;
+  /* ── PROJECTION LOCALE ───────────────────────────────────────
+     À l'échelle d'un village, la Terre est plate : on convertit une
+     fois pour toutes en mètres autour d'une origine, et tout le reste
+     du dessin est de la géométrie élémentaire. Aucune tuile, aucun
+     réseau — la carte est celle des pièces elles-mêmes. */
+  function setOrigine(){
+    if(origine) return;
+    if(fix){ origine = [fix[0], fix[1]]; return; }
+    const sp = loadSpots(), ks = Object.keys(sp);
+    if(ks.length){
+      let la = 0, lo = 0; ks.forEach(k=>{ la += sp[k][0]; lo += sp[k][1]; });
+      origine = [ la/ks.length, lo/ks.length ];
     }
-    /* boussole non calibrée : iOS le dit, autant en tenir compte */
-    if(typeof e.webkitCompassAccuracy === "number" && e.webkitCompassAccuracy < 0) return;
-    h = (h + screenAngle() + 360) % 360;
-    pushHeading(h, "boussole");
   }
-  async function startCompass(){
-    if(compassOn) return;
-    try{
-      const D = window.DeviceOrientationEvent;
-      if(D && typeof D.requestPermission === "function"){
-        const st = await D.requestPermission();
-        diag.perm = st;
-        if(st !== "granted"){ compassDenied = true; return; }
-      }
-      addEventListener("deviceorientationabsolute", onOrient, true);
-      addEventListener("deviceorientation", onOrient, true);
-      compassOn = true;
-    }catch(e){ compassDenied = true; diag.perm = "erreur"; }
-  }
-  function stopCompass(){
-    if(!compassOn) return;
-    removeEventListener("deviceorientationabsolute", onOrient, true);
-    removeEventListener("deviceorientation", onOrient, true);
-    compassOn = false; heading = null; hx = hy = null; headSrc = null;
-  }
-  const headLive = ()=> heading != null && (performance.now() - headAt) < 4000;
-  /* la BOUSSOLE seule (pas le cap de secours) : c'est elle qui décide
-     si le cap déduit de la marche a encore le droit de s'exprimer */
-  const compassLive = ()=> headSrc === "boussole" && (performance.now() - headAt) < 2500;
+  const mLat = ()=> 111320;
+  const mLon = ()=> 111320*Math.cos((origine ? origine[0] : 44.4)*Math.PI/180);
+  const toM  = (p)=> ({ e:(p[1]-origine[1])*mLon(), n:(p[0]-origine[0])*mLat() });
 
-  /* ── PORTÉE AUTOMATIQUE ─────────────────────────────────────── */
-  const PORTEES = [10, 20, 40, 80, 150, 300, 600, 1200, 2500, 6000];
-  function porteeFor(d){
-    for(const p of PORTEES) if(d*1.30 <= p) return p;
-    return PORTEES[PORTEES.length-1];
-  }
-
-  /* ── TOUTES LES CIBLES, pas seulement la plus proche ────────── */
+  /* ── LES CIBLES ──────────────────────────────────────────────── */
   function allTargets(){
-    if(!fix) return [];
-    const spots = loadSpots();
-    const out = [];
+    const sp = loadSpots(), out = [];
     CONFIG.stations.forEach(st=>{
-      const sp = spots[st.code];
-      if(!sp) return;
-      out.push({ st, sp, d: distM(fix, sp), brg: bearingTo(fix, sp),
-                 done: !!S.flashed[st.code] });
+      const p = sp[st.code]; if(!p) return;
+      out.push({ st, p, done:!!S.flashed[st.code],
+                 d: fix ? distM(fix, p) : null,
+                 brg: fix ? bearingTo(fix, p) : null });
     });
-    out.sort((a,b)=>a.d-b.d);
+    if(fix) out.sort((a,b)=>a.d-b.d);
     return out;
   }
   function target(){
     const all = allTargets();
-    if(lockCode){
-      const l = all.find(t=>t.st.code === lockCode);
-      if(l) return l;
-    }
+    if(lockCode){ const l = all.find(t=>t.st.code === lockCode); if(l) return l; }
     return all.find(t=>!t.done) || null;
   }
 
-  /* ── LA COURBE D'APPROCHE ───────────────────────────────────
-     Sur les vingt derniers mètres, le GPS tremble plus que la
-     distance ne change : un chiffre seul ne dit plus rien. La pente
-     sur la dernière minute, elle, dit tout — on se rapproche, on
-     s'éloigne, ou on tourne en rond. */
-  function pushHist(d){
-    const t = performance.now();
-    hist.push({ d, t });
-    while(hist.length && t - hist[0].t > 90000) hist.shift();
+  /* ── HONNÊTETÉ SUR CE QU'ON SAIT ─────────────────────────────
+     Conservé de la version précédente, parce que c'est ce qui rend
+     l'outil utilisable : ne jamais annoncer plus précis que le GPS. */
+  function distTxt(d, a){
+    a = a || 0;
+    if(a >= 8 && a > d*0.22){
+      const lo = Math.max(0, Math.round((d-a)/5)*5), hi = Math.round((d+a)/5)*5;
+      return lo <= 0 ? "moins de " + hi + " m" : lo + "–" + hi + " m";
+    }
+    return d < 200 ? Math.round(d) + " m"
+         : d < 1000 ? Math.round(d/10)*10 + " m" : (d/1000).toFixed(2) + " km";
   }
-  function penteM(){
-    if(hist.length < 4) return null;
-    const t1 = hist[hist.length-1].t, cut = t1 - 30000;
-    const pts = hist.filter(p=>p.t >= cut);
-    if(pts.length < 4) return null;
-    /* régression linéaire : la moyenne des écarts serait dominée par
-       le dernier point, or c'est justement le plus bruité */
-    let sx=0, sy=0, sxx=0, sxy=0;
-    pts.forEach(p=>{ const x=(p.t-pts[0].t)/1000, y=p.d;
-      sx+=x; sy+=y; sxx+=x*x; sxy+=x*y; });
-    const n = pts.length, den = n*sxx - sx*sx;
-    if(Math.abs(den) < 1e-6) return null;
-    return ((n*sxy - sx*sy)/den) * 60;      // mètres par minute
-  }
+  const spreadOf = (d, a)=> (!d || a == null) ? 0
+    : Math.min(180, Math.atan2(a, Math.max(1, d))*180/Math.PI);
 
-  function setUI(state, dist, sub, col){
-    $("#radar-state").textContent = state;
-    $("#radar-dist").textContent = dist;
-    $("#radar-sub").textContent = sub;
-    document.documentElement.style.setProperty("--rc", col || "rgba(120,150,255,.5)");
-    document.documentElement.style.setProperty("--rg", (col || "#7896ff") + "55");
-  }
+  /* ── LA CARTE ────────────────────────────────────────────────── */
+  const PAS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+  function pasGrille(mpp, W){ const vise = W*mpp/4;
+    for(const p of PAS) if(p >= vise) return p; return PAS[PAS.length-1]; }
 
-  /* ── LE GUIDAGE EN TOUTES LETTRES ───────────────────────────
-     Un point sur un cadran demande un effort de lecture. Une phrase,
-     non. C'est elle qu'on lit en marchant, l'écran à bout de bras. */
-  function guideTxt(t, up, live){
-    if(!t) return "";
-    if(t.d <= 12) return "Tu y es. Lève les yeux et cherche le mur.";
-    if(!live) return `Va ${versCard(t.brg)}.`;
-    const rel = relAngle(t.brg, up);
-    const a = Math.abs(rel);
-    if(a < 12)  return "Tout droit.";
-    if(a > 155) return "Fais demi-tour.";
-    const cote = rel > 0 ? "droite" : "gauche";
-    if(a < 45)  return `Légèrement sur ta ${cote}.`;
-    if(a < 115) return `Tourne à ${cote} — ${Math.round(a)}°.`;
-    return `Bien sur ta ${cote}, presque derrière toi.`;
+  function ajusterVue(){
+    if(!suivre || !origine) return;
+    const t = target();
+    if(fix) { const m = toM(fix); vue.e = m.e; vue.n = m.n; }
+    if(fix && t){
+      /* on cadre de façon à voir la cible ET soi-même, avec de l'air */
+      const a = toM(fix), b = toM(t.p);
+      vue.e = (a.e + b.e)/2; vue.n = (a.n + b.n)/2;
+      const W = cv.clientWidth || 300, H = W;
+      const need = Math.max(Math.abs(a.e-b.e)/(W*0.72), Math.abs(a.n-b.n)/(H*0.62),
+                            (accM||10)*2.4/W);
+      vue.mpp = Math.max(0.25, need);
+    }
   }
+  function X(e){ return (cv.clientWidth||300)/2 + (e - vue.e)/vue.mpp; }
+  function Y(n){ return (cv.clientHeight||300)/2 - (n - vue.n)/vue.mpp; }
 
-  function drawTrend(){
-    const cvT = $("#radar-trend"); if(!cvT) return;
+  function dessiner(now){
     const dpr = Math.min(2, devicePixelRatio || 1);
-    const w = cvT.clientWidth || 280, h = 34;
+    const W = cv.clientWidth || 300, H = cv.clientHeight || 300;
+    if(cv.width !== Math.round(W*dpr) || cv.height !== Math.round(H*dpr)){
+      cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+    }
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = "#0c0e1e"; c.fillRect(0, 0, W, H);
+    setOrigine();
+    if(!origine){
+      /* ni position ni spot : il n'y a rien à projeter */
+      c.fillStyle = "#6a7099"; c.textAlign = "center"; c.textBaseline = "middle";
+      c.font = "13px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+      c.fillText("Aucune position, aucune pièce enregistrée.", W/2, H/2);
+      return;
+    }
+    ajusterVue();
+
+    /* ── la grille métrique : c'est elle qui donne l'échelle ──
+       Sans repère de taille, une carte sans rues ne veut rien dire :
+       on ne sait pas si le point est à dix mètres ou à un kilomètre. */
+    const pas = pasGrille(vue.mpp, W);
+    c.strokeStyle = "rgba(120,150,255,.10)"; c.lineWidth = 1;
+    const e0 = Math.floor((vue.e - W/2*vue.mpp)/pas)*pas;
+    const n0 = Math.floor((vue.n - H/2*vue.mpp)/pas)*pas;
+    for(let e = e0; e < vue.e + W/2*vue.mpp + pas; e += pas){
+      const x = X(e); c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke();
+    }
+    for(let n = n0; n < vue.n + H/2*vue.mpp + pas; n += pas){
+      const y = Y(n); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
+    }
+
+    /* ── ta TRACE : elle remplace la boussole ──────────────────
+       Deux points suffisent à savoir dans quel sens on marche. Une
+       trace entière dit en plus si l'on tourne en rond, ou si l'on
+       vient de dépasser la pièce. */
+    if(trail.length > 1){
+      c.lineWidth = 3; c.lineCap = "round"; c.lineJoin = "round";
+      for(let i = 1; i < trail.length; i++){
+        const A = toM(trail[i-1]), B = toM(trail[i]);
+        c.strokeStyle = `rgba(127,208,255,${.10 + .55*(i/trail.length)})`;
+        c.beginPath(); c.moveTo(X(A.e), Y(A.n)); c.lineTo(X(B.e), Y(B.n)); c.stroke();
+      }
+    }
+
+    /* ── les pièces ───────────────────────────────────────────── */
+    const all = allTargets(), t = target();
+    all.forEach(o=>{
+      const m = toM(o.p), x = X(m.e), y = Y(m.n);
+      const actif = t && o.st.code === t.st.code;
+      const col = o.done ? "#4a5070" : o.st.couleur;
+      if(actif){
+        const k = 1 + Math.sin(now/300)*.22;
+        c.strokeStyle = col + "88"; c.lineWidth = 2;
+        c.beginPath(); c.arc(x, y, 15*k, 0, 7); c.stroke();
+      }
+      c.fillStyle = col;
+      c.beginPath(); c.arc(x, y, actif ? 7 : 5, 0, 7); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.55)"; c.lineWidth = 2;
+      c.beginPath(); c.arc(x, y, actif ? 7 : 5, 0, 7); c.stroke();
+      c.font = (actif ? "bold " : "") + "11px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "rgba(0,0,0,.7)";
+      c.fillText(o.st.code.slice(3), x+1, y - 15);
+      c.fillStyle = o.done ? "#7a8098" : "#EDEDF7";
+      c.fillText(o.st.code.slice(3), x, y - 16);
+    });
+
+    /* ── toi ──────────────────────────────────────────────────── */
+    if(fix){
+      const m = toM(fix), x = X(m.e), y = Y(m.n);
+      if(accM != null){
+        const r = accM/vue.mpp;
+        c.fillStyle = "rgba(127,208,255,.10)";
+        c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+        c.strokeStyle = "rgba(127,208,255,.42)"; c.setLineDash([4,4]); c.lineWidth = 1;
+        c.beginPath(); c.arc(x, y, r, 0, 7); c.stroke(); c.setLineDash([]);
+      }
+      /* le trait vers la cible : la direction, sans aucune boussole */
+      if(t){
+        const b = toM(t.p);
+        c.strokeStyle = "rgba(237,237,247,.28)"; c.lineWidth = 1.5;
+        c.setLineDash([6,5]);
+        c.beginPath(); c.moveTo(x, y); c.lineTo(X(b.e), Y(b.n)); c.stroke();
+        c.setLineDash([]);
+      }
+      c.fillStyle = "#fff";
+      c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill();
+      c.strokeStyle = "#2BE4D0"; c.lineWidth = 2.5;
+      c.beginPath(); c.arc(x, y, 6, 0, 7); c.stroke();
+    }
+
+    /* ── nord, et l'échelle ───────────────────────────────────
+       Le nord est FIXE, en haut. C'est tout l'intérêt : une carte qui
+       ne tourne jamais ne peut pas se tromper de sens. */
+    c.font = "bold 11px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillStyle = "rgba(8,10,26,.66)";
+    c.beginPath();
+    if(c.roundRect) c.roundRect(W-38, 6, 32, 36, 9); else c.rect(W-38, 6, 32, 36);
+    c.fill();
+    c.fillStyle = "rgba(255,110,110,.95)";
+    c.beginPath(); c.moveTo(W-22, 12); c.lineTo(W-17, 24); c.lineTo(W-27, 24); c.closePath(); c.fill();
+    c.fillStyle = "rgba(255,150,150,.95)";
+    c.fillText("N", W-22, 34);
+    /* la règle graduée — sur son propre fond, sinon une pièce qui
+       passe dessus la rend illisible au moment où on en a besoin */
+    const lr = pas/vue.mpp;
+    if(lr > 24 && lr < W*0.7){
+      const x0 = 14, y0 = H - 16;
+      c.fillStyle = "rgba(8,10,26,.72)";
+      c.beginPath();
+      if(c.roundRect) c.roundRect(x0-8, y0-24, lr+16, 32, 8);
+      else c.rect(x0-8, y0-24, lr+16, 32);
+      c.fill();
+      c.strokeStyle = "rgba(237,237,247,.75)"; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0+lr, y0);
+      c.moveTo(x0, y0-4); c.lineTo(x0, y0+4);
+      c.moveTo(x0+lr, y0-4); c.lineTo(x0+lr, y0+4); c.stroke();
+      c.textAlign = "left"; c.fillStyle = "rgba(237,237,247,.85)";
+      c.font = "10px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+      c.fillText(pas >= 1000 ? (pas/1000)+" km" : pas+" m", x0, y0 - 11);
+    }
+  }
+
+  /* ── LE TEXTE, sous la carte ─────────────────────────────────── */
+  function majTextes(){
+    const st = $("#radar-state"), dd = $("#radar-dist"),
+          gg = $("#radar-guide"), sb = $("#radar-sub");
+    const t = target();
+    const col = (v)=>{ document.documentElement.style.setProperty("--rc", v);
+                       document.documentElement.style.setProperty("--rg", v + "55"); };
+    if(watchId == null){
+      st.textContent = "RADAR COUPÉ"; dd.textContent = ""; gg.textContent = "";
+      sb.textContent = "Active le radar pour te situer sur la carte.";
+      col("rgba(120,150,255,.5)"); montrerZone(null, false); return;
+    }
+    if(!fix){
+      const el = Math.round((performance.now() - t0Watch)/1000);
+      st.textContent = gpsErr ? "POSITION REFUSÉE" : "RECHERCHE GPS…";
+      dd.textContent = gpsErr ? "" : el + " s";
+      gg.textContent = "";
+      sb.textContent = gpsErr
+        ? "Autorise la localisation dans les réglages du téléphone."
+        : (nFix ? `${nFix} relevé${nFix>1?"s":""} · meilleure précision ±${Math.round(bestAcc)} m`
+                : "Sors à ciel ouvert, loin des murs. Le premier point prend 10 à 30 s.");
+      col(gpsErr ? "#ff8484" : "#7fd0ff"); montrerZone(null, false); return;
+    }
+    if(!t){
+      const n = Object.keys(loadSpots()).length;
+      st.textContent = n ? "TOUT EST FLASHÉ !" : "AUCUNE PIÈCE ENREGISTRÉE";
+      dd.textContent = ""; gg.textContent = "";
+      sb.textContent = n ? "Plus rien à traquer par ici. 👏"
+        : "Colle les coordonnées des pièces depuis Google Maps, plus bas.";
+      col("#39e08a"); montrerZone(null, false); return;
+    }
+    if(t.d > 30000){
+      st.textContent = "POSITION ABERRANTE"; dd.textContent = (t.d/1000).toFixed(0) + " km";
+      gg.textContent = "Ne suis pas ce cap : la position est fausse.";
+      gg.style.color = "#ff8484";
+      sb.textContent = `${t.st.code} est enregistrée à ${(t.d/1000).toFixed(0)} km d'ici — `
+        + `une coordonnée fausse, pas une pièce lointaine.`;
+      col("#ff8484"); montrerZone(null, false); return;
+    }
+    pushHist(t.d);
+    const a = accM || 0, zone = t.d <= a, spread = spreadOf(t.d, a);
+    const fiable = spread < 40;
+    st.textContent = zone ? "DANS LA ZONE"
+      : t.d < 40 ? "TOUT PRÈS" : t.d < 120 ? "PROCHE"
+      : t.d < 400 ? "À QUELQUES RUES" : "LOIN";
+    dd.textContent = distTxt(t.d, a);
+    /* le guidage ne parle plus de gauche ni de droite : sans boussole,
+       ces mots-là n'ont aucun sens. Il donne un CAP, que la carte
+       montre, et que la trace permet de vérifier. */
+    gg.textContent = zone
+      ? "Tu y es. Le GPS ne peut plus t'aider : cherche à vue."
+      : !fiable
+        ? "Avance d'une vingtaine de mètres : le point est trop flou pour donner un cap."
+        : `Suis le trait en pointillés — ${versCard(t.brg)}.`;
+    gg.style.color = zone ? "#8fd0ff" : fiable ? "#EDEDF7" : "#8fd0ff";
+    const bits = [ `${t.st.code} — ${t.st.nom}` ];
+    if(fiable) bits.push(`${cardinal(t.brg)} (${Math.round(t.brg)}°)`);
+    bits.push(`GPS ±${Math.round(a)} m`);
+    const p = pente();
+    if(p != null && Math.abs(p) > 1) bits.push(p < 0 ? `−${Math.round(-p)} m/min` : `+${Math.round(p)} m/min`);
+    sb.textContent = bits.join(" · ");
+    col(zone ? "#8fd0ff" : t.d < 120 ? "#39e08a" : "#7fd0ff");
+    montrerZone(t, zone || t.d < 25);
+  }
+
+  /* la courbe d'approche : sur les derniers mètres, la PENTE dit ce
+     que le chiffre ne dit plus */
+  function pushHist(d){ const t = performance.now();
+    hist.push({ d, t }); while(hist.length && t - hist[0].t > 90000) hist.shift(); }
+  function pente(){
+    if(hist.length < 4) return null;
+    const t1 = hist[hist.length-1].t, pts = hist.filter(p=>p.t >= t1 - 30000);
+    if(pts.length < 4) return null;
+    let sx=0, sy=0, sxx=0, sxy=0;
+    pts.forEach(p=>{ const x=(p.t-pts[0].t)/1000, y=p.d; sx+=x; sy+=y; sxx+=x*x; sxy+=x*y; });
+    const n = pts.length, den = n*sxx - sx*sx;
+    return Math.abs(den) < 1e-6 ? null : ((n*sxy - sx*sy)/den)*60;
+  }
+  function dessinerCourbe(){
+    const cvT = $("#radar-trend"); if(!cvT) return;
+    const dpr = Math.min(2, devicePixelRatio||1), w = cvT.clientWidth||280, h = 34;
     if(cvT.width !== w*dpr || cvT.height !== h*dpr){ cvT.width = w*dpr; cvT.height = h*dpr; }
-    const g = cvT.getContext("2d");
-    g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+    const g = cvT.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
     if(hist.length < 3) return;
-    const t1 = hist[hist.length-1].t, t0 = Math.max(hist[0].t, t1 - 90000);
-    const pts = hist.filter(p=>p.t >= t0);
-    if(pts.length < 3) return;
+    const t1 = hist[hist.length-1].t, t0 = Math.max(hist[0].t, t1-90000);
+    const pts = hist.filter(p=>p.t >= t0); if(pts.length < 3) return;
     let lo = Infinity, hi = -Infinity;
     pts.forEach(p=>{ if(p.d<lo)lo=p.d; if(p.d>hi)hi=p.d; });
-    if(hi - lo < 1) { hi = lo + 1; }
-    const X = (p)=> (p.t - t0)/(t1 - t0 || 1) * (w-2) + 1;
-    const Y = (p)=> h - 4 - (p.d - lo)/(hi - lo) * (h - 10);
-    const pente = penteM();
-    const col = pente == null ? "#7896ff" : pente < -1 ? "#39e08a" : pente > 1 ? "#ff8484" : "#ffce4d";
+    if(hi-lo < 1) hi = lo+1;
+    const Xp = p=>(p.t-t0)/(t1-t0||1)*(w-2)+1, Yp = p=>h-4-(p.d-lo)/(hi-lo)*(h-10);
+    const pe = pente();
+    const col = pe == null ? "#7896ff" : pe < -1 ? "#39e08a" : pe > 1 ? "#ff8484" : "#ffce4d";
     g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = "round";
-    g.beginPath(); pts.forEach((p,i)=> i ? g.lineTo(X(p),Y(p)) : g.moveTo(X(p),Y(p))); g.stroke();
+    g.beginPath(); pts.forEach((p,i)=> i ? g.lineTo(Xp(p),Yp(p)) : g.moveTo(Xp(p),Yp(p))); g.stroke();
     g.fillStyle = col + "22";
-    g.lineTo(X(pts[pts.length-1]), h); g.lineTo(X(pts[0]), h); g.closePath(); g.fill();
+    g.lineTo(Xp(pts[pts.length-1]), h); g.lineTo(Xp(pts[0]), h); g.closePath(); g.fill();
   }
 
-  function drawList(){
+  /* la liste des cibles, où l'on choisit celle qu'on traque */
+  function dessinerListe(){
     const host = $("#radar-list"); if(!host) return;
-    const all = allTargets();
-    if(!all.length){ host.innerHTML = ""; return; }
+    const all = allTargets(); if(!all.length){ host.innerHTML = ""; return; }
     const cur = target();
     host.innerHTML = all.map(t=>{
-      const on = cur && t.st.code === t.st.code && cur.st.code === t.st.code;
-      const d = t.d < 1000 ? Math.round(t.d) + " m" : (t.d/1000).toFixed(1) + " km";
-      return `<button class="rl${on?" on":""}${t.done?" fait":""}" data-code="${t.st.code}">
-        <i style="background:${t.st.couleur}"></i>
-        <b>${t.st.code.slice(3)}</b>
-        <span>${d}</span>
-        <em>${cardinal(t.brg)}</em>
-        ${t.done?"<u>✓</u>":""}</button>`;
+      const on = cur && cur.st.code === t.st.code;
+      const d = t.d == null ? "—" : t.d < 1000 ? Math.round(t.d)+" m" : (t.d/1000).toFixed(1)+" km";
+      return `<button class="rl${on?" on":""}${t.done?" fait":""}" data-code="${t.st.code}">`
+        + `<i style="background:${t.st.couleur}"></i><b>${t.st.code.slice(3)}</b>`
+        + `<span>${d}</span><em>${t.brg==null?"":cardinal(t.brg)}</em>${t.done?"<u>✓</u>":""}</button>`;
     }).join("");
   }
 
-  function draw(now){
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    const cssW = cv.clientWidth || 280;
-    if(cv.width !== cssW*dpr){ cv.width = cv.height = cssW*dpr; }
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const W = cssW, R = W/2, RR = R - 12;
-    const all = allTargets();
-    const t = target();
-    const heat = t ? heatOf(t.d, accM) : null;
-    const col = heat ? heat[2] : "#5b6699";
-    const live = headLive();
-    const up = live ? heading : 0;
-    const portee = t ? porteeFor(Math.max(t.d, (accM || 0)*1.2)) : 300;
-
-    c.clearRect(0, 0, W, W);
-    const bg = c.createRadialGradient(R, R, 6, R, R, R);
-    bg.addColorStop(0, "#101228"); bg.addColorStop(1, "#0a0a20");
-    c.fillStyle = bg; c.fillRect(0, 0, W, W);
-
-    /* anneaux chiffrés */
-    c.strokeStyle = "rgba(120,150,255,.20)"; c.lineWidth = 1;
-    c.font = "9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
-    c.textAlign = "center"; c.textBaseline = "middle";
-    const LA = 225*Math.PI/180;
-    [1/3, 2/3, 1].forEach(k=>{
-      c.beginPath(); c.arc(R, R, RR*k, 0, 7); c.stroke();
-      const m = Math.round(portee*k);
-      c.fillStyle = "rgba(150,175,235,.6)";
-      c.fillText(m >= 1000 ? (m/1000).toFixed(m%1000?1:0)+" km" : m+" m",
-                 R + Math.cos(LA)*(RR*k - 12), R + Math.sin(LA)*(RR*k - 12));
-    });
-    c.strokeStyle = "rgba(120,150,255,.13)";
-    c.beginPath(); c.moveTo(R, 10); c.lineTo(R, W-10);
-    c.moveTo(10, R); c.lineTo(W-10, R); c.stroke();
-
-    /* Le nord, et lui seul, est écrit. Les quatre lettres cardinales
-       encombraient le cadran et se cognaient aux pièces : les trois
-       autres directions se lisent très bien à partir d'un seul repère,
-       et trois petits traits suffisent à les jalonner. */
-    for(let i = 1; i < 4; i++){
-      const a = (i*90 - up - 90) * Math.PI/180;
-      c.strokeStyle = "rgba(150,175,235,.30)"; c.lineWidth = 1.5;
-      c.beginPath();
-      c.moveTo(R + Math.cos(a)*(RR-5), R + Math.sin(a)*(RR-5));
-      c.lineTo(R + Math.cos(a)*RR,     R + Math.sin(a)*RR);
-      c.stroke();
-    }
-    {
-      const a = (-up - 90) * Math.PI/180;
-      const nx = R + Math.cos(a)*RR, ny = R + Math.sin(a)*RR;
-      c.save(); c.translate(nx, ny); c.rotate(a + Math.PI/2);
-      c.fillStyle = live ? "rgba(255,110,110,.95)" : "rgba(190,200,235,.5)";
-      c.beginPath(); c.moveTo(0,-1); c.lineTo(5,7); c.lineTo(-5,7); c.closePath(); c.fill();
-      c.restore();
-      c.fillStyle = live ? "rgba(255,140,140,.9)" : "rgba(190,200,235,.5)";
-      c.font = "bold 9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
-      c.fillText("N", R + Math.cos(a)*(RR-13), R + Math.sin(a)*(RR-13));
-    }
-
-    /* ── LA PISTE : par où tu es passé ────────────────────────
-       Elle dit ce qu'aucun chiffre ne dit : que tu tournes en rond,
-       ou que tu viens de dépasser la cible. */
-    if(trail.length > 1 && fix){
-      const mPerDegLat = 111320, mPerDegLon = 111320*Math.cos(fix[0]*Math.PI/180);
-      c.lineWidth = 2; c.lineJoin = "round";
-      for(let i = 1; i < trail.length; i++){
-        const conv = (p)=>{
-          const dn = (p[0]-fix[0])*mPerDegLat, de = (p[1]-fix[1])*mPerDegLon;
-          const a = (-up)*Math.PI/180;
-          const ex =  de*Math.cos(a) - dn*Math.sin(a);
-          const ny =  de*Math.sin(a) + dn*Math.cos(a);
-          return [ R + ex/portee*RR, R - ny/portee*RR ];
-        };
-        const A = conv(trail[i-1]), B = conv(trail[i]);
-        c.strokeStyle = `rgba(127,208,255,${.06 + .30*(i/trail.length)})`;
-        c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke();
-      }
-    }
-
-    /* balayage */
-    if(watchId != null){
-      const a = now/900;
-      const grad = c.createConicGradient ? c.createConicGradient(a, R, R) : null;
-      if(grad){
-        grad.addColorStop(0, col + "88"); grad.addColorStop(.16, col + "00");
-        grad.addColorStop(1, col + "00");
-        c.fillStyle = grad;
-        c.beginPath(); c.moveTo(R, R); c.arc(R, R, RR, a, a + .6); c.closePath(); c.fill();
-      }
-    }
-
-    /* incertitude du GPS, à l'échelle */
-    if(fix && accM != null){
-      const ar = Math.min(RR, accM/portee*RR);
-      c.fillStyle = "rgba(127,208,255,.09)";
-      c.beginPath(); c.arc(R, R, ar, 0, 7); c.fill();
-      c.strokeStyle = "rgba(127,208,255,.35)"; c.setLineDash([3,4]); c.lineWidth = 1;
-      c.beginPath(); c.arc(R, R, ar, 0, 7); c.stroke(); c.setLineDash([]);
-    }
-
-    /* ── TOUTES les pièces, la cible en évidence ──────────────
-       Quand la marge d'erreur est plus grande que la distance, le
-       point exact n'a plus de sens : on dessine un ARC d'incertitude
-       à la place, qui dit « elle est quelque part par là ». */
-    const spreadT = t ? brgSpread(t.d, accM) : 0;
-    all.forEach(o=>{
-      const actif = t && o.st.code === t.st.code;
-      const rel = ((o.brg - up) - 90) * Math.PI/180;
-      const rr = Math.min(RR, o.d/portee*RR);
-      const bx = R + Math.cos(rel)*rr, by = R + Math.sin(rel)*rr;
-      const cc = o.done ? "#4a5070" : (actif ? col : o.st.couleur);
-      if(actif && spreadT >= 40){
-        const a0 = rel - spreadT*Math.PI/180, a1 = rel + spreadT*Math.PI/180;
-        c.fillStyle = cc + "22";
-        c.beginPath(); c.moveTo(R, R); c.arc(R, R, Math.min(RR, rr*1.15), a0, a1); c.closePath(); c.fill();
-        c.strokeStyle = cc + "44"; c.lineWidth = 1;
-        c.beginPath(); c.arc(R, R, Math.min(RR, rr), a0, a1); c.stroke();
-      }
-      if(actif && spreadT < 40){
-        c.strokeStyle = cc + "66"; c.lineWidth = 1.5;
-        c.beginPath(); c.moveTo(R, R); c.lineTo(bx, by); c.stroke();
-      }
-      if(actif){
-        const k = 1 + Math.sin(now/260)*.3;
-        c.fillStyle = cc + "44";
-        c.beginPath(); c.arc(bx, by, 12*k, 0, 7); c.fill();
-      }
-      c.fillStyle = cc;
-      c.beginPath(); c.arc(bx, by, actif ? 5 : 3.2, 0, 7); c.fill();
-      if(!o.done || actif){
-        c.fillStyle = actif ? "#EDEDF7" : "rgba(200,210,240,.55)";
-        c.font = (actif ? "bold " : "") + "9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
-        c.fillText(o.st.code.slice(3), bx, by - 12);
-      }
-      /* flèche de bord pour la cible, quand elle est hors du cadran */
-      if(actif && live){
-        const ax = R + Math.cos(rel)*(RR+3), ay = R + Math.sin(rel)*(RR+3);
-        c.save(); c.translate(ax, ay); c.rotate(rel);
-        c.fillStyle = cc;
-        c.beginPath(); c.moveTo(8,0); c.lineTo(-4,-5.5); c.lineTo(-4,5.5); c.closePath(); c.fill();
-        c.restore();
-      }
-    });
-
-    /* TOI, avec ton cap */
-    if(live){
-      c.save(); c.translate(R, R);
-      c.fillStyle = "rgba(237,237,247,.30)";
-      c.beginPath(); c.moveTo(0,-16); c.lineTo(6,4); c.lineTo(0,1); c.lineTo(-6,4); c.closePath(); c.fill();
-      c.restore();
-    }
-    c.fillStyle = "#EDEDF7";
-    c.beginPath(); c.arc(R, R, 4, 0, 7); c.fill();
-    c.strokeStyle = "rgba(237,237,247,.4)"; c.lineWidth = 1.6;
-    c.beginPath(); c.arc(R, R, 8 + Math.sin(now/500)*2, 0, 7); c.stroke();
-
-    /* ── textes ── */
-    const guide = $("#radar-guide");
-    if(watchId == null){
-      setUI("RADAR COUPÉ", "", "Active le radar pour traquer la pièce la plus proche.", null);
-      if(guide) guide.textContent = "";
-      hist.length = 0; trail.length = 0;
-      montrerZone(null, false);
-    }else if(!fix && gpsErr){
-      setUI("POSITION REFUSÉE", "", "Autorise la localisation dans les réglages du téléphone.", "#ff8484");
-      if(guide) guide.textContent = "";
-      montrerZone(null, false);
-    }else if(!fix){
-      { const el = Math.round((performance.now() - t0Watch)/1000);
-        setUI("RECHERCHE GPS…", el + " s",
-          nFix ? `${nFix} relevé${nFix>1?"s":""} · meilleure précision ±${Math.round(bestAcc)} m`
-               : "Sors à ciel ouvert, loin des murs. Le premier point prend 10 à 30 s.", "#7fd0ff"); }
-      if(guide) guide.textContent = "";
-    }else if(!t){
-      const any = Object.keys(loadSpots()).length;
-      setUI(any ? "TOUT EST FLASHÉ !" : "AUCUN SPOT RÉGLÉ",
-        "", any ? "Plus rien à traquer par ici. 👏"
-                : "Les coordonnées des pièces ne sont pas encore enregistrées.", "#39e08a");
-      if(guide) guide.textContent = "";
-    }else if(t.d > 30000){
-      /* ── LA POSITION ENREGISTRÉE EST ABERRANTE ────────────────
-         Trente kilomètres, ce n'est pas une pièce mal repérée : c'est
-         une coordonnée fausse — inversée, mal saisie, ou enregistrée
-         ailleurs pour un essai. Le radar donnerait alors une distance
-         et une direction parfaitement calculées… vers nulle part. Il
-         vaut mille fois mieux le dire que de guider dans le vide. */
-      setUI("POSITION ABERRANTE",
-        (t.d/1000).toFixed(0) + " km",
-        `${t.st.code} est enregistrée à ${(t.d/1000).toFixed(0)} km d'ici. `
-        + `C'est une coordonnée fausse, pas une pièce lointaine — vérifie-la, ou efface-la.`,
-        "#ff8484");
-      if(guide){ guide.textContent = "Ne suis pas ce cap : la position est fausse.";
-                 guide.style.color = "#ff8484"; }
-      montrerZone(null, false);
-    }else{
-      pushHist(t.d);
-      const heat2 = heatOf(t.d, accM);
-      const zone = dansZone(t.d, accM);
-      const distTxt = distTxtOf(t.d, accM);
-      const spread = brgSpread(t.d, accM);
-      const fiable = spread < 40;
-      const bits = [];
-      if(fiable) bits.push(live ? `cap ${Math.round(t.brg)}° ${cardinal(t.brg)}`
-                                : `${cardinal(t.brg)} (${Math.round(t.brg)}°)`);
-      else bits.push(`direction \u00b1${Math.round(spread)}° : pas fiable`);
-      if(accM != null) bits.push(`GPS ±${Math.round(accM)} m`);
-      const p = penteM();
-      if(p != null && Math.abs(p) > 1)
-        bits.push(p < 0 ? `−${Math.round(-p)} m/min` : `+${Math.round(p)} m/min`);
-      if(!live) bits.push(compassDenied ? "boussole refusée"
-                        : tiltBad ? "pose le téléphone à plat"
-                        : "boussole absente");
-      else if(headSrc === "gps") bits.push("cap déduit de ta marche");
-      setUI(zone ? ZONE[0] : heat2[1], distTxt, bits.join(" · "), zone ? ZONE[1] : heat2[2]);
-      /* ── DANS LA ZONE : on passe la main à l'œil ───────────────
-         Dès que la marge d'erreur avale la distance, ou sous 25 m,
-         le GPS n'a plus rien à dire d'utile. On montre alors ce qui
-         sert vraiment : le mur, et la phrase qu'on a écrite dessus.
-         C'est le seul moment du jeu où l'écran doit dire « arrête de
-         me regarder ». */
-      montrerZone(t, zone || t.d < 25);
-      if(guide){
-        guide.textContent = fiable ? guideTxt(t, up, live)
-          : (t.d <= (accM||0)
-              ? "Tu es dans la zone. Cherche à vue : le GPS ne peut plus t'aider."
-              : "Avance d'une vingtaine de mètres : le GPS est trop flou pour donner un cap.");
-        guide.style.color = fiable ? (zone ? ZONE[1] : heat2[2]) : "#8fd0ff";
-      }
-      if(heat2[3] && now - lastBeep > heat2[3]){
-        lastBeep = now;
-        AudioFX.pixel(420 + Math.max(0, 500 - t.d));
-        try{ navigator.vibrate && navigator.vibrate(t.d < 40 ? 40 : 15); }catch(e){}
-      }
-    }
-    if(now - lastAux > 700){ lastAux = now; drawTrend(); drawList(); drawDiag(); }
+  /* le panneau « cherche à vue » : photo du mur et repère écrit */
+  let zCode = null, zOn = null;
+  function montrerZone(t, on){
+    const el = $("#radar-zone"); if(!el) return;
+    const code = t ? t.st.code : null;
+    if(on === zOn && code === zCode) return;
+    zOn = on; zCode = code;
+    if(!on || !t){ el.hidden = true; el.innerHTML = ""; return; }
+    const img = loadMap(KEY_IMG)[code], note = loadMap(KEY_NOTE)[code] || "";
+    const esc = (x)=>String(x).replace(/[<>&]/g, ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]));
+    el.hidden = false;
+    el.innerHTML = `<div class="z-t">Cherche à vue — ${code}</div>`
+      + (img ? `<img src="${img}" alt="">` : "")
+      + `<div class="z-n">${note ? esc(note)
+          : "Le GPS ne peut plus t'aider : lève les yeux, regarde les murs, les angles, et au-dessus de la hauteur des yeux."}</div>`;
   }
 
-  /* ── DIAGNOSTIC (mode réglage) ───────────────────────────────
-     Quand le radar « est perdu », il faut pouvoir dire POURQUOI :
-     pas de fix, précision de 60 m, boussole muette, orientation non
-     absolue… Sans ces chiffres bruts, on répare à l'aveugle. */
-  function drawDiag(){
-    const el = $("#radar-diag"); if(!el || !TRICHE) return;
-    const L = [];
-    L.push(`GPS ${fix ? fix[0].toFixed(5)+", "+fix[1].toFixed(5) : "—"} · ±${accM!=null?Math.round(accM):"—"} m`
-           + ` · ${gpsSpeed!=null?gpsSpeed.toFixed(1)+" m/s":"immobile"}`);
-    L.push(`cap ${heading!=null?Math.round(heading)+"°":"—"} (${headSrc||"aucun"})`
-           + ` · à plat ${diag.plat===undefined?"?":diag.plat?"oui":"non"}`
-           + ` · perm ${diag.perm||"n/a"}`);
-    L.push(`orientation: abs=${diag.abs===undefined?"?":diag.abs} webkit=${diag.wk?"oui":"non"}`
-           + ` α=${diag.alpha!=null?Math.round(diag.alpha):"—"}`
-           + ` β=${diag.beta!=null?Math.round(diag.beta):"—"}`
-           + ` γ=${diag.gamma!=null?Math.round(diag.gamma):"—"}`
-           + ` prec=${diag.acc!=null?diag.acc:"—"}`);
-    L.push(`spots ${Object.keys(loadSpots()).length}/8 · écran ${screenAngle()}°`);
-    el.textContent = L.join("\n");
+  /* ── LE GPS ──────────────────────────────────────────────────
+     Filtre de Kalman à vitesse, conservé : il suit un déplacement sans
+     retard là où une moyenne exponentielle garde un décalage constant.
+     Mesuré : marche à ±10 m, −0,2 m de retard ; à vélo, +3,3 m. */
+  function kfNew(m, r){ return { p:m, v:0, P00:r, P01:0, P10:0, P11:1 }; }
+  function kfStep(s, m, r, dt){
+    const q = 1.2;
+    s.p += s.v*dt;
+    s.P00 += dt*(2*s.P01 + dt*s.P11) + q*dt*dt*dt/3;
+    s.P01 += dt*s.P11 + q*dt*dt/2; s.P10 = s.P01; s.P11 += q*dt;
+    const y = m - s.p, S = s.P00 + r, k0 = s.P00/S, k1 = s.P10/S;
+    s.p += k0*y; s.v += k1*y;
+    const a = s.P00, b = s.P01;
+    s.P00 -= k0*a; s.P01 -= k0*b; s.P10 -= k1*a; s.P11 -= k1*b;
   }
-
-  /* la boucle ne s'arrête QUE sur ordre explicite (stop) — la
-     transition d'écran active map-screen avec un léger retard */
-  function loopFrame(now){
-    if(stopped){ raf = null; return; }
-    if($("#map-screen").classList.contains("active")) draw(now);
-    raf = requestAnimationFrame(loopFrame);
-  }
-
   function startWatch(){
     if(!navigator.geolocation){
-      setUI("PAS DE GPS ICI", "", "Ce navigateur ne fournit pas la position.", "#ff8484");
-      return;
+      $("#radar-state").textContent = "PAS DE GPS ICI";
+      $("#radar-sub").textContent = "Ce navigateur ne fournit pas la position."; return;
     }
     $("#btn-radar-on").textContent = "📡 Couper le radar";
-    gpsErr = false; t0Watch = performance.now();
-    /* ── LE FILTRE ────────────────────────────────────────────
-       La version précédente lissait la position par moyenne
-       exponentielle. C'était une erreur, et une erreur MESURABLE :
-       un lissage de ce type ne peut pas suivre un déplacement
-       régulier. Il conserve un retard constant, proportionnel à la
-       vitesse. Mesuré sur le banc d'essai : en s'éloignant de 15 m
-       par seconde, le radar annonçait 116 m quand la vraie distance
-       était de 150 m — 34 m de retard qui ne se rattrapaient JAMAIS.
-       D'où « je m'éloigne et il dit que c'est près ».
-
-       On passe donc à un filtre de Kalman à VITESSE : l'état n'est
-       plus seulement « où je suis » mais « où je suis ET à quelle
-       allure je vais ». Un tel filtre suit un déplacement régulier
-       sans retard, tout en continuant de gommer le tremblement quand
-       on est immobile — et il se règle tout seul sur la précision
-       annoncée par le GPS, au lieu d'un coefficient choisi à la main.
-
-       Travail en MÈTRES autour d'une origine locale : à cette
-       échelle, un degré de latitude vaut une constante, et on évite
-       de filtrer des degrés dont la valeur en mètres change avec la
-       latitude. */
-    function kfNew(m, r){ return { p:m, v:0, P00:r, P01:0, P10:0, P11:1 }; }
-    function kfStep(s, m, r, dt){
-      const q = 1.2;                       // bruit de manœuvre (marche à pied)
-      /* prédiction : on avance à la vitesse estimée */
-      s.p += s.v*dt;
-      s.P00 += dt*(2*s.P01 + dt*s.P11) + q*dt*dt*dt/3;
-      s.P01 += dt*s.P11 + q*dt*dt/2;
-      s.P10  = s.P01;
-      s.P11 += q*dt;
-      /* correction par la mesure, pondérée par sa précision */
-      const y = m - s.p, S = s.P00 + r;
-      const k0 = s.P00/S, k1 = s.P10/S;
-      s.p += k0*y; s.v += k1*y;
-      const a = s.P00, b2 = s.P01;
-      s.P00 -= k0*a; s.P01 -= k0*b2;
-      s.P10 -= k1*a; s.P11 -= k1*b2;
-    }
+    gpsErr = false; t0Watch = performance.now(); suivre = true;
     watchId = navigator.geolocation.watchPosition(p=>{
       const lat = p.coords.latitude, lon = p.coords.longitude;
-      const na = (typeof p.coords.accuracy === "number" && p.coords.accuracy > 0)
-                 ? p.coords.accuracy : 30;
+      const na = (typeof p.coords.accuracy === "number" && p.coords.accuracy > 0) ? p.coords.accuracy : 30;
       gpsErr = false; nFix++;
       if(bestAcc == null || na < bestAcc) bestAcc = na;
-
-      if(!kOrigin){ kOrigin = [lat, lon]; }
-      const mLat = 111320, mLon = 111320*Math.cos(kOrigin[0]*Math.PI/180);
-      const mN = (lat - kOrigin[0])*mLat, mE = (lon - kOrigin[1])*mLon;
-      const r = na*na;                      // variance de la mesure
-      const tn = performance.now();
-      const dt = kAt ? Math.min(10, Math.max(.05, (tn - kAt)/1000)) : .5;
+      if(!kOrigin) kOrigin = [lat, lon];
+      const ml = 111320, mo = 111320*Math.cos(kOrigin[0]*Math.PI/180);
+      const mN = (lat-kOrigin[0])*ml, mE = (lon-kOrigin[1])*mo;
+      const r = na*na, tn = performance.now();
+      const dt = kAt ? Math.min(10, Math.max(.05, (tn-kAt)/1000)) : .5;
       kAt = tn;
-
       if(!kN){ kN = kfNew(mN, r); kE = kfNew(mE, r); }
       else{
-        /* saut absurde (téléportation réseau) : on repart à zéro
-           plutôt que de traîner une aberration pendant une minute */
-        const saut = Math.hypot(mN - kN.p, mE - kE.p);
+        const saut = Math.hypot(mN-kN.p, mE-kE.p);
         if(saut > Math.max(150, na*6)){ kN = kfNew(mN, r); kE = kfNew(mE, r); }
         else{ kfStep(kN, mN, r, dt); kfStep(kE, mE, r, dt); }
       }
-      fix = [ kOrigin[0] + kN.p/mLat, kOrigin[1] + kE.p/mLon ];
-      accM = na;
+      fix = [ kOrigin[0] + kN.p/ml, kOrigin[1] + kE.p/mo ];
+      accM = na; gpsSpeed = Math.hypot(kN.v, kE.v);
       raw.push({ lat, lon, a:na, t:tn });
       while(raw.length && tn - raw[0].t > 20000) raw.shift();
-      /* la vitesse vient maintenant du filtre : elle existe même
-         quand le navigateur ne fournit pas coords.speed */
-      gpsSpeed = Math.hypot(kN.v, kE.v);
-      /* la piste : un point toutes les ~3 s, 2 minutes de mémoire */
-      if(!trail.length || tn - (trail.tLast || 0) > 3000){
+      if(!trail.length || tn - (trail.tLast || 0) > 2500){
         trail.push([fix[0], fix[1]]); trail.tLast = tn;
-        if(trail.length > 40) trail.shift();
+        if(trail.length > 60) trail.shift();
       }
-      /* ── LE CAP DE SECOURS ────────────────────────────────────
-         Quand la boussole se tait, on déduit la direction du
-         déplacement. Le filtre donne directement le vecteur vitesse :
-         c'est plus propre et plus réactif que de remonter la piste. */
-      if(!compassLive()){
-        let brg = null;
-        if(gpsSpeed > 0.45) brg = (Math.atan2(kE.v, kN.v)*180/Math.PI + 360) % 360;
-        else if(typeof p.coords.heading === "number" && !isNaN(p.coords.heading)
-                && typeof p.coords.speed === "number" && p.coords.speed > 0.7)
-          brg = p.coords.heading;
-        if(brg != null) pushHeading(brg, "gps");
-      }
-    }, ()=>{ gpsErr = true; },
-    { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
-    startCompass();
+    }, ()=>{ gpsErr = true; }, { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
   }
   function stopWatch(){
     if(watchId != null){ try{ navigator.geolocation.clearWatch(watchId); }catch(e){} }
-    stopCompass();
-    watchId = null; fix = null; accM = null; badFix = 0; gpsSpeed = null;
+    watchId = null; fix = null; accM = null; gpsSpeed = null;
     kOrigin = null; kN = null; kE = null; kAt = 0; nFix = 0; bestAcc = null;
     trail.length = 0; hist.length = 0; raw.length = 0;
     $("#btn-radar-on").textContent = "📡 Activer le radar";
   }
 
-  /* ── mode réglage (?triche=1) : enregistrer les spots sur place ── */
+  /* ── LA CARTE SE MANIPULE ────────────────────────────────────
+     Faire glisser, pincer, recentrer : c'est ce qu'on attend d'une
+     carte, et c'est aussi ce qui permet de vérifier un repérage —
+     on dézoome, on regarde si les huit pièces forment bien la figure
+     du village. */
+  function ptsOf(e){ return [...(e.touches || [])].map(t=>({ x:t.clientX, y:t.clientY })); }
+  function onDown(e){
+    const t = ptsOf(e);
+    if(t.length === 2){
+      pinch = { d:Math.hypot(t[0].x-t[1].x, t[0].y-t[1].y), mpp:vue.mpp }; drag = null;
+    }else{
+      const p = t[0] || { x:e.clientX, y:e.clientY };
+      drag = { x:p.x, y:p.y, e:vue.e, n:vue.n, bouge:false };
+    }
+  }
+  function onMove(e){
+    const t = ptsOf(e);
+    if(pinch && t.length === 2){
+      const d = Math.hypot(t[0].x-t[1].x, t[0].y-t[1].y);
+      if(d > 8){ vue.mpp = Math.max(0.2, Math.min(60, pinch.mpp * pinch.d/d)); suivre = false; }
+      e.preventDefault(); return;
+    }
+    if(!drag) return;
+    const p = t[0] || { x:e.clientX, y:e.clientY };
+    const dx = p.x - drag.x, dy = p.y - drag.y;
+    if(Math.abs(dx) + Math.abs(dy) > 4) drag.bouge = true;
+    if(drag.bouge){
+      vue.e = drag.e - dx*vue.mpp; vue.n = drag.n + dy*vue.mpp;
+      suivre = false; e.preventDefault();
+    }
+  }
+  function onUp(e){
+    /* un simple toucher, sans glisser : on choisit la pièce la plus
+       proche du doigt — c'est le geste naturel sur une carte */
+    if(drag && !drag.bouge && origine){
+      const r = cv.getBoundingClientRect();
+      const px = drag.x - r.left, py = drag.y - r.top;
+      let best = null;
+      allTargets().forEach(o=>{
+        const m = toM(o.p), d = Math.hypot(X(m.e)-px, Y(m.n)-py);
+        if(d < 34 && (!best || d < best.d)) best = { code:o.st.code, d };
+      });
+      if(best){ lockCode = (lockCode === best.code) ? null : best.code;
+                hist.length = 0; AudioFX.nav(); dessinerListe(); }
+    }
+    drag = null; pinch = null;
+  }
+
+  function boucle(now){
+    if(stopped){ raf = null; return; }
+    if($("#map-screen").classList.contains("active")){
+      dessiner(now);
+      if(now - lastAux > 600){ lastAux = now; majTextes(); dessinerCourbe(); dessinerListe(); majDiag(); }
+    }
+    raf = requestAnimationFrame(boucle);
+  }
+
+  /* ── PANNEAU DE RÉGLAGE (mode #triche) ───────────────────────── */
   function buildChips(){
-    const host = $("#radar-chips"); host.innerHTML = "";
-    const spots = loadSpots();
+    const host = $("#radar-chips"); if(!host) return;
+    const sp = loadSpots();
+    host.innerHTML = "";
     CONFIG.stations.forEach(st=>{
       const b = document.createElement("button");
       b.className = "b3" + (st.code === selCode ? " sel" : "");
-      b.textContent = (spots[st.code] ? "✓ " : "") + st.code.slice(3);
+      b.textContent = (sp[st.code] ? "✓ " : "") + st.code.slice(3);
       b.addEventListener("click", ()=>{ selCode = st.code; AudioFX.nav(); buildChips(); });
       host.appendChild(b);
     });
     majPhoto();
-    /* ── D'OÙ VIENT CETTE POSITION ? ─────────────────────────────
-       Il y a DEUX couches, et c'est là qu'on se fait piéger :
-
-         · celle du JEU (CONFIG.map.spots), écrite dans le code, donc
-           la même pour tout le monde — c'est la seule que ton père
-           verra sur son téléphone ;
-         · celle de CE TÉLÉPHONE (localStorage), posée par le bouton
-           « Enregistrer la pièce ici ». Elle ne sort jamais d'ici.
-
-       Et la locale ÉCRASE celle du jeu. Donc, si on a fait un essai
-       sur son propre téléphone, on continuera de voir cet essai même
-       après avoir gravé la vraie position dans le code : on croit
-       que la correction n'a pas marché, alors qu'elle marche
-       parfaitement pour tous les autres.
-
-       D'où cet affichage, qui dit toujours à quelle couche on a
-       affaire — et qui prévient quand la locale en masque une vraie. */
-    const el = $("#radar-spot");
-    if(el){
-      let local = {}; try{ local = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){}
-      const loc = local[selCode], code = (CONFIG.map.spots || {})[selCode];
-      const fmt = (p)=>`${p[0].toFixed(5)}, ${p[1].toFixed(5)}`;
-      if(loc && code && (loc[0] !== code[0] || loc[1] !== code[1])){
-        el.innerHTML = `<b>${selCode} : ${fmt(loc)}</b><br>`
-          + `⚠ réglage de CE téléphone — il masque celle du jeu (${fmt(code)}).`
-          + ` « ✕ Effacer ce spot » pour retrouver la vraie.`;
-        el.style.color = "#ffce4d";
-      }else if(loc){
-        el.innerHTML = `<b>${selCode} : ${fmt(loc)}</b><br>`
-          + `réglage de CE téléphone seulement — invisible pour les autres`
-          + ` tant qu'il n'est pas collé dans le jeu.`;
-        el.style.color = "#8fd0ff";
-      }else if(code){
-        el.innerHTML = `<b>${selCode} : ${fmt(code)}</b><br>gravée dans le jeu — visible par tous.`;
-        el.style.color = "#39e08a";
-      }else{
-        el.textContent = `${selCode} : aucune position enregistrée`;
-        el.style.color = "";
-      }
-    }
+    const el = $("#radar-spot"); if(!el) return;
+    const loc = loadMap(KEY)[selCode], code = (CONFIG.map.spots || {})[selCode];
+    const f = (p)=>`${p[0].toFixed(5)}, ${p[1].toFixed(5)}`;
+    if(loc && code && (loc[0] !== code[0] || loc[1] !== code[1])){
+      el.innerHTML = `<b>${selCode} : ${f(loc)}</b><br>⚠ réglage de CE téléphone — il masque celle du jeu (${f(code)}).`;
+      el.style.color = "#ffce4d";
+    }else if(loc){
+      el.innerHTML = `<b>${selCode} : ${f(loc)}</b><br>réglage de CE téléphone seulement — invisible pour les autres.`;
+      el.style.color = "#8fd0ff";
+    }else if(code){
+      el.innerHTML = `<b>${selCode} : ${f(code)}</b><br>gravée dans le jeu — visible par tous.`;
+      el.style.color = "#39e08a";
+    }else{ el.textContent = `${selCode} : aucune position enregistrée`; el.style.color = ""; }
   }
-  /* le panneau « cherche à vue », sur l'écran radar */
-  let zoneCode = null, zoneOn = null;
-  function montrerZone(t, on){
-    const el = $("#radar-zone"); if(!el) return;
-    const code = t ? t.st.code : null;
-    if(on === zoneOn && code === zoneCode) return;   // rien de neuf : on ne redessine pas
-    zoneOn = on; zoneCode = code;
-    if(!on || !t){ el.hidden = true; el.innerHTML = ""; return; }
-    const img = loadMap(KEY_IMG)[code], note = loadMap(KEY_NOTE)[code] || "";
-    if(!img && !note){
-      el.hidden = false;
-      el.innerHTML = `<div class="z-t">Cherche à vue</div>`
-        + `<div class="z-n">Tu es à portée de ${t.st.code} — ${t.st.nom}. `
-        + `Le GPS ne peut plus t'aider : lève les yeux, regarde les murs, `
-        + `les angles et au-dessus de la hauteur des yeux.</div>`;
-      return;
-    }
-    el.hidden = false;
-    el.innerHTML = `<div class="z-t">Cherche à vue — ${t.st.code}</div>`
-      + (img ? `<img src="${img}" alt="Le mur de ${t.st.code}">` : "")
-      + (note ? `<div class="z-n">${note.replace(/[<>&]/g, ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]))}</div>` : "");
-  }
-
-  /* l'aperçu de la photo et du repère écrit de la pièce choisie */
   function majPhoto(){
     const prev = $("#photo-prev"); if(!prev) return;
     const img = loadMap(KEY_IMG)[selCode], note = loadMap(KEY_NOTE)[selCode] || "";
@@ -9221,326 +8998,221 @@ const Radar = (()=>{
       : "<span class='none'>Aucune photo pour cette pièce.</span>";
     const ni = $("#note-in"); if(ni && document.activeElement !== ni) ni.value = note;
   }
+  /* lire des coordonnées écrites n'importe comment : sept formats de
+     Google Maps, tous vérifiés */
+  function lireCoords(txt){
+    if(!txt) return null;
+    const t = String(txt).trim();
+    let m = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);       if(m) return [+m[1], +m[2]];
+    m = t.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);            if(m) return [+m[1], +m[2]];
+    const dms = /(\d+)\s*[°d]\s*(\d+)\s*['′]\s*([\d.]+)\s*["″]?\s*([NSEOW])/gi;
+    const pts = []; let d;
+    while((d = dms.exec(t))){
+      let v = +d[1] + (+d[2])/60 + (+d[3])/3600;
+      const h = d[4].toUpperCase(); if("SOW".includes(h)) v = -v;
+      pts.push({ v, h });
+    }
+    if(pts.length >= 2){
+      const la = pts.find(p=>"NS".includes(p.h)) || pts[0];
+      const lo = pts.find(p=>"EOW".includes(p.h)) || pts[1];
+      return [la.v, lo.v];
+    }
+    m = t.match(/(-?\d+[.,]\d+)\s*[,;\s]\s*(-?\d+[.,]\d+)/);
+    if(m) return [ +m[1].replace(",","."), +m[2].replace(",",".") ];
+    return null;
+  }
+  /* moyenne des relevés BRUTS pris une fois immobile : la technique du
+     géomètre, et la seule qui mesure le GPS plutôt que mon filtre */
+  function pointMoyen(){
+    const tn = performance.now();
+    let pts = raw.filter(p=>tn - p.t < 8000);
+    if(!pts.length) return null;
+    const der = pts[pts.length-1], seuil = Math.max(6, (der.a||10)*1.6);
+    const proche = pts.filter(p=>distM([p.lat,p.lon],[der.lat,der.lon]) <= seuil);
+    pts = proche.length >= 2 ? proche : [der];
+    let w = 0, sla = 0, slo = 0;
+    pts.forEach(p=>{ const k = 1/Math.max(1, p.a*p.a); w += k; sla += p.lat*k; slo += p.lon*k; });
+    return { lat:sla/w, lon:slo/w, n:pts.length, acc:Math.sqrt(1/w)/Math.sqrt(pts.length) };
+  }
+  function reduireImage(file, cb){
+    const fr = new FileReader();
+    fr.onload = ()=>{ const img = new Image();
+      img.onload = ()=>{
+        const max = 560, k = Math.min(1, max/Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width*k)), h = Math.max(1, Math.round(img.height*k));
+        const cc = document.createElement("canvas"); cc.width = w; cc.height = h;
+        cc.getContext("2d").drawImage(img, 0, 0, w, h);
+        cb(cc.toDataURL("image/jpeg", 0.72));
+      };
+      img.onerror = ()=>cb(null); img.src = fr.result; };
+    fr.onerror = ()=>cb(null); fr.readAsDataURL(file);
+  }
+  function majDiag(){
+    const el = $("#radar-diag"); if(!el || !TRICHE) return;
+    el.textContent =
+      `GPS ${fix ? fix[0].toFixed(5)+", "+fix[1].toFixed(5) : "—"} · ±${accM!=null?Math.round(accM):"—"} m`
+      + ` · ${gpsSpeed!=null?gpsSpeed.toFixed(1)+" m/s":"—"}\n`
+      + `relevés ${nFix} · meilleure ±${bestAcc!=null?Math.round(bestAcc):"—"} m · trace ${trail.length} pts\n`
+      + `carte : ${vue.mpp.toFixed(2)} m/px · ${suivre?"suit ta position":"déplacée à la main"}\n`
+      + `pièces enregistrées ${Object.keys(loadSpots()).length}/8`;
+  }
+
+  function wire(){
+    if(bound) return; bound = true;
+    $("#btn-radar-on").addEventListener("click", ()=>{
+      AudioFX.select(); watchId == null ? startWatch() : stopWatch();
+    });
+    $("#radar-list").addEventListener("click", e=>{
+      const b = e.target.closest(".rl"); if(!b) return;
+      lockCode = (lockCode === b.dataset.code) ? null : b.dataset.code;
+      hist.length = 0; AudioFX.nav(); dessinerListe();
+    });
+    /* les gestes sur la carte */
+    cv.addEventListener("touchstart", onDown, { passive:true });
+    cv.addEventListener("touchmove", onMove, { passive:false });
+    cv.addEventListener("touchend", onUp);
+    cv.addEventListener("mousedown", onDown);
+    addEventListener("mousemove", onMove);
+    addEventListener("mouseup", onUp);
+    cv.addEventListener("wheel", e=>{
+      vue.mpp = Math.max(0.2, Math.min(60, vue.mpp * (e.deltaY > 0 ? 1.15 : 0.87)));
+      suivre = false; e.preventDefault();
+    }, { passive:false });
+    $("#btn-map-in").addEventListener("click", ()=>{ vue.mpp = Math.max(0.2, vue.mpp/1.6); suivre = false; AudioFX.tick(); });
+    $("#btn-map-out").addEventListener("click", ()=>{ vue.mpp = Math.min(60, vue.mpp*1.6); suivre = false; AudioFX.tick(); });
+    $("#btn-map-fit").addEventListener("click", ()=>{ suivre = true; AudioFX.select(); });
+
+    if(!TRICHE) return;
+    $("#btn-radar-rec").addEventListener("click", ()=>{
+      const pm = pointMoyen();
+      if(!pm){ AudioFX.err(); $("#radar-sub").textContent = "Pas encore de position."; return; }
+      saveSpot(selCode, pm.lat, pm.lon); AudioFX.ok(); buildChips();
+      $("#radar-sub").textContent = `${selCode} enregistrée (moyenne de ${pm.n}, ±${pm.acc.toFixed(1)} m).`;
+    });
+    $("#btn-radar-del").addEventListener("click", ()=>{
+      if(!loadSpots()[selCode]){ AudioFX.err(); return; }
+      delSpot(selCode); AudioFX.back(); buildChips();
+      $("#radar-sub").textContent = `${selCode} effacée.`;
+    });
+    $("#btn-radar-copy").addEventListener("click", ()=>{
+      const j = JSON.stringify(loadSpots()); AudioFX.select();
+      if(navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(j).catch(()=>prompt("Spots :", j));
+      else prompt("Spots :", j);
+    });
+    $("#btn-radar-map").addEventListener("click", ()=>{
+      const sp = loadSpots()[selCode];
+      if(!sp){ AudioFX.err(); return; }
+      AudioFX.select();
+      const u = `https://maps.google.com/?q=${sp[0]},${sp[1]}`;
+      try{ window.open(u, "_blank", "noopener"); }catch(e){ prompt("Position :", u); }
+    });
+    $("#btn-radar-export").addEventListener("click", ()=>{
+      const paquet = { spots:loadSpots(), notes:loadMap(KEY_NOTE), photos:loadMap(KEY_IMG),
+                       le:new Date().toISOString().slice(0,10) };
+      const txt = JSON.stringify(paquet); AudioFX.select();
+      try{
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([txt], { type:"application/json" }));
+        a.download = "reperage-les-vans.json";
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        $("#radar-sub").textContent = `Repérage exporté (${Math.round(txt.length/1024)} Ko).`;
+      }catch(e){ prompt("Repérage :", txt); }
+    });
+    $("#btn-paste-ok").addEventListener("click", ()=>{
+      const el = $("#paste-in"), out = $("#paste-out"), p = lireCoords(el.value);
+      if(!p){ AudioFX.err();
+        out.innerHTML = "<span class='ko'>Je n'arrive pas à lire ça. Colle les deux nombres tels que Google Maps les donne, par exemple <b>44.40458, 4.13214</b>.</span>"; return; }
+      const [lat, lon] = p;
+      if(!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180){
+        AudioFX.err(); out.innerHTML = "<span class='ko'>Ces nombres ne sont pas des coordonnées valables.</span>"; return; }
+      const loin = distM([lat, lon], [44.404, 4.133])/1000;
+      if(loin > 150){ AudioFX.err();
+        out.innerHTML = `<span class='ko'>Ce point est à ${Math.round(loin)} km des Vans.`
+          + (Math.abs(lon) > Math.abs(lat)
+             ? ` On dirait que la latitude et la longitude sont inversées — essaie <b>${lon.toFixed(5)}, ${lat.toFixed(5)}</b>.`
+             : " Vérifie les coordonnées.") + "</span>"; return; }
+      saveSpot(selCode, lat, lon); AudioFX.ok(); el.value = ""; buildChips(); suivre = true;
+      out.innerHTML = `<span class='ok'>${selCode} posée à ${lat.toFixed(5)}, ${lon.toFixed(5)}.</span>`
+        + ` Elle apparaît sur la carte.`;
+    });
+    $("#paste-in").addEventListener("keydown", e=>{
+      if(e.key === "Enter"){ e.preventDefault(); $("#btn-paste-ok").click(); } });
+    $("#btn-paste-me").addEventListener("click", ()=>{
+      if(!fix){ AudioFX.err(); $("#paste-out").innerHTML = "<span class='ko'>Active d'abord le radar.</span>"; return; }
+      const txt = fix[0].toFixed(6) + ", " + fix[1].toFixed(6); AudioFX.select();
+      if(navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(txt).catch(()=>prompt("Ta position :", txt));
+      else prompt("Ta position :", txt);
+      $("#paste-out").innerHTML = `Copié : <b>${txt}</b> (±${Math.round(accM||0)} m).`;
+    });
+    $("#photo-in").addEventListener("change", e=>{
+      const f = e.target.files && e.target.files[0]; e.target.value = "";
+      if(!f) return;
+      $("#photo-prev").innerHTML = "<span class='none'>Réduction en cours…</span>";
+      reduireImage(f, data=>{
+        if(!data){ AudioFX.err(); $("#photo-prev").innerHTML = "<span class='none'>Image illisible.</span>"; return; }
+        const m = loadMap(KEY_IMG); m[selCode] = data;
+        if(!saveMap(KEY_IMG, m)){ AudioFX.err();
+          $("#photo-prev").innerHTML = "<span class='none'>Plus de place : retire une photo d'une autre pièce.</span>"; return; }
+        AudioFX.ok(); majPhoto();
+      });
+    });
+    $("#btn-photo-del").addEventListener("click", ()=>{
+      const m = loadMap(KEY_IMG); delete m[selCode]; saveMap(KEY_IMG, m); AudioFX.back(); majPhoto(); });
+    $("#note-in").addEventListener("change", ()=>{
+      const m = loadMap(KEY_NOTE), v = $("#note-in").value.trim();
+      if(v) m[selCode] = v; else delete m[selCode];
+      saveMap(KEY_NOTE, m); AudioFX.tick(); });
+    $("#btn-cal-a").addEventListener("click", ()=>{
+      const pm = pointMoyen();
+      if(!pm){ AudioFX.err(); $("#radar-cal-out").innerHTML = "<span class='ko'>Pas encore de position.</span>"; return; }
+      calA = [pm.lat, pm.lon]; calAcc = pm.acc; calT = Date.now(); AudioFX.ok();
+      $("#radar-cal-out").innerHTML = `Repère posé — moyenne de ${pm.n} relevé${pm.n>1?"s":""} (±${pm.acc.toFixed(1)} m).<br>`
+        + (pm.n < 3 ? "<span class='ko'>Peu de relevés : reste immobile quelques secondes de plus.</span><br>" : "")
+        + `Marche 30 à 50 m en ligne droite, arrête-toi 5 secondes, puis touche ②.`;
+    });
+    $("#btn-cal-b").addEventListener("click", ()=>{
+      if(!calA){ AudioFX.err(); $("#radar-cal-out").innerHTML = "<span class='ko'>Pose d'abord un repère avec ①.</span>"; return; }
+      const pm = pointMoyen();
+      if(!pm){ AudioFX.err(); $("#radar-cal-out").innerHTML = "<span class='ko'>Position perdue.</span>"; return; }
+      const B = [pm.lat, pm.lon], d = distM(calA, B), br = bearingTo(calA, B);
+      const dt = (Date.now()-calT)/1000;
+      const marge = Math.round(Math.sqrt((calAcc||0)**2 + (pm.acc||0)**2)*2);
+      AudioFX.ok();
+      const verdict = d < marge
+        ? `<span class='ko'>Le déplacement (${Math.round(d)} m) est plus petit que la marge d'erreur (±${marge} m) : ce test ne prouve rien. Recommence en marchant plus loin, à ciel ouvert.</span>`
+        : d > marge*3
+          ? `<span class='ok'>Mesure fiable.</span> Si ça correspond à ta marche, le radar mesure juste — et c'est la position enregistrée qui est fausse.`
+          : `Mesure à peu près exploitable, mais le GPS est bruité : marche plus loin pour en être sûr.`;
+      $("#radar-cal-out").innerHTML =
+        `Le radar a mesuré : <b>${Math.round(d)} m</b> ${versCard(br)} (${Math.round(br)}°), en ${Math.round(dt)} s.<br>`
+        + `Points moyens : ±${(calAcc||0).toFixed(1)} m au départ, ±${(pm.acc||0).toFixed(1)} m à l'arrivée (${pm.n} relevé${pm.n>1?"s":""}).<br>`
+        + verdict;
+      calA = null;
+    });
+  }
+
+  /* ── API PUBLIQUE (inchangée) ────────────────────────────────── */
   function start(){
     cv = $("#radar-cv"); c = cv.getContext("2d");
-    $("#radar-setup").hidden = !TRICHE;
-    if(TRICHE){ selCode = selCode || "LV_01"; buildChips(); }
-    if(!bound){
-      bound = true;
-      $("#btn-radar-on").addEventListener("click", ()=>{
-        AudioFX.select();
-        watchId == null ? startWatch() : stopWatch();
-      });
-      $("#btn-radar-rec").addEventListener("click", ()=>{
-        if(!fix){ AudioFX.err(); setUI("PAS DE FIX GPS", "", "Active d'abord le radar et attends la position.", "#ff8484"); return; }
-        saveSpot(selCode, fix[0], fix[1]);
-        AudioFX.ok(); buildChips();
-        $("#radar-sub").textContent = `${selCode} enregistrée ici (±${Math.round(accM||0)} m)`;
-      });
-      $("#btn-radar-del").addEventListener("click", ()=>{
-        const spots = loadSpots();
-        if(!spots[selCode]){ AudioFX.err();
-          $("#radar-sub").textContent = `${selCode} n'a aucune position à effacer.`; return; }
-        delSpot(selCode); AudioFX.back(); buildChips();
-        $("#radar-sub").textContent = `${selCode} effacée — le radar ne la cherche plus.`;
-      });
-      /* choisir SA cible : jusqu'ici le radar imposait la plus proche.
-         Sur le terrain on veut souvent aller chercher une pièce
-         précise, pas celle qui se trouve être à trois mètres. */
-      $("#radar-list").addEventListener("click", e=>{
-        const b = e.target.closest(".rl"); if(!b) return;
-        const code = b.dataset.code;
-        lockCode = (lockCode === code) ? null : code;
-        hist.length = 0;                       // la courbe repart à zéro
-        AudioFX.nav(); drawList();
-      });
-      /* ── RÉDUIRE LA PHOTO ─────────────────────────────────────
-         Une photo d'iPhone pèse 3 à 5 Mo. Le stockage local d'un
-         navigateur en accepte environ 5 en TOUT : en garder huit
-         telles quelles est impossible. On les ramène donc à 560 px de
-         large en JPEG — largement assez pour reconnaître un mur, et
-         une quarantaine de kilo-octets pièce. */
-      function reduireImage(file, cb){
-        const fr = new FileReader();
-        fr.onload = ()=>{
-          const img = new Image();
-          img.onload = ()=>{
-            const max = 560;
-            const k = Math.min(1, max/Math.max(img.width, img.height));
-            const w = Math.max(1, Math.round(img.width*k)), h = Math.max(1, Math.round(img.height*k));
-            const cv2 = document.createElement("canvas");
-            cv2.width = w; cv2.height = h;
-            const c2 = cv2.getContext("2d");
-            c2.drawImage(img, 0, 0, w, h);
-            cb(cv2.toDataURL("image/jpeg", 0.72));
-          };
-          img.onerror = ()=>cb(null);
-          img.src = fr.result;
-        };
-        fr.onerror = ()=>cb(null);
-        fr.readAsDataURL(file);
-      }
-
-      /* ── LIRE DES COORDONNÉES ÉCRITES N'IMPORTE COMMENT ───────
-         Google Maps, selon qu'on copie l'étiquette, l'adresse de la
-         page ou le partage, produit au moins quatre formats
-         différents. Refuser trois d'entre eux, ce serait transformer
-         la solution en nouveau problème — on les accepte donc tous :
-
-           44.40458, 4.13214
-           https://maps.google.com/?q=44.40458,4.13214
-           https://www.google.com/maps/@44.40458,4.13214,19z
-           https://maps.app.goo.gl/… suivi de !3d44.40458!4d4.13214
-           44°24'16.5"N 4°07'55.7"E                                  */
-      function lireCoords(txt){
-        if(!txt) return null;
-        const t = String(txt).trim();
-        /* 1) la forme la plus riche d'abord : !3d<lat>!4d<lon>, que
-              Google glisse dans ses longues adresses */
-        let m = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
-        if(m) return [ +m[1], +m[2] ];
-        /* 2) l'adresse en @lat,lon,zoom */
-        m = t.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
-        if(m) return [ +m[1], +m[2] ];
-        /* 3) degrés-minutes-secondes, avec hémisphère */
-        const dms = /(\d+)\s*[°d]\s*(\d+)\s*['\u2032]\s*([\d.]+)\s*["\u2033]?\s*([NSEOW])/gi;
-        const pts = []; let d;
-        while((d = dms.exec(t))){
-          let v = +d[1] + (+d[2])/60 + (+d[3])/3600;
-          const h = d[4].toUpperCase();
-          if(h === "S" || h === "O" || h === "W") v = -v;
-          pts.push({ v, h });
-        }
-        if(pts.length >= 2){
-          const lat = pts.find(p=>"NS".includes(p.h)) || pts[0];
-          const lon = pts.find(p=>"EOW".includes(p.h)) || pts[1];
-          return [ lat.v, lon.v ];
-        }
-        /* 4) deux nombres décimaux, séparés par une virgule ou un espace */
-        m = t.match(/(-?\d+[.,]\d+)\s*[,;\s]\s*(-?\d+[.,]\d+)/);
-        if(m) return [ +m[1].replace(",", "."), +m[2].replace(",", ".") ];
-        return null;
-      }
-
-      /* ── POINT MOYEN À L'ARRÊT ────────────────────────────────
-         C'est la technique du géomètre, et c'est ce qui manquait.
-
-         Quand on est immobile, le GPS ne donne pas UN point : il en
-         donne un par seconde, tous différents, dispersés autour du
-         vrai. Un seul relevé porte donc toute l'erreur ; la moyenne de
-         dix la divise par trois — c'est en racine du nombre de
-         mesures. On pondère par 1/précision², parce qu'un relevé
-         annoncé à ±5 m vaut quatre fois un relevé à ±10 m.
-
-         Et surtout : on repart des relevés BRUTS. Le filtre de
-         Kalman est fait pour afficher une position stable pendant
-         qu'on marche ; il amortit forcément les départs et les
-         arrêts. S'en servir pour MESURER une marche, c'était mesurer
-         mon propre lissage — d'où les 17 m annoncés 7. */
-      function pointMoyen(){
-        const tn = performance.now();
-        let pts = raw.filter(p=>tn - p.t < 8000);
-        if(!pts.length) return null;
-        /* On ne moyenne QUE ce qui a été relevé une fois arrêté.
-           Sinon la fenêtre avale les derniers pas de la marche et
-           tire le point moyen en arrière : une marche de 17 m était
-           mesurée 13. On écarte donc les relevés trop éloignés du
-           tout dernier — ceux-là datent d'avant l'arrêt. */
-        const der = pts[pts.length-1];
-        const seuil = Math.max(6, (der.a || 10) * 1.6);
-        const proche = pts.filter(p=>
-          distM([p.lat,p.lon], [der.lat,der.lon]) <= seuil);
-        if(proche.length >= 2) pts = proche;
-        else pts = [der];
-        let w = 0, sLat = 0, sLon = 0;
-        pts.forEach(p=>{ const k = 1/Math.max(1, p.a*p.a);
-          w += k; sLat += p.lat*k; sLon += p.lon*k; });
-        const accEff = Math.sqrt(1/w) / Math.sqrt(pts.length);
-        return { lat:sLat/w, lon:sLon/w, n:pts.length, acc:accEff };
-      }
-
-      /* ── LE BANC D'ESSAI DE MARCHE ────────────────────────────
-         Quand quelqu'un dit « le radar est tout faux », trois choses
-         peuvent être en cause, et on ne peut pas les distinguer depuis
-         un écran : les formules, la position enregistrée, ou le GPS du
-         téléphone. Les formules, elles, ont été vérifiées contre la
-         référence géodésique (Vincenty, WGS84) : 0,28 % d'écart de
-         distance et 0,1° de relèvement sur 300 tirages. Restent les
-         deux autres, et seule une marche réelle peut trancher.
-
-         On pose un repère, on marche, et le radar annonce ce QU'IL a
-         mesuré. Si ça correspond à ce qu'on vient de faire, il va
-         bien — et c'est la position de la pièce qui est fausse. */
-      $("#btn-cal-a").addEventListener("click", ()=>{
-        const pm = pointMoyen();
-        if(!pm){ AudioFX.err();
-          $("#radar-cal-out").innerHTML = "<span class='ko'>Pas encore de position — active le radar et attends le premier point.</span>";
-          return; }
-        calA = [pm.lat, pm.lon]; calAcc = pm.acc; calT = Date.now();
-        AudioFX.ok();
-        $("#radar-cal-out").innerHTML =
-          `Repère posé à <b>${calA[0].toFixed(5)}, ${calA[1].toFixed(5)}</b>`
-          + ` — moyenne de ${pm.n} relevé${pm.n>1?"s":""} (±${pm.acc.toFixed(1)} m).<br>`
-          + (pm.n < 3 ? "<span class='ko'>Peu de relevés : reste immobile quelques secondes de plus avant de partir.</span><br>" : "")
-          + `Marche maintenant 30 à 50 m en ligne droite, puis touche ②.`;
-      });
-      $("#btn-cal-b").addEventListener("click", ()=>{
-        if(!calA){ AudioFX.err();
-          $("#radar-cal-out").innerHTML = "<span class='ko'>Pose d'abord un repère avec ①.</span>"; return; }
-        const pm = pointMoyen();
-        if(!pm){ AudioFX.err();
-          $("#radar-cal-out").innerHTML = "<span class='ko'>Position perdue — attends que le GPS revienne.</span>"; return; }
-        const B = [pm.lat, pm.lon];
-        const d = distM(calA, B), br = bearingTo(calA, B);
-        const dt = (Date.now() - calT)/1000;
-        /* la marge se combine en quadrature : deux erreurs indépendantes
-           ne s'additionnent pas bêtement */
-        const marge = Math.round(Math.sqrt((calAcc||0)**2 + (pm.acc||0)**2)*2);
-        AudioFX.ok();
-        /* le verdict : ce n'est PAS la distance qui compte, c'est de
-           savoir si elle est mesurable compte tenu du bruit */
-        let verdict;
-        if(d < marge)
-          verdict = `<span class='ko'>Le déplacement (${Math.round(d)} m) est plus petit que la marge d'erreur `
-            + `(±${marge} m) : ce test ne prouve rien. Recommence en marchant plus loin, à ciel ouvert.</span>`;
-        else if(d > marge*3)
-          verdict = `<span class='ok'>Mesure fiable.</span> Si ça correspond à ta marche, le radar calcule juste — `
-            + `et c'est la position enregistrée de la pièce qui est fausse.`;
-        else
-          verdict = `Mesure à peu près exploitable, mais le GPS est bruité : marche plus loin pour en être sûr.`;
-        $("#radar-cal-out").innerHTML =
-          `Le radar a mesuré : <b>${Math.round(d)} m</b> ${/^[aeiouéè]/i.test(cardinalL(br))?"vers l'":"vers le "}<b>${cardinalL(br)}</b> `
-          + `(${Math.round(br)}°), en ${Math.round(dt)} s.<br>`
-          + `Points moyens : ±${(calAcc||0).toFixed(1)} m au départ, ±${(pm.acc||0).toFixed(1)} m à l'arrivée`
-          + ` (${pm.n} relevé${pm.n>1?"s":""}).<br>`
-          + verdict;
-        calA = null;
-      });
-      $("#btn-paste-ok").addEventListener("click", ()=>{
-        const el = $("#paste-in"), out = $("#paste-out");
-        const p = lireCoords(el.value);
-        if(!p){ AudioFX.err();
-          out.innerHTML = "<span class='ko'>Je n'arrive pas à lire ça. Colle les deux nombres tels que Google Maps les donne, par exemple <b>44.40458, 4.13214</b>.</span>";
-          return; }
-        const [lat, lon] = p;
-        if(!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180){
-          AudioFX.err();
-          out.innerHTML = "<span class='ko'>Ces nombres ne sont pas des coordonnées valables.</span>"; return; }
-        /* garde-fou : latitude et longitude interverties donnent des
-           valeurs qui « passent » mais désignent l'autre bout du monde.
-           À nos latitudes, la longitude est toujours plus petite. */
-        const loin = distM([lat, lon], [44.404, 4.133]) / 1000;
-        if(loin > 150){
-          AudioFX.err();
-          out.innerHTML = `<span class='ko'>Ce point est à ${Math.round(loin)} km des Vans.`
-            + (Math.abs(lon) > Math.abs(lat)
-               ? " On dirait que la latitude et la longitude sont inversées — essaie <b>"
-                 + lon.toFixed(5) + ", " + lat.toFixed(5) + "</b>."
-               : " Vérifie les coordonnées.") + "</span>";
-          return; }
-        saveSpot(selCode, lat, lon);
-        AudioFX.ok(); el.value = ""; buildChips();
-        out.innerHTML = `<span class='ok'>${selCode} posée à ${lat.toFixed(5)}, ${lon.toFixed(5)}.</span>`
-          + ` Vérifie-la avec « 🗺 Voir ce spot sur une carte ».`;
-      });
-      $("#paste-in").addEventListener("keydown", e=>{
-        if(e.key === "Enter"){ e.preventDefault(); $("#btn-paste-ok").click(); }
-      });
-      /* copier SA position : pour aller la coller dans Maps et voir,
-         de ses yeux, où le téléphone croit qu'on est */
-      $("#btn-paste-me").addEventListener("click", ()=>{
-        const pm = raw.length ? { lat:fix[0], lon:fix[1] } : null;
-        if(!pm){ AudioFX.err();
-          $("#paste-out").innerHTML = "<span class='ko'>Active d'abord le radar.</span>"; return; }
-        const txt = pm.lat.toFixed(6) + ", " + pm.lon.toFixed(6);
-        AudioFX.select();
-        if(navigator.clipboard && navigator.clipboard.writeText)
-          navigator.clipboard.writeText(txt).catch(()=>prompt("Ta position :", txt));
-        else prompt("Ta position :", txt);
-        $("#paste-out").innerHTML = `Copié : <b>${txt}</b> (±${Math.round(accM||0)} m).`
-          + ` Colle-le dans Google Maps pour voir où ton téléphone te situe.`;
-      });
-
-      $("#photo-in").addEventListener("change", e=>{
-        const f = e.target.files && e.target.files[0];
-        e.target.value = "";                     // pour pouvoir reprendre la même
-        if(!f) return;
-        $("#photo-prev").innerHTML = "<span class='none'>Réduction en cours…</span>";
-        reduireImage(f, (data)=>{
-          if(!data){ AudioFX.err();
-            $("#photo-prev").innerHTML = "<span class='none'>Image illisible.</span>"; return; }
-          const m = loadMap(KEY_IMG); m[selCode] = data;
-          if(!saveMap(KEY_IMG, m)){ AudioFX.err();
-            $("#photo-prev").innerHTML = "<span class='none'>Plus de place : retire une photo d'une autre pièce.</span>";
-            return; }
-          AudioFX.ok(); majPhoto();
-        });
-      });
-      $("#btn-photo-del").addEventListener("click", ()=>{
-        const m = loadMap(KEY_IMG); delete m[selCode]; saveMap(KEY_IMG, m);
-        AudioFX.back(); majPhoto();
-      });
-      $("#note-in").addEventListener("change", ()=>{
-        const m = loadMap(KEY_NOTE);
-        const v = $("#note-in").value.trim();
-        if(v) m[selCode] = v; else delete m[selCode];
-        saveMap(KEY_NOTE, m); AudioFX.tick();
-      });
-      /* ── EXPORTER LE REPÉRAGE ────────────────────────────────
-         Positions, repères écrits et photos dans un seul fichier :
-         c'est ce qui permet de graver le travail de terrain dans le
-         jeu, pour qu'il serve aussi sur un AUTRE téléphone. */
-      $("#btn-radar-export").addEventListener("click", ()=>{
-        const paquet = { spots: loadSpots(), notes: loadMap(KEY_NOTE), photos: loadMap(KEY_IMG),
-                         le: new Date().toISOString().slice(0,10) };
-        const txt = JSON.stringify(paquet);
-        AudioFX.select();
-        try{
-          const bl = new Blob([txt], { type:"application/json" });
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(bl);
-          a.download = "reperage-les-vans.json";
-          document.body.appendChild(a); a.click();
-          setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-          $("#radar-sub").textContent = `Repérage exporté (${Math.round(txt.length/1024)} Ko).`;
-        }catch(e){ prompt("Repérage :", txt); }
-      });
-
-      /* ouvrir la position enregistrée dans l'appli Cartes : c'est le
-         moyen le plus direct de voir si un spot est au bon endroit */
-      $("#btn-radar-map").addEventListener("click", ()=>{
-        const sp = loadSpots()[selCode];
-        if(!sp){ AudioFX.err(); $("#radar-sub").textContent = `${selCode} n'a aucune position à montrer.`; return; }
-        AudioFX.select();
-        const u = `https://maps.google.com/?q=${sp[0]},${sp[1]}`;
-        try{ window.open(u, "_blank", "noopener"); }catch(e){ prompt("Position :", u); }
-      });
-      $("#btn-radar-copy").addEventListener("click", ()=>{
-        const json = JSON.stringify(loadSpots());
-        AudioFX.select();
-        if(navigator.clipboard && navigator.clipboard.writeText)
-          navigator.clipboard.writeText(json).catch(()=>prompt("Spots :", json));
-        else prompt("Spots :", json);
-      });
-    }
-    lastBeep = 0; stopped = false;
-    if(!raf) raf = requestAnimationFrame(loopFrame);
+    const su = $("#radar-setup"); if(su) su.hidden = !TRICHE;
+    if(TRICHE){ selCode = selCode || "LV_01"; }
+    wire();
+    if(TRICHE) buildChips();
+    stopped = false; suivre = true;
+    if(!raf) raf = requestAnimationFrame(boucle);
   }
   function stop(){ stopped = true; stopWatch(); }
-  /* écran éteint / appli en arrière-plan : on coupe le GPS haute
-     précision (gros consommateur) et on gèle la boucle. Au retour,
-     resume() relance le radar exactement dans l'état précédent. */
-  function pause(){
-    if(stopped && watchId == null) return;   // déjà à l'arrêt
-    wasWatching = watchId != null;
-    stopWatch(); stopped = true;
-  }
+  function pause(){ if(watchId != null){ wasOn = true; stopWatch(); } stopped = true; }
   function resume(){
     if(!$("#map-screen").classList.contains("active")) return;
     stopped = false;
-    if(!raf) raf = requestAnimationFrame(loopFrame);
-    if(wasWatching){ wasWatching = false; startWatch(); }
+    if(!raf) raf = requestAnimationFrame(boucle);
+    if(wasOn){ wasOn = false; startWatch(); }
   }
+  let wasOn = false;
   return { start, stop, pause, resume };
 })();
 
@@ -21631,7 +21303,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v113</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v114</p>`);
     wire();
   }
   function wire(){

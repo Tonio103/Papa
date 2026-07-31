@@ -62,6 +62,57 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v114) — LE RADAR REFAIT DE ZÉRO : UNE CARTE ⚠
+
+### Pourquoi tout reprendre
+
+Le cadran « tête en haut » avait un défaut **de conception**, pas de calcul.
+Pour savoir où est « devant », il lui fallait la **boussole**. Or dans un
+navigateur, la boussole est le maillon faible : refusée, absente, faussée par le
+téléphone tenu debout, perturbée par un mur de pierre. Quand elle se trompait,
+le radar affichait une direction fausse **tout en ayant parfaitement raison sur
+le fond** — les formules avaient d'ailleurs été auditées contre Vincenty
+(0,28 % en distance, 0,10° en relèvement).
+
+Impossible à corriger : le défaut était dans le principe.
+
+### Une carte, nord en haut
+
+Une carte **ne tourne jamais**. Elle ne peut donc pas mentir sur l'orientation,
+et n'a aucun besoin de boussole. C'est **la trace de tes propres pas** qui dit
+dans quel sens tu vas — exactement comme sur une carte papier, et exactement ce
+que fait Google Maps quand la boussole ne répond pas.
+
+Ce que la carte affiche :
+
+- **les 8 pièces à leurs vraies positions relatives**, avec leur numéro et leur
+  couleur ; les flashées en gris ;
+- **toi**, avec ton cercle d'incertitude GPS dessiné à l'échelle ;
+- **ta trace**, qui s'estompe — elle révèle que tu tournes en rond ou que tu
+  viens de dépasser la pièce ;
+- **un trait en pointillés** vers la cible : la direction, sans aucune boussole ;
+- **une grille métrique et une règle graduée** — sans repère de taille, une
+  carte sans rues ne veut rien dire ;
+- **le nord**, fixe, en haut à droite.
+
+Et elle **se manipule** : glisser pour déplacer, pincer ou ＋ ／ － pour zoomer,
+⌖ pour recentrer, toucher une pièce pour la traquer. Dézoomer permet de vérifier
+un repérage d'un coup d'œil : les huit pièces doivent former la figure du
+village.
+
+### Ce qui a été conservé, parce que c'était bon
+
+Le collage des coordonnées Google Maps (sept formats), la photo du mur et le
+repère écrit, le panneau « cherche à vue », l'export du repérage, le banc
+d'essai de marche, le filtre de Kalman, et toute l'honnêteté sur l'incertitude
+(fourchettes de distance, « direction pas fiable », « DANS LA ZONE »).
+
+Le guidage, lui, ne parle plus de gauche ni de droite : **sans boussole, ces
+mots-là n'ont aucun sens**. Il donne un cap, que la carte montre et que la trace
+permet de vérifier.
+
+sw v113→v114.
+
 ## Nouveautés (v113) — LES VINGT DERNIERS MÈTRES, PAR L'IMAGE
 
 Aucun GPS de téléphone ne couvre les vingt derniers mètres : à ±15 m, la flèche
