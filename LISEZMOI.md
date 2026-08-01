@@ -62,6 +62,46 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v118) — LV_02 GRAVÉE DANS LE JEU (exemple complet)
+
+Première pièce réellement repérée, et elle sert de modèle aux sept autres.
+
+`CONFIG.map` accueille maintenant **trois listes** au lieu d'une, qui
+fonctionnent toutes de la même façon :
+
+| liste | contenu | qui la voit |
+|---|---|---|
+| `spots` | la position | tout le monde |
+| `photos` | la photo du mur | tout le monde |
+| `notes` | le repère écrit | tout le monde |
+
+Ce qui est écrit là est visible sur **n'importe quel téléphone**, sans aucun
+réglage. Ce qui est fait sur place en mode `#triche` reste, lui, dans l'appareil
+qui l'a fait — et masque temporairement la version gravée. Même règle pour les
+trois, sinon on aurait trois comportements différents pour trois choses qui vont
+ensemble.
+
+### LV_02 — Le Binaire
+
+- position : `44.4081263, 4.1295079`
+- photo du mur : réduite de 3024×4032 à 420×560, **31 Ko**
+- repère : *« Le détail à reconnaître : les lames de bois et le montant peint en
+  rouge. »*
+
+### Vérifié sur un téléphone vierge
+
+Contexte neuf, stockage vide, **sans** mode réglage — c'est-à-dire dans les
+conditions exactes du joueur :
+
+| | résultat |
+|---|---|
+| sur place | « DANS LA ZONE », 0 m |
+| panneau « cherche à vue » | ouvert tout seul, photo et repère affichés |
+| photo en plein écran | ✅, téléchargeable sous `mur-LV_02.jpg` |
+| à 300 m au nord | « 300 m », direction sud, panneau refermé |
+
+sw v117→v118.
+
 ## Nouveautés (v117) — LA PHOTO EN GRAND, ET DANS LA PELLICULE
 
 La photo du mur est ce qui fait vraiment trouver une pièce sur les vingt
