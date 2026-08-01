@@ -62,6 +62,42 @@ Ajoute `?triche=1` à l'URL : barre rouge en bas avec un bouton ⚡ par station 
 | `LV03_IMGS` + `SPOTS` (LV_03) | remplace les 3 images provisoires par tes photos macro (base64, ~600px) et adapte les légendes |
 | `RANKS` (dans `index.html`) | les 6 rangs du joueur et leurs seuils d'étoiles (RECRUE → MAÎTRE INVADER) affichés sur le tableau de bord du HUB et l'écran-titre |
 
+## Nouveautés (v119) — LES PHOTOS SUR L'ÉCRAN D'ACCUEIL
+
+### Les murs, dès la galerie
+
+Jusqu'ici la photo d'un mur ne se voyait qu'une fois le radar ouvert sur la
+bonne cible. Elle est maintenant **sur la carte de l'accueil**, là où on voit
+les huit pièces d'un coup d'œil :
+
+- la photo est peinte **en fond de la vignette**, derrière l'invader, à faible
+  intensité et fondue sur les bords — on reconnaît le mur sans que le dessin
+  devienne illisible ;
+- une **pastille 📷** en haut à droite ouvre la photo en plein écran, avec le
+  repère écrit et le bouton de téléchargement. Elle n'ouvre **que** la photo :
+  elle ne lance pas le mini-jeu.
+
+La photo apparaît que la pièce soit déjà flashée ou non — c'est justement avant
+de l'avoir trouvée qu'on en a besoin. Les cartes sans photo ne changent pas.
+
+### Le fond de carte du radar
+
+Un fond de carte qui ne se charge pas ne le disait pas : on voyait un rectangle
+vide sans savoir si c'était le réseau, l'appli, ou soi. Trois corrections :
+
+- une pièce qui échoue est **redemandée au bout de 20 secondes** au lieu d'être
+  abandonnée définitivement ;
+- quand aucune pièce n'arrive, le radar l'écrit : *« Fond de carte indisponible
+  — réseau coupé ? Les pièces restent placées. »* Le repérage lui-même, qui ne
+  dépend pas de la carte, continue de fonctionner exactement pareil ;
+- le panneau de diagnostic affiche `tuiles : N chargées, M en échec`.
+
+La demande de pièce ne réclame plus d'autorisation `crossOrigin` : le radar n'a
+jamais eu besoin de relire ses propres pixels, et cette autorisation ne pouvait
+qu'ajouter une raison d'échouer.
+
+sw v118→v119.
+
 ## Nouveautés (v118) — LV_02 GRAVÉE DANS LE JEU (exemple complet)
 
 Première pièce réellement repérée, et elle sert de modèle aux sept autres.
