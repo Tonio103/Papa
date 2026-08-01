@@ -668,6 +668,30 @@ button:not(.b2):not(.b3){ position:relative; overflow:hidden; }
 
 
 
+
+/* ── La photo du lieu sur la carte de la galerie ───────────── */
+.card-mur{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; z-index:0; pointer-events:none;
+  /* assez présente pour reconnaître le mur, assez discrète pour que
+     l'invader reste le sujet de la carte */
+  opacity:.34; filter:saturate(.75) contrast(1.05);
+  -webkit-mask-image:radial-gradient(120% 100% at 50% 45%, #000 55%, transparent 100%);
+  mask-image:radial-gradient(120% 100% at 50% 45%, #000 55%, transparent 100%);
+}
+.card-win > canvas{ position:relative; z-index:1; }
+/* le thème pose « position:relative » sur TOUS les boutons du jeu, et
+   avec une spécificité supérieure : il faut donc passer outre, sinon
+   la pastille retombe dans le flux et se retrouve sous la carte */
+.card > .card-cam{
+  position:absolute !important; top:6px; right:6px; z-index:4;
+  width:28px; height:28px; padding:0 !important; font-size:13px; line-height:1;
+  background:rgba(6,8,22,.72) !important; color:#EDEDF7 !important;
+  border:1px solid rgba(255,255,255,.28) !important; border-radius:50% !important;
+  box-shadow:none !important; cursor:pointer;
+}
+.card > .card-cam:active{ background:rgba(6,8,22,.95) !important; }
+
 /* ── Visionneuse de photo ─────────────────────────────────── */
 #lightbox{
   position:fixed; inset:0; z-index:200; display:flex;
@@ -4320,6 +4344,9 @@ function showNow(id){
   if(id!=="fly-screen" && typeof Fly !== "undefined") Fly.stop();           // stoppe le vol de nuit
   if(id!=="trv-screen" && typeof Trav !== "undefined") Trav.stop();         // stoppe la traversée
   if(id==="hub-screen"){
+    /* la galerie porte maintenant des photos : la visionneuse doit être
+       prête même si l'on n'a jamais ouvert le radar */
+    if(typeof Photo !== "undefined") Photo.wire();
     if(window.startHubAmbient) window.startHubAmbient();
     if(typeof Spin3D !== "undefined") Spin3D.start();   // relance la rotation des pièces
   }
@@ -4528,6 +4555,44 @@ function celebrateRankUp(rank){
   showToast();
 }
 
+/* ── LA PHOTO DU LIEU, SUR LA CARTE DE LA GALERIE ─────────────
+   C'est là qu'on regarde les huit pièces, donc c'est là qu'il faut
+   pouvoir voir à quoi ressemble l'endroit — sans avoir à ouvrir le
+   radar, et sans réseau.
+
+   Elle se pose EN FOND, derrière l'invader qui tourne : on comprend
+   d'un coup d'œil que la pièce appartient à ce mur-là. Et une pastille
+   📷 l'ouvre en grand, avec le zoom et le téléchargement.
+
+   Volontairement affichée aussi sur les pièces PAS ENCORE TROUVÉES :
+   c'est justement à ce moment-là qu'elle sert à quelque chose. */
+function poserPhoto(card, st){
+  const ph = Object.assign({}, (CONFIG.map && CONFIG.map.photos) || {},
+                           (()=>{ try{ return JSON.parse(localStorage.getItem("invasionLesVans:spotshots") || "{}"); }
+                                  catch(e){ return {}; } })());
+  const img = ph[st.code];
+  if(!img) return;
+  const win = card.querySelector(".card-win");
+  if(!win) return;
+  win.style.position = "relative";
+  win.insertAdjacentHTML("afterbegin",
+    `<img class="card-mur" src="${img}" alt="Le mur de ${st.code}">`);
+  const b = document.createElement("button");
+  b.className = "card-cam"; b.type = "button";
+  b.textContent = "📷";
+  b.setAttribute("aria-label", "Voir la photo du mur de " + st.code);
+  b.addEventListener("click", e=>{
+    /* sans ça, on lancerait le mini-jeu en voulant juste regarder */
+    e.stopPropagation();
+    const nt = Object.assign({}, (CONFIG.map && CONFIG.map.notes) || {},
+                             (()=>{ try{ return JSON.parse(localStorage.getItem("invasionLesVans:spotnotes") || "{}"); }
+                                    catch(e){ return {}; } })());
+    AudioFX.select();
+    Photo.open(img, "Le mur de " + st.code, nt[st.code] || "", "mur-" + st.code);
+  });
+  card.appendChild(b);
+}
+
 function renderHub(){
   Spin3D.clear();                 // les canvas sont recréés : on repart d'un registre vide
   rollScore(S.points);
@@ -4592,6 +4657,7 @@ function renderHub(){
       card.innerHTML = `<div class="card-top">${st.code}</div>
                         <div class="card-win"></div>
                         <span class="pts">${starsTxt}</span>${replay}`;
+      poserPhoto(card, st);
       const cv = document.createElement("canvas");
       cv.width = 150; cv.height = 122;
       cv.style.cssText = "width:75px;height:61px;";
@@ -4608,6 +4674,7 @@ function renderHub(){
       card.innerHTML = `<div class="card-top locked">${st.code}</div>
                         <div class="card-win" style="position:relative;"></div>
                         <span class="pts">${st.points} PTS</span>`;
+      poserPhoto(card, st);
       const cvL = document.createElement("canvas");
       cvL.width = 150; cvL.height = 122;
       cvL.style.cssText = "width:78px;height:64px;opacity:.85;filter:brightness(.8) saturate(.7);";
@@ -8667,7 +8734,9 @@ const Photo = (()=>{
   }
   function onUp(){ drag = null; pinch = null; }
 
+  let branche = false;
   function wire(){
+    if(branche) return; branche = true;
     box = $("#lightbox"); img = $("#lb-img");
     $("#lb-close").addEventListener("click", close);
     /* toucher le fond referme — mais pas l'image ni les boutons */
@@ -8872,20 +8941,28 @@ const Radar = (()=>{
     let z = Math.round(Math.log2(156543.03392*Math.cos(lat*Math.PI/180)/mpp));
     return Math.max(13, Math.min(19, z));
   }
+  let nTuiles = 0, nRatees = 0, dernierEssai = 0;
   function getTuile(z, x, y){
     const n = Math.pow(2, z);
     if(y < 0 || y >= n) return null;
     x = ((x % n) + n) % n;
     const url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
     let im = tuiles.get(url);
-    if(im === undefined){
+    if(im === undefined || (im.rate && performance.now() - im.quand > 20000)){
+      /* PAS de crossOrigin. On n'a jamais besoin de relire les pixels
+         de cette carte — et l'exiger ajoutait une condition de plus à
+         remplir pour qu'une tuile s'affiche, donc une panne possible
+         de plus, pour rien. Une image ordinaire suffit à la dessiner.
+
+         Une tuile en échec est réessayée au bout de vingt secondes :
+         un tunnel, un ascenseur, une seconde sans réseau ne doivent
+         pas condamner définitivement un morceau de carte. */
       im = new Image();
-      im.crossOrigin = "anonymous";     // sinon la carte ne serait pas relisible
-      im.onerror = ()=>{ im.rate = true; };
+      im.quand = performance.now();
+      im.onload = ()=>{ nTuiles++; };
+      im.onerror = ()=>{ im.rate = true; nRatees++; };
       im.src = url;
       tuiles.set(url, im);
-      /* on borne la mémoire : au-delà, les plus anciennes partent —
-         le cache du service worker, lui, les garde sur le disque */
       if(tuiles.size > 400){ const k = tuiles.keys().next().value; tuiles.delete(k); }
     }
     return im;
@@ -8909,6 +8986,20 @@ const Radar = (()=>{
       c.drawImage(im, sx, sy, TUILE*ech + 1, TUILE*ech + 1);
     }
     c.restore();
+    /* ── DIRE QUAND LE FOND MANQUE ────────────────────────────
+       Une carte vide peut passer pour une panne du jeu alors que
+       c'est simplement le réseau. On le dit, et on rappelle le
+       remède — télécharger le village une fois pour toutes. */
+    if(nTuiles === 0 && nRatees > 0){
+      c.font = "12px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillStyle = "rgba(8,10,26,.8)";
+      c.fillRect(10, H/2 - 26, W - 20, 52);
+      c.fillStyle = "rgba(255,206,77,.95)";
+      c.fillText("Fond de carte indisponible", W/2, H/2 - 8);
+      c.fillStyle = "rgba(200,210,240,.75)";
+      c.fillText("Réseau coupé ? Les pièces restent placées.", W/2, H/2 + 10);
+    }
     /* la mention, exigée par la licence d'OpenStreetMap */
     c.font = "9px " + (getComputedStyle(document.body).fontFamily || "sans-serif");
     c.textAlign = "right"; c.textBaseline = "bottom";
@@ -9600,6 +9691,7 @@ const Radar = (()=>{
       + ` · ${immo>0.6?"immobile (moyennage)":"en marche"}\n`
       + `cap ${cap!=null?Math.round(cap)+"°":"—"} · relevés ${nFix} · trace ${trail.length} pts\n`
       + `carte : ${vue.mpp.toFixed(2)} m/px · ${suivre?"suit ta position":"déplacée à la main"}\n`
+      + `tuiles : ${nTuiles} chargées, ${nRatees} en échec\n`
       + `pièces enregistrées ${Object.keys(loadSpots()).length}/8`;
   }
 
@@ -21954,7 +22046,7 @@ const Options = (()=>{
         <div class="opt-sub">La visite guidée du repaire par Squiddy</div></div>
         <button id="opt-tuto" class="b3" style="font-size:13px">Lancer</button></div>`);
     host.insertAdjacentHTML("beforeend",
-      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v118</p>`);
+      `<p class="sub" style="text-align:center; font-size:13px; opacity:.6; margin-top:6px;">L'Invasion des Vans · v119</p>`);
     wire();
   }
   function wire(){
